@@ -30,5 +30,4 @@ pub use ppt_sign::*;
 pub use pre_sign::*;
 pub use sign_detail::*;
 
-pub static UA: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 (schild:eaf4fb193ec970c0a9775e2a27b0232b) (device:iPhone11,2) Language/zh-Hans com.ssreader.ChaoXingStudy/ChaoXingStudy_3_6.0.2_ios_phone_202209281930_99 (@Kalimdor)_1665876591620212942";
 pub static QRCODE_PAT: &str = "https://mobilelearn.chaoxing.com/widget/sign/e";

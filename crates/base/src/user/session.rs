@@ -5,7 +5,6 @@ use crate::activity::{
 };
 use crate::course::Course;
 use crate::protocol;
-use crate::protocol::UA;
 use crate::utils::CONFIG_DIR;
 use serde::Deserialize;
 use std::fs::File;
@@ -13,7 +12,7 @@ use std::{
     hash::Hash,
     ops::{Deref, Index},
 };
-use ureq::{Agent, AgentBuilder};
+use ureq::Agent;
 
 #[derive(Debug)]
 pub struct Session {
@@ -39,28 +38,10 @@ impl Hash for Session {
 }
 
 impl Session {
-    pub async fn load_json<P: AsRef<std::path::Path>>(
-        cookies_file: P,
-    ) -> Result<Self, ureq::Error> {
-        let cookie_store = {
-            let file = std::fs::File::open(cookies_file)
-                .map(std::io::BufReader::new)
-                .unwrap();
-            cookie_store::CookieStore::load_json(file).unwrap()
-        };
-        let cookies = {
-            let mut cookies = Vec::new();
-            for c in cookie_store.iter_any() {
-                cookies.push(c.to_owned())
-            }
-            cookies
-        };
-        let cookies = UserCookies::new(cookies);
-        let client = AgentBuilder::new()
-            .user_agent(UA)
-            .cookie_store(cookie_store)
-            .build();
-        let stu_name = Self::find_stu_name_in_html(&client).await?;
+    pub fn load_json<P: AsRef<std::path::Path>>(cookies_file: P) -> Result<Self, ureq::Error> {
+        let client = login::load_json(cookies_file);
+        let cookies = UserCookies::new(&client);
+        let stu_name = Self::find_stu_name_in_html(&client)?;
         println!("用户[{}]加载 Cookies 成功！", stu_name);
         Ok(Session {
             agent: client,
@@ -79,57 +60,14 @@ impl Session {
         &self.stu_name
     }
 
-    pub async fn login(account: &str, enc_passwd: &str) -> Result<Session, ureq::Error> {
-        let cookie_store = cookie_store::CookieStore::new(None);
-        let client = AgentBuilder::new()
-            .user_agent(UA)
-            .cookie_store(cookie_store)
-            .build();
-        let response = login::protocol::login_enc(&client, account, enc_passwd).await?;
-        /// TODO: 存疑
-        #[derive(Deserialize)]
-        struct LoginR {
-            url: Option<String>,
-            msg1: Option<String>,
-            msg2: Option<String>,
-            status: bool,
-        }
-        let LoginR {
-            status,
-            url,
-            msg1,
-            msg2,
-        } = response.into_json().unwrap();
-        let mut mes = Vec::new();
-        if let Some(url) = url {
-            mes.push(url);
-        }
-        if let Some(msg1) = msg1 {
-            mes.push(msg1);
-        }
-        if let Some(msg2) = msg2 {
-            mes.push(msg2);
-        }
-        if !status {
-            for mes in mes {
-                eprintln!("{mes:?}");
-            }
-            panic!("登录失败！");
-        }
-        // Write store back to disk
-        let mut writer = std::fs::File::create(CONFIG_DIR.join(account.to_string() + ".json"))
-            .map(std::io::BufWriter::new)
-            .unwrap();
-        let store = {
-            let mut r = Vec::new();
-            for s in client.cookie_store().iter_any() {
-                r.push(s.to_owned());
-            }
-            r
-        };
-        client.cookie_store().save_json(&mut writer).unwrap();
-        let cookies = UserCookies::new(store);
-        let stu_name = Self::find_stu_name_in_html(&client).await?;
+    pub fn login(account: &str, enc_passwd: &str) -> Result<Session, ureq::Error> {
+        let client = login::login_enc(
+            account,
+            enc_passwd,
+            Some(CONFIG_DIR.join(account.to_string() + ".json")),
+        );
+        let cookies = UserCookies::new(&client);
+        let stu_name = Self::find_stu_name_in_html(&client)?;
         println!("用户[{}]登录成功！", stu_name);
         Ok(Session {
             agent: client,
@@ -144,7 +82,7 @@ impl Session {
         println!("用户[{}]已获取课程列表。", self.stu_name);
         Ok(courses)
     }
-    async fn find_stu_name_in_html(client: &Agent) -> Result<String, ureq::Error> {
+    fn find_stu_name_in_html(client: &Agent) -> Result<String, ureq::Error> {
         let r = protocol::account_manage(client)?;
         let html_content = r.into_string().unwrap();
         #[cfg(debug_assertions)]

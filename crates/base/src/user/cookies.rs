@@ -1,4 +1,5 @@
 use cookie_store::Cookie;
+use ureq::Agent;
 #[allow(non_snake_case)]
 #[derive(Debug)]
 pub struct UserCookies {
@@ -20,8 +21,18 @@ pub struct UserCookies {
 }
 
 impl UserCookies {
+    pub fn new(client: &Agent) -> Self {
+        let cookies = {
+            let mut cookies = Vec::new();
+            for c in client.cookie_store().iter_any() {
+                cookies.push(c.to_owned());
+            }
+            cookies
+        };
+        UserCookies::from_cookies_vec(cookies)
+    }
     #[allow(non_snake_case)]
-    fn new_(
+    fn create(
         // JSESSIONID: &str,
         // lv: &str,
         // uf: &str,
@@ -57,7 +68,7 @@ impl UserCookies {
         }
     }
     #[allow(non_snake_case)]
-    pub fn new(cookies: Vec<Cookie>) -> Self {
+    pub fn from_cookies_vec(cookies: Vec<Cookie>) -> Self {
         // let mut JSESSIONID = String::new();
         // let mut lv = String::new();
         // let mut uf = String::new();
@@ -153,6 +164,6 @@ impl UserCookies {
 
 impl Default for UserCookies {
     fn default() -> Self {
-        Self::new_("-1", "")
+        Self::create("-1", "")
     }
 }

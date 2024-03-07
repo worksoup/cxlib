@@ -56,7 +56,7 @@ pub async fn chat_group_location_sign(
     client
         .post(url)
         .set(
-            "content-type",
+            "Content-Type",
             "application/x-www-form-urlencoded; charset=UTF-8",
         )
         .send_string(&body)
