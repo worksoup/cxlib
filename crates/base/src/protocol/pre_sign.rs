@@ -1,10 +1,10 @@
-use base::course::Course;
+use crate::course::Course;
 use ureq::{Agent, Response};
 
 // 预签到
 static PRE_SIGN: &str = "https://mobilelearn.chaoxing.com/newsign/preSign";
 
-pub async fn pre_sign(
+pub fn pre_sign(
     client: &Agent,
     course: Course,
     active_id: &str,

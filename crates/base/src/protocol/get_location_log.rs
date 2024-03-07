@@ -1,4 +1,4 @@
-use base::course::Course;
+use crate::course::Course;
 use ureq::{Agent, Response};
 
 // 获取位置信息列表

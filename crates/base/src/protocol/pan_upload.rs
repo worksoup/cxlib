@@ -6,7 +6,7 @@ static PAN_UPLOAD: &str = "https://pan-yz.chaoxing.com/upload";
 
 pub async fn pan_upload(
     client: &Agent,
-    file: std::fs::File,
+    file: &std::fs::File,
     uid: &str,
     token: &str,
     file_name: &str,

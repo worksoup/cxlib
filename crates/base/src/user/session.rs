@@ -1,78 +1,70 @@
-pub mod cookies;
-pub mod course;
-
+use super::cookies::UserCookies;
 use crate::activity::{
-    sign::Struct签到,
-    {Enum活动, Struct非签到活动},
+    sign::{Sign, SignTrait},
+    Activity, OtherActivity,
 };
+use crate::course::Course;
 use crate::protocol;
 use crate::protocol::UA;
-use crate::session::course::{GetCoursesR, Struct课程};
-use crate::utils::配置文件夹;
-use cookies::UserCookies;
-use futures::{stream::FuturesUnordered, StreamExt};
-use reqwest::{Client, ClientBuilder};
-use serde_derive::Deserialize;
+use crate::utils::CONFIG_DIR;
+use serde::Deserialize;
+use std::fs::File;
 use std::{
-    cmp::Ordering,
     hash::Hash,
     ops::{Deref, Index},
 };
+use ureq::{Agent, AgentBuilder};
 
 #[derive(Debug)]
-pub struct Struct签到会话 {
-    client: Client,
-    用户真名: String,
+pub struct Session {
+    agent: Agent,
+    stu_name: String,
     cookies: UserCookies,
 }
 
-impl PartialEq for Struct签到会话 {
+impl PartialEq for Session {
     fn eq(&self, other: &Self) -> bool {
         self.get_uid() == other.get_uid()
     }
 }
 
-impl Eq for Struct签到会话 {}
+impl Eq for Session {}
 
-impl Hash for Struct签到会话 {
+impl Hash for Session {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.get_uid().hash(state);
         self.get_fid().hash(state);
-        self.get_用户真名().hash(state);
+        self.get_stu_name().hash(state);
     }
 }
 
-impl Struct签到会话 {
-    pub async fn 从cookies文件加载<P: AsRef<std::path::Path>>(
-        cookies路径: P,
-    ) -> Result<Self, reqwest::Error> {
+impl Session {
+    pub async fn load_json<P: AsRef<std::path::Path>>(
+        cookies_file: P,
+    ) -> Result<Self, ureq::Error> {
         let cookie_store = {
-            let cookies文件 = std::fs::File::open(cookies路径)
+            let file = std::fs::File::open(cookies_file)
                 .map(std::io::BufReader::new)
                 .unwrap();
-            reqwest_cookie_store::CookieStore::load_json(cookies文件).unwrap()
+            cookie_store::CookieStore::load_json(file).unwrap()
         };
-        let cookie_store = reqwest_cookie_store::CookieStoreMutex::new(cookie_store);
-        let cookie_store = std::sync::Arc::new(cookie_store);
         let cookies = {
-            let store = cookie_store.lock().unwrap();
             let mut cookies = Vec::new();
-            for c in store.iter_any() {
+            for c in cookie_store.iter_any() {
                 cookies.push(c.to_owned())
             }
             cookies
         };
         let cookies = UserCookies::new(cookies);
-        let client = Client::builder()
+        let client = AgentBuilder::new()
             .user_agent(UA)
-            .cookie_provider(std::sync::Arc::clone(&cookie_store))
-            .build()
-            .unwrap();
-        let 用户真名 = Self::获取用户真名(&client).await?;
-        println!("用户[{}]加载 Cookies 成功！", 用户真名);
-        Ok(Struct签到会话 {
-            client,
-            用户真名,
+            .cookie_store(cookie_store)
+            .build();
+        let stu_name = Self::find_stu_name_in_html(&client).await?;
+        println!("用户[{}]加载 Cookies 成功！", stu_name);
+        Ok(Session {
+            agent: client,
+            stu_name,
             cookies,
         })
     }
@@ -83,22 +75,17 @@ impl Struct签到会话 {
         self.cookies.get_fid()
     }
 
-    pub fn get_用户真名(&self) -> &str {
-        &self.用户真名
+    pub fn get_stu_name(&self) -> &str {
+        &self.stu_name
     }
 
-    pub async fn 通过账号密码登录(
-        账号: &str,
-        加密过的密码: &str,
-    ) -> Result<Struct签到会话, reqwest::Error> {
-        let cookie_store = reqwest_cookie_store::CookieStore::new(None);
-        let cookie_store = reqwest_cookie_store::CookieStoreMutex::new(cookie_store);
-        let cookie_store = std::sync::Arc::new(cookie_store);
-        let client = ClientBuilder::new()
+    pub async fn login(account: &str, enc_passwd: &str) -> Result<Session, ureq::Error> {
+        let cookie_store = cookie_store::CookieStore::new(None);
+        let client = AgentBuilder::new()
             .user_agent(UA)
-            .cookie_provider(std::sync::Arc::clone(&cookie_store))
-            .build()?;
-        let response = protocol::login_enc(&client, 账号, 加密过的密码).await?;
+            .cookie_store(cookie_store)
+            .build();
+        let response = login::protocol::login_enc(&client, account, enc_passwd).await?;
         /// TODO: 存疑
         #[derive(Deserialize)]
         struct LoginR {
@@ -112,7 +99,7 @@ impl Struct签到会话 {
             url,
             msg1,
             msg2,
-        } = response.json().await.unwrap();
+        } = response.into_json().unwrap();
         let mut mes = Vec::new();
         if let Some(url) = url {
             mes.push(url);
@@ -129,58 +116,37 @@ impl Struct签到会话 {
             }
             panic!("登录失败！");
         }
-        {
-            // Write store back to disk
-            let mut writer = std::fs::File::create(配置文件夹.join(账号.to_string() + ".json"))
-                .map(std::io::BufWriter::new)
-                .unwrap();
-            let store = cookie_store.lock().unwrap();
-            store.save_json(&mut writer).unwrap();
-        }
+        // Write store back to disk
+        let mut writer = std::fs::File::create(CONFIG_DIR.join(account.to_string() + ".json"))
+            .map(std::io::BufWriter::new)
+            .unwrap();
         let store = {
-            let s = cookie_store.clone();
-            let s = s.lock().unwrap();
             let mut r = Vec::new();
-            for s in s.iter_any() {
+            for s in client.cookie_store().iter_any() {
                 r.push(s.to_owned());
             }
             r
         };
+        client.cookie_store().save_json(&mut writer).unwrap();
         let cookies = UserCookies::new(store);
-        let 用户真名 = Self::获取用户真名(&client).await?;
-        println!("用户[{用户真名}]登录成功！");
-        Ok(Struct签到会话 {
-            client,
-            用户真名,
+        let stu_name = Self::find_stu_name_in_html(&client).await?;
+        println!("用户[{}]登录成功！", stu_name);
+        Ok(Session {
+            agent: client,
+            stu_name,
             cookies,
         })
     }
 
-    pub async fn 获取课程列表(&self) -> Result<Vec<Struct课程>, reqwest::Error> {
+    pub async fn get_courses(&self) -> Result<Vec<Course>, ureq::Error> {
         let r = protocol::back_clazz_data(self.deref()).await?;
-        let r: GetCoursesR = r.json().await.unwrap();
-        let mut arr = Vec::new();
-        for c in r.channel_list {
-            if let Some(data) = c.content.课程 {
-                for course in data.data {
-                    if c.班级号.is_i64() {
-                        arr.push(Struct课程::new(
-                            course.课程号,
-                            c.班级号.as_i64().unwrap(),
-                            course.任课教师.as_str(),
-                            course.封面图url.as_str(),
-                            course.课程名.as_str(),
-                        ))
-                    }
-                }
-            }
-        }
-        println!("用户[{}]已获取课程列表。", self.用户真名);
-        Ok(arr)
+        let courses = Course::get_list_from_response(r)?;
+        println!("用户[{}]已获取课程列表。", self.stu_name);
+        Ok(courses)
     }
-    async fn 获取用户真名(client: &Client) -> Result<String, reqwest::Error> {
-        let r = protocol::account_manage(client).await?;
-        let html_content = r.text().await?;
+    async fn find_stu_name_in_html(client: &Agent) -> Result<String, ureq::Error> {
+        let r = protocol::account_manage(client)?;
+        let html_content = r.into_string().unwrap();
         #[cfg(debug_assertions)]
         println!("{html_content}");
         let e = html_content.find("colorBlue").unwrap();
@@ -192,66 +158,60 @@ impl Struct签到会话 {
             .trim();
         Ok(name.to_owned())
     }
-    pub async fn 获取网盘token(&self) -> Result<String, reqwest::Error> {
+    pub async fn get_pan_token(&self) -> Result<String, ureq::Error> {
         let r = protocol::pan_token(self).await?;
         #[derive(Deserialize)]
         struct Tmp {
-            _token: String,
+            #[serde(alias = "_token")]
+            token: String,
         }
-        let r: Tmp = r.json().await.unwrap();
-        Ok(r._token)
+        let r: Tmp = r.into_json().unwrap();
+        Ok(r.token)
     }
 
-    pub async fn 上传在线图片(
-        &self,
-        buffer: Vec<u8>,
-        file_name: &str,
-    ) -> Result<String, reqwest::Error> {
-        let token = self.获取网盘token().await?;
-        let r = protocol::pan_upload(self, buffer, self.get_uid(), &token, file_name).await?;
+    pub async fn upload_image(&self, file: &File, file_name: &str) -> Result<String, ureq::Error> {
+        let token = self.get_pan_token().await?;
+        let r = protocol::pan_upload(self, file, self.get_uid(), &token, file_name).await?;
         #[derive(Deserialize)]
-        #[allow(non_snake_case)]
         struct Tmp {
-            objectId: String,
+            #[serde(alias = "objectId")]
+            object_id: String,
         }
-        let tmp: Tmp = r.json().await.unwrap();
-        Ok(tmp.objectId)
+        let tmp: Tmp = r.into_json().unwrap();
+        Ok(tmp.object_id)
     }
 }
 
-impl Struct签到会话 {
-    pub async fn 遍历课程以获取所有活动(
+impl Session {
+    pub async fn get_all_activities(
         &self,
-    ) -> Result<(Vec<Struct签到>, Vec<Struct签到>, Vec<Struct非签到活动>), reqwest::Error> {
+    ) -> Result<(Vec<Sign>, Vec<Sign>, Vec<OtherActivity>), ureq::Error> {
         let mut 有效签到列表 = Vec::new();
         let mut 其他签到列表 = Vec::new();
         let mut 非签到活动列表 = Vec::new();
-        let mut tasks = FuturesUnordered::new();
-        let 课程列表 = self.获取课程列表().await?;
+        let 课程列表 = self.get_courses().await?;
         for c in 课程列表 {
-            tasks.push(Enum活动::获取课程的所有活动(self, c));
-        }
-        while let Some(item) = tasks.next().await {
-            for a in item? {
-                if let Enum活动::签到(签到) = a {
-                    if 签到.是否有效() {
+            let item = Activity::get_list_from_course(self, &c)?;
+            for a in item {
+                if let Activity::签到(签到) = a {
+                    if 签到.is_valid() {
                         有效签到列表.push(签到);
                     } else {
                         其他签到列表.push(签到);
                     }
-                } else if let Enum活动::非签到活动(非签到活动) = a {
+                } else if let Activity::非签到活动(非签到活动) = a {
                     非签到活动列表.push(非签到活动);
                 }
             }
         }
-        有效签到列表.sort_by(|a1, a2| -> Ordering { a1.开始时间戳.cmp(&a2.开始时间戳) });
+        有效签到列表.sort();
         Ok((有效签到列表, 其他签到列表, 非签到活动列表))
     }
 }
 
-impl Deref for Struct签到会话 {
-    type Target = Client;
-    fn deref(&self) -> &Client {
-        &self.client
+impl Deref for Session {
+    type Target = Agent;
+    fn deref(&self) -> &Agent {
+        &self.agent
     }
 }

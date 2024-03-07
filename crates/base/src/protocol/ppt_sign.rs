@@ -1,10 +1,10 @@
-use base::location::Location;
+use crate::location::Location;
 use ureq::{Agent, Response};
 
 // 签到
 static PPT_SIGN: &str = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax";
 
-pub async fn general_sign(
+pub fn general_sign(
     session: &Agent,
     uid: &str,
     fid: &str,
@@ -14,7 +14,7 @@ pub async fn general_sign(
     session.get(&format!("{PPT_SIGN}?activeId={active_id}&uid={uid}&clientip=&latitude=-1&longitude=-1&appType=15&fid={fid}&name={stu_name}")).call()
 }
 
-pub async fn photo_sign(
+pub fn photo_sign(
     session: &Agent,
     uid: &str,
     fid: &str,
@@ -26,7 +26,7 @@ pub async fn photo_sign(
     session.get(&format!("{PPT_SIGN}?activeId={active_id}&uid={uid}&clientip=&useragent=&latitude=-1&longitude=-1&appType=15&fid={fid}&objectId={object_id}&name={}", percent_encoding::utf8_percent_encode(stu_name, percent_encoding::NON_ALPHANUMERIC))).call()
 }
 
-pub async fn qrcode_sign(
+pub fn qrcode_sign(
     session: &Agent,
     uid: &str,
     fid: &str,
@@ -51,7 +51,7 @@ pub async fn qrcode_sign(
     session.get(&url).call()
 }
 
-pub async fn location_sign(
+pub fn location_sign(
     session: &Agent,
     uid: &str,
     fid: &str,
@@ -68,7 +68,7 @@ pub async fn location_sign(
     session.get(&url).call()
 }
 
-pub async fn signcode_sign(
+pub fn signcode_sign(
     session: &Agent,
     uid: &str,
     fid: &str,
