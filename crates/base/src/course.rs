@@ -53,15 +53,15 @@ impl Course {
             name: name.into(),
         }
     }
-    fn from_raw(raw: &CourseRaw, class_id: i64) -> Course {
-        Self {
-            id: raw.id,
-            class_id,
-            teacher: raw.teacher.clone(),
-            image_url: raw.image_url.clone(),
-            name: raw.name.clone(),
-        }
-    }
+    // fn from_raw(raw: &CourseRaw, class_id: i64) -> Course {
+    //     Self {
+    //         id: raw.id,
+    //         class_id,
+    //         teacher: raw.teacher.clone(),
+    //         image_url: raw.image_url.clone(),
+    //         name: raw.name.clone(),
+    //     }
+    // }
     pub fn get_id(&self) -> i64 {
         self.id
     }

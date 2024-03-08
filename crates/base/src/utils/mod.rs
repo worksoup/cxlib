@@ -1,24 +1,4 @@
-use des::{
-    cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit},
-    Des,
-};
-use directories::ProjectDirs;
-use lazy_static::lazy_static;
-use std::path::PathBuf;
 use unicode_width::UnicodeWidthStr;
-lazy_static! {
-    pub static ref CONFIG_DIR: PathBuf = {
-        let is_testing = std::env::var("TEST_CXSIGN").is_ok();
-        let binding = ProjectDirs::from("rt.lea", "worksoup", "newsign").unwrap();
-        let dir = if is_testing {
-            binding.config_dir().join("test").to_owned()
-        } else {
-            binding.config_dir().to_owned()
-        };
-        let _ = std::fs::create_dir_all(dir.clone());
-        dir
-    };
-}
 
 pub fn print_now() {
     let str = chrono::DateTime::<chrono::Local>::from(std::time::SystemTime::now())

@@ -8,8 +8,8 @@ use sign::SignTrait;
 
 #[derive(Debug)]
 pub enum Activity {
-    签到(Sign),
-    非签到活动(OtherActivity),
+    Sign(Sign),
+    Other(OtherActivity),
 }
 
 impl Activity {
@@ -39,9 +39,9 @@ impl Activity {
                             开始时间戳: (ar.startTime / 1000) as i64,
                             签到信息: detail,
                         };
-                        活动列表.push(Activity::签到(base_sign.to_sign()))
+                        活动列表.push(Activity::Sign(base_sign.to_sign()))
                     } else {
-                        活动列表.push(Activity::非签到活动(OtherActivity {
+                        活动列表.push(Activity::Other(OtherActivity {
                             id: ar.id.to_string(),
                             name: ar.nameOne,
                             course: c.clone(),
@@ -50,7 +50,7 @@ impl Activity {
                         }))
                     }
                 } else {
-                    活动列表.push(Activity::非签到活动(OtherActivity {
+                    活动列表.push(Activity::Other(OtherActivity {
                         id: ar.id.to_string(),
                         name: ar.nameOne,
                         course: c.clone(),

@@ -1,11 +1,13 @@
 use super::cookies::UserCookies;
-use crate::activity::{
-    sign::{Sign, SignTrait},
-    Activity, OtherActivity,
-};
 use crate::course::Course;
 use crate::protocol;
-use crate::utils::CONFIG_DIR;
+use crate::{
+    activity::{
+        sign::{Sign, SignTrait},
+        Activity, OtherActivity,
+    },
+    get_json_file_path,
+};
 use serde::Deserialize;
 use std::fs::File;
 use std::{
@@ -38,8 +40,8 @@ impl Hash for Session {
 }
 
 impl Session {
-    pub fn load_json<P: AsRef<std::path::Path>>(cookies_file: P) -> Result<Self, ureq::Error> {
-        let client = login::load_json(cookies_file);
+    pub fn load_json(account: &str) -> Result<Self, ureq::Error> {
+        let client = login::load_json(get_json_file_path(account));
         let cookies = UserCookies::new(&client);
         let stu_name = Self::find_stu_name_in_html(&client)?;
         println!("用户[{}]加载 Cookies 成功！", stu_name);
@@ -61,11 +63,7 @@ impl Session {
     }
 
     pub fn login(account: &str, enc_passwd: &str) -> Result<Session, ureq::Error> {
-        let client = login::login_enc(
-            account,
-            enc_passwd,
-            Some(CONFIG_DIR.join(account.to_string() + ".json")),
-        );
+        let client = login::login_enc(account, enc_passwd, Some(get_json_file_path(account)));
         let cookies = UserCookies::new(&client);
         let stu_name = Self::find_stu_name_in_html(&client)?;
         println!("用户[{}]登录成功！", stu_name);
@@ -131,13 +129,13 @@ impl Session {
         for c in 课程列表 {
             let item = Activity::get_list_from_course(self, &c)?;
             for a in item {
-                if let Activity::签到(签到) = a {
+                if let Activity::Sign(签到) = a {
                     if 签到.is_valid() {
                         有效签到列表.push(签到);
                     } else {
                         其他签到列表.push(签到);
                     }
-                } else if let Activity::非签到活动(非签到活动) = a {
+                } else if let Activity::Other(非签到活动) = a {
                     非签到活动列表.push(非签到活动);
                 }
             }

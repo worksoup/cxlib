@@ -11,3 +11,6 @@ ureq.worksoup = true
 serde = { worksoup = true, features = ["derive"] }
 serde_json.worksoup = true
 cookie_store.workspace = true
+des = "0.8"
+hex = "0.4"
+#hex-literal = "0.4"
