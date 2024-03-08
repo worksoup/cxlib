@@ -1,6 +1,6 @@
 use crate::activity::sign::{
-    Enum签到后状态, Enum签到结果, GestureSign, LocationSign, NormalSign, PhotoSign, QrCodeSign,
-    Sign, SignTrait, SigncodeSign, Struct签到信息,
+    SignState, GestureSign, LocationSign, NormalSign, PhotoSign, QrCodeSign, Sign, SignDetail,
+    SignResult, SignTrait, SigncodeSign,
 };
 use crate::course::Course;
 use crate::location::Location;
@@ -13,52 +13,53 @@ use ureq::Error;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct BaseSign {
-    pub 开始时间戳: i64,
-    pub 活动id: String,
-    pub 签到名: String,
-    pub 课程: Course,
+    pub start_timestamp: i64,
+    pub active_id: String,
+    pub name: String,
+    pub course: Course,
     pub other_id: String,
-    pub 状态码: i32,
-    pub 签到信息: Struct签到信息,
+    pub status_code: i32,
+    pub sign_detail: SignDetail,
 }
 impl SignTrait for BaseSign {
     fn is_valid(&self) -> bool {
         let time = std::time::SystemTime::from(
-            chrono::DateTime::from_timestamp(self.开始时间戳, 0).unwrap(),
+            chrono::DateTime::from_timestamp(self.start_timestamp, 0).unwrap(),
         );
         let one_hour = std::time::Duration::from_secs(7200);
-        self.状态码 == 1 && std::time::SystemTime::now().duration_since(time).unwrap() < one_hour
+        self.status_code == 1
+            && std::time::SystemTime::now().duration_since(time).unwrap() < one_hour
     }
-    fn get_attend_info(&self, 签到会话: &Session) -> Result<Enum签到后状态, ureq::Error> {
-        let r = crate::protocol::get_attend_info(&签到会话, &self.活动id)?;
+    fn get_attend_info(&self, session: &Session) -> Result<SignState, ureq::Error> {
+        let r = crate::protocol::get_attend_info(&session, &self.active_id)?;
         #[derive(Deserialize)]
         struct Data原始数据 {
-            #[allow(unused)]
             status: i64,
         }
         #[derive(Deserialize)]
         struct 原始数据 {
-            #[allow(unused)]
             data: Data原始数据,
         }
-        let r: 原始数据 = r.into_json().unwrap();
-        Ok(r.data.status.into())
+        let 原始数据 {
+            data: Data原始数据 { status },
+        } = r.into_json().unwrap();
+        Ok(status.into())
     }
-    fn pre_sign(&self, session: &Session) -> Result<Enum签到结果, ureq::Error> {
-        let active_id = self.活动id.as_str();
+    fn pre_sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
+        let active_id = self.active_id.as_str();
         let uid = session.get_uid();
         let response_of_pre_sign =
-            protocol::pre_sign(session, self.课程.clone(), active_id, uid, false, "", "")?;
+            protocol::pre_sign(session, self.course.clone(), active_id, uid, false, "", "")?;
         println!("用户[{}]预签到已请求。", session.get_stu_name());
         self.预签到_analysis部分(active_id, session, response_of_pre_sign)
     }
-    fn sign(&self, session: &Session) -> Result<Enum签到结果, Error> {
+    fn sign(&self, session: &Session) -> Result<SignResult, Error> {
         let r = protocol::general_sign(
             session,
             session.get_uid(),
             session.get_fid(),
             session.get_stu_name(),
-            self.活动id.as_str(),
+            self.active_id.as_str(),
         )?;
         Ok(Self::通过文本判断签到结果(
             &r.into_string().unwrap(),
@@ -107,11 +108,11 @@ impl BaseSign {
     pub fn to_sign(self) -> Sign {
         match self.other_id.parse::<u8>().unwrap_or_else(|e| {
             eprintln!("{}", self.other_id);
-            eprintln!("{}", self.课程.get_name());
+            eprintln!("{}", self.course.get_name());
             panic!("{e}")
         }) {
             0 => {
-                if self.是否为拍照签到() {
+                if self.is_photo_sign() {
                     Sign::Photo(PhotoSign {
                         base_sign: self,
                         photo: None,
@@ -129,42 +130,42 @@ impl BaseSign {
         }
     }
     pub fn display(&self, already_course: bool) {
-        let name_width = get_width_str_should_be(self.签到名.as_str(), 12);
+        let name_width = get_width_str_should_be(self.name.as_str(), 12);
         if already_course {
             println!(
                 "id: {}, name: {:>width$}, status: {}, time: {}, ok: {}",
-                self.活动id,
-                self.签到名,
-                self.状态码,
-                chrono::DateTime::from_timestamp(self.开始时间戳, 0).unwrap(),
+                self.active_id,
+                self.name,
+                self.status_code,
+                chrono::DateTime::from_timestamp(self.start_timestamp, 0).unwrap(),
                 self.is_valid(),
                 width = name_width,
             );
         } else {
             println!(
                 "id: {}, name: {:>width$}, status: {}, time: {}, ok: {}, course: {}/{}",
-                self.活动id,
-                self.签到名,
-                self.状态码,
-                chrono::DateTime::from_timestamp(self.开始时间戳, 0).unwrap(),
+                self.active_id,
+                self.name,
+                self.status_code,
+                chrono::DateTime::from_timestamp(self.start_timestamp, 0).unwrap(),
                 self.is_valid(),
-                self.课程.get_id(),
-                self.课程.get_name(),
+                self.course.get_id(),
+                self.course.get_name(),
                 width = name_width,
             );
         }
     }
 
-    fn 是否为拍照签到(&self) -> bool {
-        self.签到信息.is_photo
+    fn is_photo_sign(&self) -> bool {
+        self.sign_detail.is_photo
     }
 
-    pub fn 二维码是否刷新(&self) -> bool {
-        self.签到信息.is_refresh_qrcode
+    pub fn is_refesh_qrcode(&self) -> bool {
+        self.sign_detail.is_refresh_qrcode
     }
 
     pub fn get_二维码签到时的c参数(&self) -> &str {
-        &self.签到信息.c
+        &self.sign_detail.c
     }
 
     fn 预签到_analysis部分(
@@ -172,7 +173,7 @@ impl BaseSign {
         active_id: &str,
         session: &Session,
         response_of_presign: ureq::Response,
-    ) -> Result<Enum签到结果, ureq::Error> {
+    ) -> Result<SignResult, ureq::Error> {
         let response_of_analysis = protocol::analysis(session, active_id)?;
         let data = response_of_analysis.into_string().unwrap();
         let code = {
@@ -198,16 +199,14 @@ impl BaseSign {
                 let end_of_statuscontent_h1 = html.find('<').unwrap();
                 let id为statuscontent的h1的内容 = html[0..end_of_statuscontent_h1].trim();
                 if id为statuscontent的h1的内容 == "签到成功" {
-                    Enum签到结果::成功
+                    SignResult::Sussess
                 } else {
-                    Enum签到结果::失败 {
-                        失败信息: id为statuscontent的h1的内容.into(),
+                    SignResult::Fail {
+                        msg: id为statuscontent的h1的内容.into(),
                     }
                 }
             } else {
-                Enum签到结果::失败 {
-                    失败信息: html.into(),
-                }
+                SignResult::Fail { msg: html.into() }
             }
         };
         std::thread::sleep(std::time::Duration::from_millis(500));
@@ -219,11 +218,11 @@ impl BaseSign {
         c: &str,
         enc: &str,
         session: &Session,
-    ) -> Result<Enum签到结果, ureq::Error> {
-        let active_id = self.活动id.as_str();
+    ) -> Result<SignResult, ureq::Error> {
+        let active_id = self.active_id.as_str();
         let uid = session.get_uid();
         let response_of_presign =
-            protocol::pre_sign(session, self.课程.clone(), active_id, uid, true, c, enc)?;
+            protocol::pre_sign(session, self.course.clone(), active_id, uid, true, c, enc)?;
         println!("用户[{}]预签到已请求。", session.get_stu_name());
         self.预签到_analysis部分(active_id, session, response_of_presign)
     }
@@ -233,13 +232,13 @@ impl BaseSign {
     pub async fn 作为普通签到处理(
         &self,
         session: &Session,
-    ) -> Result<Enum签到结果, ureq::Error> {
+    ) -> Result<SignResult, ureq::Error> {
         let r = protocol::general_sign(
             session,
             session.get_uid(),
             session.get_fid(),
             session.get_stu_name(),
-            self.活动id.as_str(),
+            self.active_id.as_str(),
         )?;
         Ok(Self::通过文本判断签到结果(
             &r.into_string().unwrap(),
@@ -249,22 +248,22 @@ impl BaseSign {
         &self,
         session: &Session,
         signcode: &str,
-    ) -> Result<Enum签到结果, ureq::Error> {
-        if Self::check_signcode(session, &self.活动id, signcode).await? {
+    ) -> Result<SignResult, ureq::Error> {
+        if Self::check_signcode(session, &self.active_id, signcode).await? {
             let r = protocol::signcode_sign(
                 session,
                 session.get_uid(),
                 session.get_fid(),
                 session.get_stu_name(),
-                self.活动id.as_str(),
+                self.active_id.as_str(),
                 signcode,
             )?;
             Ok(Self::通过文本判断签到结果(
                 &r.into_string().unwrap(),
             ))
         } else {
-            Ok(Enum签到结果::失败 {
-                失败信息: "签到码或手势不正确".into(),
+            Ok(SignResult::Fail {
+                msg: "签到码或手势不正确".into(),
             })
         }
     }
@@ -273,14 +272,14 @@ impl BaseSign {
         address: &Location,
         session: &Session,
         是否限定位置: bool,
-    ) -> Result<Enum签到结果, ureq::Error> {
+    ) -> Result<SignResult, ureq::Error> {
         let r = protocol::location_sign(
             session,
             session.get_uid(),
             session.get_fid(),
             session.get_stu_name(),
             address,
-            self.活动id.as_str(),
+            self.active_id.as_str(),
             是否限定位置,
         )?;
         Ok(Self::通过文本判断签到结果(
@@ -291,13 +290,13 @@ impl BaseSign {
         &self,
         photo: &Photo,
         session: &Session,
-    ) -> Result<Enum签到结果, ureq::Error> {
+    ) -> Result<SignResult, ureq::Error> {
         let r = protocol::photo_sign(
             session,
             session.get_uid(),
             session.get_fid(),
             session.get_stu_name(),
-            self.活动id.as_str(),
+            self.active_id.as_str(),
             photo.get_object_id(),
         )?;
         Ok(Self::通过文本判断签到结果(
@@ -309,14 +308,14 @@ impl BaseSign {
         enc: &str,
         address: &Location,
         session: &Session,
-    ) -> Result<Enum签到结果, ureq::Error> {
+    ) -> Result<SignResult, ureq::Error> {
         let r = protocol::qrcode_sign(
             session,
             enc,
             session.get_uid(),
             session.get_fid(),
             session.get_stu_name(),
-            self.活动id.as_str(),
+            self.active_id.as_str(),
             address,
         )?;
         Ok(Self::通过文本判断签到结果(

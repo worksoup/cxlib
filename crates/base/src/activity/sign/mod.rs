@@ -49,7 +49,7 @@ impl SignTrait for Sign {
         }
     }
 
-    fn get_attend_info(&self, session: &Session) -> Result<Enum签到后状态, ureq::Error> {
+    fn get_attend_info(&self, session: &Session) -> Result<SignState, ureq::Error> {
         match self {
             Sign::Photo(a) => a.get_attend_info(session),
             Sign::Normal(a) => a.get_attend_info(session),
@@ -61,7 +61,7 @@ impl SignTrait for Sign {
         }
     }
 
-    fn pre_sign(&self, session: &Session) -> Result<Enum签到结果, ureq::Error> {
+    fn pre_sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
         match self {
             Sign::Photo(a) => a.pre_sign(session),
             Sign::Normal(a) => a.pre_sign(session),
@@ -73,7 +73,7 @@ impl SignTrait for Sign {
         }
     }
 
-    fn sign(&self, session: &Session) -> Result<Enum签到结果, ureq::Error> {
+    fn sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
         match self {
             Sign::Photo(a) => a.sign(session),
             Sign::Normal(a) => a.sign(session),
@@ -86,14 +86,14 @@ impl SignTrait for Sign {
     }
 }
 #[derive(Debug)]
-pub enum Enum签到结果 {
-    成功,
-    失败 { 失败信息: String },
+pub enum SignResult {
+    Sussess,
+    Fail { msg: String },
 }
 
 #[derive(num_enum::FromPrimitive, num_enum::IntoPrimitive)]
 #[repr(i64)]
-pub enum Enum签到后状态 {
+pub enum SignState {
     #[default]
     未签 = 0,
     签到成功 = 1,
@@ -119,7 +119,7 @@ pub struct SignActivityRaw {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Struct签到信息 {
+pub struct SignDetail {
     is_photo: bool,
     is_refresh_qrcode: bool,
     c: String,
@@ -127,43 +127,46 @@ pub struct Struct签到信息 {
 
 pub trait SignTrait: Ord {
     fn is_valid(&self) -> bool;
-    fn get_attend_info(&self, session: &Session) -> Result<Enum签到后状态, ureq::Error>;
-    fn 通过文本判断签到结果(text: &str) -> Enum签到结果 {
+    fn get_attend_info(&self, session: &Session) -> Result<SignState, ureq::Error>;
+    fn 通过文本判断签到结果(text: &str) -> SignResult {
         match text {
-            "success" => Enum签到结果::成功,
-            信息 => Enum签到结果::失败 {
-                失败信息: if 信息.is_empty() {
+            "success" => SignResult::Sussess,
+            msg => SignResult::Fail {
+                msg: if msg.is_empty() {
                     "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。"
                 } else {
-                    信息
+                    msg
                 }
                 .into(),
             },
         }
     }
-    fn pre_sign(&self, session: &Session) -> Result<Enum签到结果, ureq::Error>;
-    fn sign(&self, session: &Session) -> Result<Enum签到结果, ureq::Error>;
-    fn 通过active_id获取签到信息(
-        active_id: &str,
-        session: &Session,
-    ) -> Result<Struct签到信息, ureq::Error> {
+    fn pre_sign(&self, session: &Session) -> Result<SignResult, ureq::Error>;
+    fn sign(&self, session: &Session) -> Result<SignResult, ureq::Error>;
+    fn get_sign_detail(active_id: &str, session: &Session) -> Result<SignDetail, ureq::Error> {
         #[derive(Deserialize)]
-        #[allow(non_snake_case)]
         struct GetSignDetailR {
-            ifPhoto: i64,
-            ifRefreshEwm: i64,
-            signCode: Option<String>,
+            #[serde(alias = "ifPhoto")]
+            is_photo_sign: i64,
+            #[serde(alias = "ifRefreshEwm")]
+            is_refresh_qrcode: i64,
+            #[serde(alias = "signCode")]
+            sign_code: Option<String>,
         }
         let r = protocol::sign_detail(session, active_id)?;
         let GetSignDetailR {
-            ifPhoto,
-            ifRefreshEwm,
-            signCode,
+            is_photo_sign,
+            is_refresh_qrcode,
+            sign_code,
         } = r.into_json().unwrap();
-        Ok(Struct签到信息 {
-            is_photo: ifPhoto > 0,
-            is_refresh_qrcode: ifRefreshEwm > 0,
-            c: if let Some(c) = signCode { c } else { "".into() },
+        Ok(SignDetail {
+            is_photo: is_photo_sign > 0,
+            is_refresh_qrcode: is_refresh_qrcode > 0,
+            c: if let Some(c) = sign_code {
+                c
+            } else {
+                "".into()
+            },
         })
     }
 }

@@ -1,5 +1,5 @@
 use crate::activity::sign::base::BaseSign;
-use crate::activity::sign::{Enum签到后状态, Enum签到结果, SignTrait};
+use crate::activity::sign::{SignState, SignResult, SignTrait};
 use crate::user::session::Session;
 use ureq::Error;
 
@@ -13,15 +13,15 @@ impl SignTrait for QrCodeSign {
         self.base_sign.is_valid()
     }
 
-    fn get_attend_info(&self, session: &Session) -> Result<Enum签到后状态, Error> {
+    fn get_attend_info(&self, session: &Session) -> Result<SignState, Error> {
         self.base_sign.get_attend_info(session)
     }
 
-    fn pre_sign(&self, session: &Session) -> Result<Enum签到结果, Error> {
+    fn pre_sign(&self, session: &Session) -> Result<SignResult, Error> {
         self.base_sign.pre_sign(session)
     }
 
-    fn sign(&self, session: &Session) -> Result<Enum签到结果, Error> {
+    fn sign(&self, session: &Session) -> Result<SignResult, Error> {
         self.base_sign.sign(session)
     }
 }

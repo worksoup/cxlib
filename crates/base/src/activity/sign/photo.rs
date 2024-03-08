@@ -1,5 +1,5 @@
 use crate::activity::sign::base::BaseSign;
-use crate::activity::sign::{Enum签到后状态, Enum签到结果, SignTrait};
+use crate::activity::sign::{SignState, SignResult, SignTrait};
 use crate::photo::Photo;
 use crate::protocol;
 use crate::user::session::Session;
@@ -16,30 +16,30 @@ impl SignTrait for PhotoSign {
         self.base_sign.is_valid()
     }
 
-    fn get_attend_info(&self, session: &Session) -> Result<Enum签到后状态, Error> {
+    fn get_attend_info(&self, session: &Session) -> Result<SignState, Error> {
         self.base_sign.get_attend_info(session)
     }
 
-    fn pre_sign(&self, session: &Session) -> Result<Enum签到结果, Error> {
+    fn pre_sign(&self, session: &Session) -> Result<SignResult, Error> {
         self.base_sign.pre_sign(session)
     }
 
-    fn sign(&self, session: &Session) -> Result<Enum签到结果, Error> {
+    fn sign(&self, session: &Session) -> Result<SignResult, Error> {
         if let Some(photo) = self.photo.as_ref() {
             let r = protocol::photo_sign(
                 session,
                 session.get_uid(),
                 session.get_fid(),
                 session.get_stu_name(),
-                self.base_sign.活动id.as_str(),
+                self.base_sign.active_id.as_str(),
                 photo.get_object_id(),
             )?;
             Ok(Self::通过文本判断签到结果(
                 &r.into_string().unwrap(),
             ))
         } else {
-            Ok(Enum签到结果::失败 {
-                失败信息: "".to_string(),
+            Ok(SignResult::Fail {
+                msg: "".to_string(),
             })
         }
     }
