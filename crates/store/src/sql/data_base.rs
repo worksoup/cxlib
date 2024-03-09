@@ -22,10 +22,6 @@ impl DataBase {
         }
         let connection = Connection::open(db_dir.to_str().unwrap()).unwrap();
         let db = Self { connection };
-        // db.create_table_account();
-        // db.create_table_course();
-        // db.create_table_location();
-        // db.create_table_alias();
         db
     }
     pub fn add_table<'a, T: DataBaseTableTrait<'a>>(&'a self) -> T {
