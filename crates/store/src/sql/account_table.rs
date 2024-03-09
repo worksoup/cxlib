@@ -1,5 +1,4 @@
-use crate::sql::data_base::DataBase;
-use crate::sql::DataBaseTableTrait;
+use crate::sql::{DataBase, DataBaseTableTrait};
 use std::collections::HashMap;
 
 pub struct AccountTable<'a> {

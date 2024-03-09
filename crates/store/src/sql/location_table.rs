@@ -1,6 +1,5 @@
 use crate::sql::alias_table::AliasTable;
-use crate::sql::data_base::DataBase;
-use crate::sql::DataBaseTableTrait;
+use crate::sql::{DataBase, DataBaseTableTrait};
 use base::location::Location;
 use std::collections::HashMap;
 
@@ -64,7 +63,10 @@ impl<'a> LocationTable<'a> {
         }
     }
     pub fn get_locations(&self) -> HashMap<i64, (i64, Location)> {
-        let mut query = self.db.prepare("SELECT * FROM location;").unwrap();
+        let mut query = self
+            .db
+            .prepare(format!("SELECT * FROM {};", Self::TABLE_NAME))
+            .unwrap();
         let mut location_map = HashMap::new();
         for c in query.iter() {
             if let Ok(row) = c {
@@ -84,7 +86,7 @@ impl<'a> LocationTable<'a> {
     pub fn get_location(&self, location_id: i64) -> (i64, Location) {
         let mut query = self
             .db
-            .prepare("SELECT * FROM location WHERE lid=?;")
+            .prepare(format!("SELECT * FROM {} WHERE lid=?;", Self::TABLE_NAME))
             .unwrap();
         query.bind((1, location_id)).unwrap();
         let c: Vec<sqlite::Row> = query
@@ -100,27 +102,17 @@ impl<'a> LocationTable<'a> {
         (course_id, Location::new(addr, lon, lat, alt))
     }
     pub fn get_location_by_alias(&self, alias: &str) -> Option<Location> {
-        if AliasTable::from_ref(self.db).has_alias(alias) {
-            let mut query = self
-                .db
-                .prepare("SELECT * FROM alias WHERE name=?;")
-                .unwrap();
-            query.bind((1, alias)).unwrap();
-            let c: Vec<sqlite::Row> = query
-                .iter()
-                .filter_map(|e| if let Ok(e) = e { Some(e) } else { None })
-                .collect();
-            let row = &c[0];
-            let location_id: i64 = row.read("lid");
-            Some(self.get_location(location_id).1)
-        } else {
-            None
-        }
+        AliasTable::from_ref(self.db)
+            .get_location_id(alias)
+            .map(|id| self.get_location(id).1)
     }
     pub fn get_location_map_by_course(&self, course_id: i64) -> HashMap<i64, Location> {
         let mut query = self
             .db
-            .prepare("SELECT * FROM location WHERE courseid=?;")
+            .prepare(format!(
+                "SELECT * FROM {} WHERE courseid=?;",
+                Self::TABLE_NAME
+            ))
             .unwrap();
         query.bind((1, course_id)).unwrap();
         let mut location_map = HashMap::new();
@@ -141,7 +133,10 @@ impl<'a> LocationTable<'a> {
     pub fn get_location_list_by_course(&self, course_id: i64) -> Vec<Location> {
         let mut query = self
             .db
-            .prepare("SELECT * FROM location WHERE courseid=?;")
+            .prepare(format!(
+                "SELECT * FROM {} WHERE courseid=?;",
+                Self::TABLE_NAME
+            ))
             .unwrap();
         query.bind((1, course_id)).unwrap();
         let mut location_list = Vec::new();

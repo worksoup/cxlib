@@ -1,5 +1,5 @@
-use crate::sql::data_base::DataBase;
-use crate::sql::DataBaseTableTrait;
+use crate::sql::{DataBase, DataBaseTableTrait};
+use base::location::Location;
 
 pub struct AliasTable<'a> {
     db: &'a DataBase,
@@ -9,7 +9,10 @@ impl<'a> AliasTable<'a> {
     pub fn has_alias(&self, alias: &str) -> bool {
         let mut query = self
             .db
-            .prepare("SELECT count(*) FROM alias WHERE name=?;")
+            .prepare(format!(
+                "SELECT count(*) FROM {} WHERE name=?;",
+                Self::TABLE_NAME
+            ))
             .unwrap();
         query.bind((1, alias)).unwrap();
         query.next().unwrap();
@@ -17,19 +20,21 @@ impl<'a> AliasTable<'a> {
     }
 
     pub fn delete_alias(&self, alias: &str) {
-        let mut query = self.db.prepare("DELETE FROM alias WHERE name=?;").unwrap();
+        let mut query = self
+            .db
+            .prepare(format!("DELETE FROM {} WHERE name=?;", Self::TABLE_NAME))
+            .unwrap();
         query.bind((1, alias)).unwrap();
         query.next().unwrap();
     }
 
-    // pub fn 删除所有别名(&self) {
-    //     self.connection.execute("DELETE FROM alias;").unwrap();
-    // }
-
     pub fn add_alias_or<O: Fn(&Self, &str, i64)>(&self, alias: &str, location_id: i64, or: O) {
         let mut query = self
             .db
-            .prepare("INSERT INTO alias(name,lid) values(:name,:lid);")
+            .prepare(format!(
+                "INSERT INTO {}(name,lid) values(:name,:lid);",
+                Self::TABLE_NAME
+            ))
             .unwrap();
         query
             .bind::<&[(_, sqlite::Value)]>(
@@ -44,7 +49,10 @@ impl<'a> AliasTable<'a> {
     pub fn update_alias(&self, alias: &str, location_id: i64) {
         let mut query = self
             .db
-            .prepare("UPDATE alias SET name=:name,lid=:lid WHERE name=:name;")
+            .prepare(format!(
+                "UPDATE {} SET name=:name,lid=:lid WHERE name=:name;",
+                Self::TABLE_NAME
+            ))
             .unwrap();
         query
             .bind::<&[(_, sqlite::Value)]>(
@@ -54,7 +62,10 @@ impl<'a> AliasTable<'a> {
         query.next().unwrap();
     }
     pub fn get_aliases(&self, location_id: i64) -> Vec<String> {
-        let mut query = self.db.prepare("SELECT * FROM alias WHERE lid=?;").unwrap();
+        let mut query = self
+            .db
+            .prepare(format!("SELECT * FROM {} WHERE lid=?;", Self::TABLE_NAME))
+            .unwrap();
         query.bind((1, location_id)).unwrap();
         let mut aliases = Vec::new();
         for c in query.iter() {
@@ -66,6 +77,25 @@ impl<'a> AliasTable<'a> {
             }
         }
         aliases
+    }
+
+    pub fn get_location_id(&self, alias: &str) -> Option<i64> {
+        if self.has_alias(alias) {
+            let mut query = self
+                .db
+                .prepare(format!("SELECT * FROM {} WHERE name=?;", Self::TABLE_NAME))
+                .unwrap();
+            query.bind((1, alias)).unwrap();
+            let c: Vec<sqlite::Row> = query
+                .iter()
+                .filter_map(|e| if let Ok(e) = e { Some(e) } else { None })
+                .collect();
+            let row = &c[0];
+            let location_id: i64 = row.read("lid");
+            Some(location_id)
+        } else {
+            None
+        }
     }
 }
 

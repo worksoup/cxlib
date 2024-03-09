@@ -1,5 +1,4 @@
-use crate::sql::data_base::DataBase;
-use crate::sql::DataBaseTableTrait;
+use crate::sql::{DataBase, DataBaseTableTrait};
 use base::course::Course;
 use std::collections::HashMap;
 
