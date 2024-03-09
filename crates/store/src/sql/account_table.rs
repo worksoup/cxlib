@@ -1,3 +1,5 @@
+use base::user::session::Session;
+
 use crate::sql::{DataBase, DataBaseTableTrait};
 use std::collections::HashMap;
 
@@ -6,6 +8,35 @@ pub struct AccountTable<'a> {
 }
 
 impl<'a> AccountTable<'a> {
+    pub fn get_sessions_by_accounts_str(&self, accounts: &str) -> HashMap<String, Session> {
+        let str_list = accounts.split(',').map(|a| a.trim()).collect::<Vec<&str>>();
+        let mut s = HashMap::new();
+        for account in str_list {
+            if let Some(session) = self.get_session(account) {
+                s.insert(account.to_string(), session);
+            }
+        }
+        s
+    }
+    pub fn get_session(&self, account: &str) -> Option<Session> {
+        if self.has_account(account) {
+            Some(Session::load_json(account).unwrap())
+        } else {
+            None
+        }
+    }
+    pub fn get_sessions(&self) -> HashMap<String, Session> {
+        let binding = self.get_accounts();
+        let str_list = binding.keys().collect::<Vec<_>>();
+        let mut s = HashMap::new();
+        for account in str_list {
+            if self.has_account(account) {
+                let session = Session::load_json(account).unwrap();
+                s.insert(account.to_string(), session);
+            }
+        }
+        s
+    }
     pub fn has_account(&self, uname: &str) -> bool {
         let mut query = self
             .db
@@ -97,6 +128,24 @@ impl<'a> AccountTable<'a> {
             }
         }
         accounts
+    }
+    pub fn get_account(&self, account: &str) -> Option<(String, (String, String))> {
+        let mut query = self
+            .db
+            .prepare(format!("SELECT * FROM {} WHERE uname=?;", Self::TABLE_NAME))
+            .unwrap();
+        query.bind((1, account)).unwrap();
+        for c in query.iter() {
+            if let Ok(row) = c {
+                let uname: &str = row.read("uname");
+                let pwd: &str = row.read("pwd");
+                let name: &str = row.read("name");
+                return Some((uname.into(), (pwd.into(), name.into())));
+            } else {
+                eprintln!("账号解析行出错：{c:?}.");
+            }
+        }
+        None
     }
 }
 
