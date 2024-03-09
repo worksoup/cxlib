@@ -1,5 +1,4 @@
 use crate::sql::{DataBase, DataBaseTableTrait};
-use base::location::Location;
 
 pub struct AliasTable<'a> {
     db: &'a DataBase,
