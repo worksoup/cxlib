@@ -8,10 +8,11 @@ pub mod protocol;
 pub mod user;
 pub mod utils;
 
+// 重构完成之前使用 `cxsign` 的配置文件夹。
 lazy_static::lazy_static! {
     static ref CONFIG_DIR: PathBuf = {
-        let is_testing = std::env::var("TEST_NEWSIGN").is_ok();
-        let binding = directories::ProjectDirs::from("rt.lea", "worksoup", "newsign").unwrap();
+        let is_testing = std::env::var("TEST_CXSIGN").is_ok();
+        let binding = directories::ProjectDirs::from("rt.lea", "worksoup", "cxsign").unwrap();
         let dir = if is_testing {
             binding.config_dir().join("test").to_owned()
         } else {

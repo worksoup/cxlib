@@ -8,4 +8,4 @@ authors.workspace = true
 
 [dependencies]
 base = { path = "../base" }
-sqlite = "0.33"
+sqlite = "0.34"
