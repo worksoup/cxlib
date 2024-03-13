@@ -5,9 +5,13 @@ use ureq::Error;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SigncodeSign {
     pub(crate) base_sign: BaseSign,
+    pub(crate) signcode: Option<String>,
 }
 
 impl SignTrait for SigncodeSign {
+    fn is_ready_for_sign(&self) -> bool {
+        self.signcode.is_some()
+    }
     fn is_valid(&self) -> bool {
         self.base_sign.is_valid()
     }
@@ -17,10 +21,14 @@ impl SignTrait for SigncodeSign {
     }
 
     unsafe fn sign_internal(&self, session: &Session) -> Result<SignResult, Error> {
-        unsafe { self.base_sign.sign_internal(session) }
-    }
-
-    fn sign(&self, session: &Session) -> Result<SignResult, Error> {
-        self.base_sign.sign(session)
+        let r = self.base_sign.presign(session);
+        if let Ok(a) = r.as_ref()
+            && !a.is_susses()
+        {
+            self.base_sign
+                .sign_with_signcode(session, self.signcode.as_ref().unwrap())
+        } else {
+            r
+        }
     }
 }

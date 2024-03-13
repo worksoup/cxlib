@@ -9,12 +9,11 @@ use ureq::Error;
 pub struct RefreshQrCodeSign {
     pub(crate) base_sign: BaseSign,
     pub(crate) enc: Option<String>,
-    pub(crate) c: Option<String>,
     pub(crate) location: Option<Location>,
 }
 impl SignTrait for RefreshQrCodeSign {
     fn is_ready_for_sign(&self) -> bool {
-        self.c.is_some() && self.enc.is_some()
+        self.enc.is_some()
     }
     fn is_valid(&self) -> bool {
         self.base_sign.is_valid()
@@ -25,11 +24,12 @@ impl SignTrait for RefreshQrCodeSign {
     }
 
     unsafe fn sign_internal(&self, session: &Session) -> Result<SignResult, Error> {
-        let c = unsafe { self.c.as_ref().unwrap_unchecked() };
         let enc = unsafe { self.enc.as_ref().unwrap_unchecked() };
-        let r = self
-            .base_sign
-            .presign_for_refresh_qrcode_sign(c, enc, session);
+        let r = self.base_sign.presign_for_refresh_qrcode_sign(
+            &self.base_sign.sign_detail.c,
+            enc,
+            session,
+        );
         if let Ok(a) = r.as_ref()
             && !a.is_susses()
         {
@@ -77,6 +77,14 @@ impl SignTrait for NormalQrCodeSign {
 pub enum QrCodeSign {
     RefreshQrCodeSign(RefreshQrCodeSign),
     NormalQrCodeSign(NormalQrCodeSign),
+}
+impl QrCodeSign {
+    pub fn get_qrcode_arg_c(&self) -> &str {
+        match self {
+            QrCodeSign::RefreshQrCodeSign(a) => &a.base_sign.sign_detail.c,
+            QrCodeSign::NormalQrCodeSign(a) => &a.base_sign.sign_detail.c,
+        }
+    }
 }
 impl SignTrait for QrCodeSign {
     fn is_valid(&self) -> bool {

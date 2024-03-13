@@ -12,6 +12,9 @@ pub struct PhotoSign {
 }
 
 impl SignTrait for PhotoSign {
+    fn is_ready_for_sign(&self) -> bool {
+        self.photo.is_some()
+    }
     fn is_valid(&self) -> bool {
         self.base_sign.is_valid()
     }
@@ -21,11 +24,11 @@ impl SignTrait for PhotoSign {
     }
 
     unsafe fn sign_internal(&self, session: &Session) -> Result<SignResult, Error> {
-        unsafe { self.base_sign.sign_internal(session) }
-    }
-
-    fn sign(&self, session: &Session) -> Result<SignResult, Error> {
-        if let Some(photo) = self.photo.as_ref() {
+        let r = self.base_sign.presign(session);
+        if let Ok(a) = r.as_ref()
+            && !a.is_susses()
+        {
+            let photo = self.photo.as_ref().unwrap();
             let r = protocol::photo_sign(
                 session,
                 session.get_uid(),
@@ -38,9 +41,7 @@ impl SignTrait for PhotoSign {
                 &r.into_string().unwrap(),
             ))
         } else {
-            Ok(SignResult::Fail {
-                msg: "".to_string(),
-            })
+            r
         }
     }
 }

@@ -19,8 +19,4 @@ impl SignTrait for LocationSign {
     unsafe fn sign_internal(&self, session: &Session) -> Result<SignResult, Error> {
         unsafe { self.base_sign.sign_internal(session) }
     }
-
-    fn sign(&self, session: &Session) -> Result<SignResult, Error> {
-        self.base_sign.sign(session)
-    }
 }

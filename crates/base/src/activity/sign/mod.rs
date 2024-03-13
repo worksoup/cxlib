@@ -37,6 +37,17 @@ pub enum Sign {
     Unknown(BaseSign),
 }
 impl SignTrait for Sign {
+    fn is_ready_for_sign(&self) -> bool {
+        match self {
+            Sign::Photo(a) => a.is_ready_for_sign(),
+            Sign::Normal(a) => a.is_ready_for_sign(),
+            Sign::QrCode(a) => a.is_ready_for_sign(),
+            Sign::Gesture(a) => a.is_ready_for_sign(),
+            Sign::Location(a) => a.is_ready_for_sign(),
+            Sign::Signcode(a) => a.is_ready_for_sign(),
+            Sign::Unknown(a) => a.is_ready_for_sign(),
+        }
+    }
     fn is_valid(&self) -> bool {
         match self {
             Sign::Photo(a) => a.is_valid(),
@@ -72,18 +83,6 @@ impl SignTrait for Sign {
                 Sign::Signcode(a) => a.sign_internal(session),
                 Sign::Unknown(a) => a.sign_internal(session),
             }
-        }
-    }
-
-    fn sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
-        match self {
-            Sign::Photo(a) => a.sign(session),
-            Sign::Normal(a) => a.sign(session),
-            Sign::QrCode(a) => a.sign(session),
-            Sign::Gesture(a) => a.sign(session),
-            Sign::Location(a) => a.sign(session),
-            Sign::Signcode(a) => a.sign(session),
-            Sign::Unknown(a) => a.sign(session),
         }
     }
 }

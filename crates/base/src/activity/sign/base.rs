@@ -45,12 +45,7 @@ impl SignTrait for BaseSign {
         Ok(status.into())
     }
     unsafe fn sign_internal(&self, session: &Session) -> Result<SignResult, ureq::Error> {
-        let active_id = self.active_id.as_str();
-        let uid = session.get_uid();
-        let response_of_pre_sign =
-            protocol::pre_sign(session, self.course.clone(), active_id, uid, false, "", "")?;
-        println!("用户[{}]预签到已请求。", session.get_stu_name());
-        let r = self.analysis_before_presign(active_id, session, response_of_pre_sign);
+        let r = self.presign(session);
         if let Ok(a) = r.as_ref()
             && !a.is_susses()
         {
@@ -127,7 +122,6 @@ impl BaseSign {
             2 => {
                 if self.sign_detail.is_refresh_qrcode {
                     Sign::QrCode(QrCodeSign::RefreshQrCodeSign(RefreshQrCodeSign {
-                        c: None,
                         enc: None,
                         base_sign: self,
                         location: None,
@@ -138,9 +132,15 @@ impl BaseSign {
                     }))
                 }
             }
-            3 => Sign::Gesture(GestureSign { base_sign: self }),
+            3 => Sign::Gesture(GestureSign {
+                base_sign: self,
+                gesture: None,
+            }),
             4 => Sign::Location(LocationSign { base_sign: self }),
-            5 => Sign::Signcode(SigncodeSign { base_sign: self }),
+            5 => Sign::Signcode(SigncodeSign {
+                signcode: None,
+                base_sign: self,
+            }),
             _ => Sign::Unknown(self),
         }
     }
@@ -173,10 +173,6 @@ impl BaseSign {
 
     fn is_photo_sign(&self) -> bool {
         self.sign_detail.is_photo
-    }
-
-    pub fn get_二维码签到时的c参数(&self) -> &str {
-        &self.sign_detail.c
     }
 
     fn analysis_before_presign(
@@ -224,6 +220,14 @@ impl BaseSign {
         Ok(pre_sign_status)
     }
 
+    pub fn presign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
+        let active_id = self.active_id.as_str();
+        let uid = session.get_uid();
+        let response_of_pre_sign =
+            protocol::pre_sign(session, self.course.clone(), active_id, uid, false, "", "")?;
+        println!("用户[{}]预签到已请求。", session.get_stu_name());
+        self.analysis_before_presign(active_id, session, response_of_pre_sign)
+    }
     pub fn presign_for_refresh_qrcode_sign(
         &self,
         c: &str,
@@ -252,7 +256,7 @@ impl BaseSign {
             &r.into_string().unwrap(),
         ))
     }
-    pub fn 作为签到码签到处理(
+    pub fn sign_with_signcode(
         &self,
         session: &Session,
         signcode: &str,
