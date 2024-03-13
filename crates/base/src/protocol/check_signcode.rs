@@ -4,7 +4,7 @@ use ureq::{Agent, Response};
 static CHECK_SIGNCODE: &str =
     "https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/checkSignCode";
 
-pub async fn check_signcode(
+pub fn check_signcode(
     client: &Agent,
     active_id: &str,
     signcode: &str,

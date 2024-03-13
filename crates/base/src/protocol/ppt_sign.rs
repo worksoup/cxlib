@@ -33,12 +33,19 @@ pub fn qrcode_sign(
     stu_name: &str,
     enc: &str,
     active_id: &str,
-    location: &Location,
+    location: &Option<Location>,
 ) -> Result<Response, ureq::Error> {
-    let address = location.get_addr();
-    let lat = location.get_lat();
-    let lon = location.get_lon();
-    let altitude = location.get_alt();
+    // TODO: 存疑。
+    let (address, lat, lon, altitude) = if let Some(location) = location {
+        (
+            location.get_addr(),
+            location.get_lat(),
+            location.get_lon(),
+            location.get_alt(),
+        )
+    } else {
+        ("", "", "", "")
+    };
     let location_str = format!(
         r#"{{"result":"1","address":"{address}","latitude":{lat},"longitude":{lon},"altitude":{altitude}}}"#
     );

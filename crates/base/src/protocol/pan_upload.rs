@@ -4,7 +4,7 @@ use ureq::{Agent, Response};
 // 网盘上传接口
 static PAN_UPLOAD: &str = "https://pan-yz.chaoxing.com/upload";
 
-pub async fn pan_upload(
+pub fn pan_upload(
     client: &Agent,
     file: &std::fs::File,
     uid: &str,

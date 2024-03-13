@@ -4,7 +4,7 @@ use ureq::{Agent, Response};
 static LOGIN_PAGE: &str =
     "http://passport2.chaoxing.com/mlogin?fid=&newversion=true&refer=http%3A%2F%2Fi.chaoxing.com";
 
-pub async fn login_page(client: &Agent) -> Result<Response, ureq::Error> {
+pub fn login_page(client: &Agent) -> Result<Response, ureq::Error> {
     client.get(LOGIN_PAGE).call()
 }
 

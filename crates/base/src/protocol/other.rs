@@ -5,7 +5,7 @@ static PPT_SIGN: &str = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax";
 
 // 无课程群聊的预签到
 static CHAT_GROUP_PRE_SIGN: &str = "https://mobilelearn.chaoxing.com/sign/preStuSign";
-pub async fn chat_group_pre_sign(
+pub fn chat_group_pre_sign(
     client: &Agent,
     active_id: &str,
     uid: &str,
@@ -18,7 +18,7 @@ pub async fn chat_group_pre_sign(
 }
 // 无课程群聊的签到
 static CHAT_GROUP_SIGN: &str = "https://mobilelearn.chaoxing.com/sign/stuSignajax";
-pub async fn chat_group_general_sign(
+pub fn chat_group_general_sign(
     client: &Agent,
     active_id: &str,
     uid: &str,
@@ -28,7 +28,7 @@ pub async fn chat_group_general_sign(
     client.get(&url).call()
 }
 
-pub async fn chat_group_photo_sign(
+pub fn chat_group_photo_sign(
     client: &Agent,
     active_id: &str,
     uid: &str,
@@ -38,7 +38,7 @@ pub async fn chat_group_photo_sign(
     let url = format!("{url}?activeId={active_id}&uid={uid}&clientip=&useragent=&latitude=-1&longitude=-1&fid=0&objectId={object_id}");
     client.get(&url).call()
 }
-pub async fn chat_group_location_sign(
+pub fn chat_group_location_sign(
     client: &Agent,
     address: &str,
     active_id: &str,
@@ -61,14 +61,14 @@ pub async fn chat_group_location_sign(
         )
         .send_string(&body)
 }
-pub async fn chat_group_signcode_sign(
+pub fn chat_group_signcode_sign(
     client: &Agent,
     active_id: &str,
     uid: &str,
     signcode: &str,
 ) -> Result<Response, ureq::Error> {
     eprintln!("`chat_group_signcode_sign` 该函数需要测试！");
-    let url = CHAT_GROUP_SIGN;
-    let url = format!("{url}?activeId={active_id}&uid={uid}&clientip=&signCode={signcode}");
+    let url =
+        format!("{CHAT_GROUP_SIGN}?activeId={active_id}&uid={uid}&clientip=&signCode={signcode}");
     client.get(&url).call()
 }

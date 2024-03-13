@@ -3,7 +3,7 @@ mod gesture;
 mod location;
 mod normal;
 mod photo;
-mod qr_code;
+mod qrcode;
 mod signcode;
 
 pub use base::*;
@@ -11,7 +11,7 @@ pub use gesture::*;
 pub use location::*;
 pub use normal::*;
 pub use photo::*;
-pub use qr_code::*;
+pub use qrcode::*;
 pub use signcode::*;
 
 use crate::course::Course;
@@ -61,15 +61,17 @@ impl SignTrait for Sign {
         }
     }
 
-    fn pre_sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
-        match self {
-            Sign::Photo(a) => a.pre_sign(session),
-            Sign::Normal(a) => a.pre_sign(session),
-            Sign::QrCode(a) => a.pre_sign(session),
-            Sign::Gesture(a) => a.pre_sign(session),
-            Sign::Location(a) => a.pre_sign(session),
-            Sign::Signcode(a) => a.pre_sign(session),
-            Sign::Unknown(a) => a.pre_sign(session),
+    unsafe fn sign_internal(&self, session: &Session) -> Result<SignResult, ureq::Error> {
+        unsafe {
+            match self {
+                Sign::Photo(a) => a.sign_internal(session),
+                Sign::Normal(a) => a.sign_internal(session),
+                Sign::QrCode(a) => a.sign_internal(session),
+                Sign::Gesture(a) => a.sign_internal(session),
+                Sign::Location(a) => a.sign_internal(session),
+                Sign::Signcode(a) => a.sign_internal(session),
+                Sign::Unknown(a) => a.sign_internal(session),
+            }
         }
     }
 
@@ -87,8 +89,16 @@ impl SignTrait for Sign {
 }
 #[derive(Debug)]
 pub enum SignResult {
-    Sussess,
+    Susses,
     Fail { msg: String },
+}
+impl SignResult {
+    pub fn is_susses(&self) -> bool {
+        match self {
+            SignResult::Susses => true,
+            SignResult::Fail { .. } => false,
+        }
+    }
 }
 
 #[derive(num_enum::FromPrimitive, num_enum::IntoPrimitive)]
@@ -126,11 +136,14 @@ pub struct SignDetail {
 }
 
 pub trait SignTrait: Ord {
+    fn is_ready_for_sign(&self) -> bool {
+        true
+    }
     fn is_valid(&self) -> bool;
     fn get_attend_info(&self, session: &Session) -> Result<SignState, ureq::Error>;
     fn 通过文本判断签到结果(text: &str) -> SignResult {
         match text {
-            "success" => SignResult::Sussess,
+            "success" => SignResult::Susses,
             msg => SignResult::Fail {
                 msg: if msg.is_empty() {
                     "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。"
@@ -141,8 +154,16 @@ pub trait SignTrait: Ord {
             },
         }
     }
-    fn pre_sign(&self, session: &Session) -> Result<SignResult, ureq::Error>;
-    fn sign(&self, session: &Session) -> Result<SignResult, ureq::Error>;
+    unsafe fn sign_internal(&self, session: &Session) -> Result<SignResult, ureq::Error>;
+    fn sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
+        if self.is_ready_for_sign() {
+            unsafe { self.sign_internal(session) }
+        } else {
+            Ok(SignResult::Fail {
+                msg: "签到未准备好！".to_string(),
+            })
+        }
+    }
     fn get_sign_detail(active_id: &str, session: &Session) -> Result<SignDetail, ureq::Error> {
         #[derive(Deserialize)]
         struct GetSignDetailR {

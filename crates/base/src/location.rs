@@ -2,8 +2,7 @@ use std::f64::consts::PI;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Location {
     addr: String,
     lon: String,

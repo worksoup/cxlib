@@ -1,6 +1,6 @@
 use crate::activity::sign::{
-    SignState, GestureSign, LocationSign, NormalSign, PhotoSign, QrCodeSign, Sign, SignDetail,
-    SignResult, SignTrait, SigncodeSign,
+    GestureSign, LocationSign, NormalQrCodeSign, NormalSign, PhotoSign, QrCodeSign,
+    RefreshQrCodeSign, Sign, SignDetail, SignResult, SignState, SignTrait, SigncodeSign,
 };
 use crate::course::Course;
 use crate::location::Location;
@@ -9,7 +9,6 @@ use crate::protocol;
 use crate::user::session::Session;
 use crate::utils::get_width_str_should_be;
 use serde::Deserialize;
-use ureq::Error;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct BaseSign {
@@ -33,37 +32,41 @@ impl SignTrait for BaseSign {
     fn get_attend_info(&self, session: &Session) -> Result<SignState, ureq::Error> {
         let r = crate::protocol::get_attend_info(&session, &self.active_id)?;
         #[derive(Deserialize)]
-        struct Data原始数据 {
+        struct Status {
             status: i64,
         }
         #[derive(Deserialize)]
-        struct 原始数据 {
-            data: Data原始数据,
+        struct Data {
+            data: Status,
         }
-        let 原始数据 {
-            data: Data原始数据 { status },
+        let Data {
+            data: Status { status },
         } = r.into_json().unwrap();
         Ok(status.into())
     }
-    fn pre_sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
+    unsafe fn sign_internal(&self, session: &Session) -> Result<SignResult, ureq::Error> {
         let active_id = self.active_id.as_str();
         let uid = session.get_uid();
         let response_of_pre_sign =
             protocol::pre_sign(session, self.course.clone(), active_id, uid, false, "", "")?;
         println!("用户[{}]预签到已请求。", session.get_stu_name());
-        self.预签到_analysis部分(active_id, session, response_of_pre_sign)
-    }
-    fn sign(&self, session: &Session) -> Result<SignResult, Error> {
-        let r = protocol::general_sign(
-            session,
-            session.get_uid(),
-            session.get_fid(),
-            session.get_stu_name(),
-            self.active_id.as_str(),
-        )?;
-        Ok(Self::通过文本判断签到结果(
-            &r.into_string().unwrap(),
-        ))
+        let r = self.analysis_before_presign(active_id, session, response_of_pre_sign);
+        if let Ok(a) = r.as_ref()
+            && !a.is_susses()
+        {
+            let r = protocol::general_sign(
+                session,
+                session.get_uid(),
+                session.get_fid(),
+                session.get_stu_name(),
+                self.active_id.as_str(),
+            )?;
+            Ok(Self::通过文本判断签到结果(
+                &r.into_string().unwrap(),
+            ))
+        } else {
+            r
+        }
     }
 }
 
@@ -86,7 +89,7 @@ impl BaseSign {
     //     }
     // }
 
-    async fn check_signcode(
+    fn check_signcode(
         session: &Session,
         active_id: &str,
         signcode: &str,
@@ -96,8 +99,7 @@ impl BaseSign {
             #[allow(unused)]
             result: i64,
         }
-        let CheckR { result } = crate::protocol::check_signcode(session, active_id, signcode)
-            .await?
+        let CheckR { result } = crate::protocol::check_signcode(session, active_id, signcode)?
             .into_json()
             .unwrap();
         Ok(result == 1)
@@ -122,7 +124,20 @@ impl BaseSign {
                 }
             }
             1 => Sign::Unknown(self),
-            2 => Sign::QrCode(QrCodeSign { base_sign: self }),
+            2 => {
+                if self.sign_detail.is_refresh_qrcode {
+                    Sign::QrCode(QrCodeSign::RefreshQrCodeSign(RefreshQrCodeSign {
+                        c: None,
+                        enc: None,
+                        base_sign: self,
+                        location: None,
+                    }))
+                } else {
+                    Sign::QrCode(QrCodeSign::NormalQrCodeSign(NormalQrCodeSign {
+                        base_sign: self,
+                    }))
+                }
+            }
             3 => Sign::Gesture(GestureSign { base_sign: self }),
             4 => Sign::Location(LocationSign { base_sign: self }),
             5 => Sign::Signcode(SigncodeSign { base_sign: self }),
@@ -160,15 +175,11 @@ impl BaseSign {
         self.sign_detail.is_photo
     }
 
-    pub fn is_refesh_qrcode(&self) -> bool {
-        self.sign_detail.is_refresh_qrcode
-    }
-
     pub fn get_二维码签到时的c参数(&self) -> &str {
         &self.sign_detail.c
     }
 
-    fn 预签到_analysis部分(
+    fn analysis_before_presign(
         &self,
         active_id: &str,
         session: &Session,
@@ -199,7 +210,7 @@ impl BaseSign {
                 let end_of_statuscontent_h1 = html.find('<').unwrap();
                 let id为statuscontent的h1的内容 = html[0..end_of_statuscontent_h1].trim();
                 if id为statuscontent的h1的内容 == "签到成功" {
-                    SignResult::Sussess
+                    SignResult::Susses
                 } else {
                     SignResult::Fail {
                         msg: id为statuscontent的h1的内容.into(),
@@ -213,7 +224,7 @@ impl BaseSign {
         Ok(pre_sign_status)
     }
 
-    pub fn 预签到_对于有刷新二维码签到(
+    pub fn presign_for_refresh_qrcode_sign(
         &self,
         c: &str,
         enc: &str,
@@ -224,15 +235,12 @@ impl BaseSign {
         let response_of_presign =
             protocol::pre_sign(session, self.course.clone(), active_id, uid, true, c, enc)?;
         println!("用户[{}]预签到已请求。", session.get_stu_name());
-        self.预签到_analysis部分(active_id, session, response_of_presign)
+        self.analysis_before_presign(active_id, session, response_of_presign)
     }
 }
 
 impl BaseSign {
-    pub async fn 作为普通签到处理(
-        &self,
-        session: &Session,
-    ) -> Result<SignResult, ureq::Error> {
+    pub fn sign_as_normal_sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
         let r = protocol::general_sign(
             session,
             session.get_uid(),
@@ -244,12 +252,12 @@ impl BaseSign {
             &r.into_string().unwrap(),
         ))
     }
-    pub async fn 作为签到码签到处理(
+    pub fn 作为签到码签到处理(
         &self,
         session: &Session,
         signcode: &str,
     ) -> Result<SignResult, ureq::Error> {
-        if Self::check_signcode(session, &self.active_id, signcode).await? {
+        if Self::check_signcode(session, &self.active_id, signcode)? {
             let r = protocol::signcode_sign(
                 session,
                 session.get_uid(),
@@ -267,7 +275,7 @@ impl BaseSign {
             })
         }
     }
-    pub async fn 作为位置签到处理(
+    pub fn 作为位置签到处理(
         &self,
         address: &Location,
         session: &Session,
@@ -298,25 +306,6 @@ impl BaseSign {
             session.get_stu_name(),
             self.active_id.as_str(),
             photo.get_object_id(),
-        )?;
-        Ok(Self::通过文本判断签到结果(
-            &r.into_string().unwrap(),
-        ))
-    }
-    pub async fn 作为二维码签到处理(
-        &self,
-        enc: &str,
-        address: &Location,
-        session: &Session,
-    ) -> Result<SignResult, ureq::Error> {
-        let r = protocol::qrcode_sign(
-            session,
-            enc,
-            session.get_uid(),
-            session.get_fid(),
-            session.get_stu_name(),
-            self.active_id.as_str(),
-            address,
         )?;
         Ok(Self::通过文本判断签到结果(
             &r.into_string().unwrap(),

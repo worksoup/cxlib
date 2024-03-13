@@ -74,8 +74,8 @@ impl Session {
         })
     }
 
-    pub async fn get_courses(&self) -> Result<Vec<Course>, ureq::Error> {
-        let r = protocol::back_clazz_data(self.deref()).await?;
+    pub  fn get_courses(&self) -> Result<Vec<Course>, ureq::Error> {
+        let r = protocol::back_clazz_data(self.deref())?;
         let courses = Course::get_list_from_response(r)?;
         println!("用户[{}]已获取课程列表。", self.stu_name);
         Ok(courses)
@@ -94,8 +94,8 @@ impl Session {
             .trim();
         Ok(name.to_owned())
     }
-    pub async fn get_pan_token(&self) -> Result<String, ureq::Error> {
-        let r = protocol::pan_token(self).await?;
+    pub fn get_pan_token(&self) -> Result<String, ureq::Error> {
+        let r = protocol::pan_token(self)?;
         #[derive(Deserialize)]
         struct Tmp {
             #[serde(alias = "_token")]
@@ -105,9 +105,9 @@ impl Session {
         Ok(r.token)
     }
 
-    pub async fn upload_image(&self, file: &File, file_name: &str) -> Result<String, ureq::Error> {
-        let token = self.get_pan_token().await?;
-        let r = protocol::pan_upload(self, file, self.get_uid(), &token, file_name).await?;
+    pub fn upload_image(&self, file: &File, file_name: &str) -> Result<String, ureq::Error> {
+        let token = self.get_pan_token()?;
+        let r = protocol::pan_upload(self, file, self.get_uid(), &token, file_name)?;
         #[derive(Deserialize)]
         struct Tmp {
             #[serde(alias = "objectId")]
@@ -119,13 +119,13 @@ impl Session {
 }
 
 impl Session {
-    pub async fn get_all_activities(
+    pub fn get_all_activities(
         &self,
     ) -> Result<(Vec<Sign>, Vec<Sign>, Vec<OtherActivity>), ureq::Error> {
         let mut 有效签到列表 = Vec::new();
         let mut 其他签到列表 = Vec::new();
         let mut 非签到活动列表 = Vec::new();
-        let 课程列表 = self.get_courses().await?;
+        let 课程列表 = self.get_courses()?;
         for c in 课程列表 {
             let item = Activity::get_list_from_course(self, &c)?;
             for a in item {

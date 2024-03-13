@@ -78,7 +78,7 @@ impl Course {
         &self.name
     }
 
-    pub async fn get_all_activities(
+    pub fn get_all_activities(
         &self,
         session: &Session,
     ) -> Result<Vec<Activity>, ureq::Error> {
