@@ -42,9 +42,7 @@ impl SignTrait for RefreshQrCodeSign {
                 self.base_sign.active_id.as_str(),
                 &self.location,
             )?;
-            Ok(Self::通过文本判断签到结果(
-                &r.into_string().unwrap(),
-            ))
+            Ok(self.guess_sign_result(&r.into_string().unwrap()))
         } else {
             r
         }

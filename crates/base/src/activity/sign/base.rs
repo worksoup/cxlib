@@ -56,9 +56,7 @@ impl SignTrait for BaseSign {
                 session.get_stu_name(),
                 self.active_id.as_str(),
             )?;
-            Ok(Self::通过文本判断签到结果(
-                &r.into_string().unwrap(),
-            ))
+            Ok(self.guess_sign_result(&r.into_string().unwrap()))
         } else {
             r
         }
@@ -109,7 +107,7 @@ impl BaseSign {
             panic!("{e}")
         }) {
             0 => {
-                if self.is_photo_sign() {
+                if self.sign_detail.is_photo {
                     Sign::Photo(PhotoSign {
                         base_sign: self,
                         photo: None,
@@ -169,10 +167,6 @@ impl BaseSign {
                 width = name_width,
             );
         }
-    }
-
-    fn is_photo_sign(&self) -> bool {
-        self.sign_detail.is_photo
     }
 
     fn analysis_before_presign(
@@ -244,18 +238,6 @@ impl BaseSign {
 }
 
 impl BaseSign {
-    pub fn sign_as_normal_sign(&self, session: &Session) -> Result<SignResult, ureq::Error> {
-        let r = protocol::general_sign(
-            session,
-            session.get_uid(),
-            session.get_fid(),
-            session.get_stu_name(),
-            self.active_id.as_str(),
-        )?;
-        Ok(Self::通过文本判断签到结果(
-            &r.into_string().unwrap(),
-        ))
-    }
     pub fn sign_with_signcode(
         &self,
         session: &Session,
@@ -270,9 +252,7 @@ impl BaseSign {
                 self.active_id.as_str(),
                 signcode,
             )?;
-            Ok(Self::通过文本判断签到结果(
-                &r.into_string().unwrap(),
-            ))
+            Ok(self.guess_sign_result(&r.into_string().unwrap()))
         } else {
             Ok(SignResult::Fail {
                 msg: "签到码或手势不正确".into(),
@@ -294,9 +274,7 @@ impl BaseSign {
             self.active_id.as_str(),
             是否限定位置,
         )?;
-        Ok(Self::通过文本判断签到结果(
-            &r.into_string().unwrap(),
-        ))
+        Ok(self.guess_sign_result(&r.into_string().unwrap()))
     }
     pub fn 作为拍照签到处理(
         &self,
@@ -311,9 +289,7 @@ impl BaseSign {
             self.active_id.as_str(),
             photo.get_object_id(),
         )?;
-        Ok(Self::通过文本判断签到结果(
-            &r.into_string().unwrap(),
-        ))
+        Ok(self.guess_sign_result(&r.into_string().unwrap()))
     }
 }
 
