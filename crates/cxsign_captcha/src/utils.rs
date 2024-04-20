@@ -10,8 +10,8 @@ use crate::hash::{encode, hash, uuid};
 use crate::protocol::{check_captcha, get_captcha, get_server_time, CALLBACK_NAME};
 
 pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, ureq::serde_json::Error>
-where
-    T: ureq::serde::de::Deserialize<'a>,
+    where
+        T: ureq::serde::de::Deserialize<'a>,
 {
     let s = &text[CALLBACK_NAME.len() + 1..text.len() - 1];
     ureq::serde_json::from_str(s)
@@ -30,6 +30,7 @@ pub fn generate_secrets(
         tmp_token + "%3A" + (server_time_stamp_mills + 300000_u128).to_string().as_str();
     (captcha_key, tmp_token)
 }
+
 pub fn get_image(agent: &ureq::Agent, image_url: &str) -> Result<DynamicImage, Box<ureq::Error>> {
     let mut v = Vec::new();
     agent
@@ -45,12 +46,12 @@ pub fn get_image(agent: &ureq::Agent, image_url: &str) -> Result<DynamicImage, B
         .unwrap();
     Ok(img)
 }
+
 pub fn solve_captcha(big_image: &DynamicImage, small_image: &DynamicImage) -> u32 {
     let small_image_alpha = cxsign_imageproc::rgb_alpha_channel(small_image);
     let rects = cxsign_imageproc::find_contour_rects::<u32>(&small_image_alpha);
     let (lt, rb) = rects[0];
-    let small_image = small_image.to_luma8();
-    let small_image = cxsign_imageproc::cut_picture(&DynamicImage::from(small_image), lt, rb - lt);
+    let small_image = cxsign_imageproc::cut_picture(&small_image, lt, rb - lt);
     let small_image = small_image.to_luma8();
     let mean = image_mean(&small_image);
     let small_image = map_colors(&small_image, |p| Luma([p[0] as f32 - mean]));
@@ -77,7 +78,7 @@ pub fn solve_captcha(big_image: &DynamicImage, small_image: &DynamicImage) -> u3
                 y: small_image.height(),
             },
         )
-        .to_luma8();
+            .to_luma8();
         let window_mean = image_mean(&window);
         let window = map_colors(&window, |p| Luma([p[0] as f32 - window_mean]));
         let a = map_colors2(&window, &small_image, |w, t| Luma([w[0] * t[0]]));
@@ -90,6 +91,7 @@ pub fn solve_captcha(big_image: &DynamicImage, small_image: &DynamicImage) -> u3
     }
     max_x
 }
+
 pub fn auto_solve_captcha(
     agent: &ureq::Agent,
     captcha_id: &str,
@@ -128,6 +130,7 @@ pub fn auto_solve_captcha(
     debug!("滑块结果：{v:?}");
     Ok(v)
 }
+
 pub fn captcha_solver(
     agent: &ureq::Agent,
     captcha_id: &str,
@@ -144,11 +147,13 @@ pub fn captcha_solver(
     let Tmp { t } = trim_response_to_json(r.into_string().unwrap().as_str()).unwrap();
     auto_solve_captcha(&agent, captcha_id, t)
 }
+
 #[derive(Deserialize, Debug)]
 pub struct ValidateResult {
     #[serde(rename = "extraData")]
     extra_data: Option<String>,
 }
+
 impl ValidateResult {
     pub fn get_validate_info(&self) -> Option<String> {
         #[derive(Deserialize)]
@@ -162,10 +167,12 @@ impl ValidateResult {
         })
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use crate::protocol::CAPTCHA_ID;
-    use crate::utils::auto_solve_captcha;
+    use serde::Deserialize;
+    use crate::protocol::{CAPTCHA_ID, get_server_time};
+    use crate::utils::{auto_solve_captcha, trim_response_to_json};
 
     #[test]
     fn auto_solve_captcha_test() {
@@ -175,7 +182,13 @@ mod tests {
             .as_millis();
         println!("{time}");
         let agent = ureq::Agent::new();
-        let r = auto_solve_captcha(&agent, CAPTCHA_ID, time).unwrap();
+        let r = get_server_time(&agent, CAPTCHA_ID, time).unwrap();
+        #[derive(Deserialize)]
+        struct Tmp {
+            t: u128,
+        }
+        let Tmp { t } = trim_response_to_json(r.into_string().unwrap().as_str()).unwrap();
+        let r = auto_solve_captcha(&agent, CAPTCHA_ID, t).unwrap();
         println!("{:?}", r.get_validate_info());
     }
 }
