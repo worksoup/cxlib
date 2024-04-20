@@ -14,6 +14,7 @@ pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, ureq::serde_json
         T: ureq::serde::de::Deserialize<'a>,
 {
     let s = &text[CALLBACK_NAME.len() + 1..text.len() - 1];
+    debug!("{s}");
     ureq::serde_json::from_str(s)
 }
 
