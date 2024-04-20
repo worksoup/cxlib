@@ -20,6 +20,7 @@ pub struct RawSign {
     pub other_id: String,
     pub status_code: i32,
 }
+
 impl SignTrait for RawSign {
     fn as_inner(&self) -> &RawSign {
         self
@@ -46,6 +47,7 @@ impl SignTrait for RawSign {
         }
     }
 }
+
 impl Display for RawSign {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name_width = get_width_str_should_be(self.name.as_str(), 12);
@@ -63,6 +65,7 @@ impl Display for RawSign {
         )
     }
 }
+
 impl RawSign {
     pub(crate) fn check_signcode(
         session: &Session,
@@ -217,7 +220,8 @@ impl RawSign {
             captcha_id_and_location.push_second(location);
         }
         if let Some(start_of_captcha_id) = html.find("captchaId: '") {
-            let id = &html[start_of_captcha_id + 13..start_of_captcha_id + 13 + 32];
+            let id = &html[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
+            debug!("captcha_id: {id}");
             captcha_id_and_location.push_first(id.to_string());
         }
         let response_of_analysis = protocol::analysis(session, active_id)?;

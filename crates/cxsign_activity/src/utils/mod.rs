@@ -8,12 +8,8 @@ use log::{debug, warn};
 pub fn secondary_verification(
     agent: &ureq::Agent,
     url: String,
-    msg: String,
     captcha_id: &Option<CaptchaId>,
 ) -> Result<SignResult, Box<ureq::Error>> {
-    let enc2 = &msg[9..msg.len()];
-    debug!("enc2: {enc2:?}");
-    let url = url + "&enc2=" + enc2;
     let captcha_id = if let Some(captcha_id) = captcha_id {
         captcha_id
     } else {
@@ -38,8 +34,10 @@ pub fn guess_sign_result_by_text(text: &str) -> SignResult {
         "success" => SignResult::Susses,
         msg => {
             if msg.is_empty() {
-                SignResult::Fail { msg:
-                "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into() }
+                SignResult::Fail {
+                    msg:
+                    "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
+                }
             } else {
                 if msg == "您已签到过了" {
                     SignResult::Susses
@@ -80,9 +78,16 @@ pub(crate) fn sign_unchecked_with_location<T: SignTrait>(
         match sign.guess_sign_result_by_text(&r.into_string().unwrap()) {
             SignResult::Susses => return Ok(SignResult::Susses),
             SignResult::Fail { msg } => {
-                if msg.starts_with("validate_") {
+                if msg.starts_with("validate") {
                     // 这里假设了二次验证只有在“签到成功”的情况下出现。
-                    return secondary_verification(session, url, msg, &captcha_id);
+                    let url = if msg.len() > 9 {
+                        let enc2 = &msg[9..msg.len()];
+                        debug!("enc2: {enc2:?}");
+                        url + "&enc2=" + enc2
+                    } else {
+                        url
+                    };
+                    return secondary_verification(session, url, &captcha_id);
                 } else if msg.contains("位置") || msg.contains("Location") || msg.contains("范围")
                 {
                     continue;

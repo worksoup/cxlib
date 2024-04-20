@@ -1,6 +1,6 @@
 use crate::{cookies::UserCookies, protocol};
 use cxsign_dir::Dir;
-use log::{debug, info};
+use log::{info, trace};
 use std::{
     hash::Hash,
     ops::{Deref, Index},
@@ -77,7 +77,7 @@ impl Session {
     fn find_stu_name_in_html(client: &Agent) -> Result<String, Box<ureq::Error>> {
         let r = protocol::account_manage(client)?;
         let html_content = r.into_string().unwrap();
-        debug!("{html_content}");
+        trace!("{html_content}");
         let e = html_content.find("colorBlue").unwrap();
         let html_content = html_content.index(e..html_content.len()).to_owned();
         let e = html_content.find('>').unwrap() + 1;
