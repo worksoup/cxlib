@@ -8,3 +8,4 @@ authors.workspace = true
 image.workspace = true
 imageproc = "0.24"
 num-traits = "0.2"
+ureq = { workspace = true, features = ["cookies", "json"] }

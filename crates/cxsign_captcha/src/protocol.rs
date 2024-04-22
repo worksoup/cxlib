@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::utils::CALLBACK_NAME;
+
 pub static CAPTCHA_ID: &str = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
 // 获取滑块。
 pub(crate) static GET_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/get/verification/image";
@@ -9,8 +11,6 @@ pub(crate) static CHECK_CAPTCHA: &str =
 // 获取服务器时间。
 pub(crate) static GET_SERVER_TIME: &str = "https://captcha.chaoxing.com/captcha/get/conf";
 
-// Doesn't matter.
-pub(crate) static CALLBACK_NAME: &str = "jQuery_114514_1919810";
 pub fn get_server_time(
     agent: &ureq::Agent,
     captcha_id: &str,
@@ -31,7 +31,7 @@ pub fn get_captcha(
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
         "{GET_CAPTCHA}?{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
-        format_args!("callback={CALLBACK_NAME}",),
+        format_args!("callback={}", CALLBACK_NAME),
         format_args!("captchaId={}", captcha_id),
         format_args!("captchaKey={}", captcha_key),
         format_args!("token={}", tmp_token),
@@ -41,6 +41,7 @@ pub fn get_captcha(
     );
     Ok(agent.get(&url).call()?)
 }
+
 pub fn check_captcha(
     agent: &ureq::Agent,
     captcha_id: &str,
@@ -50,7 +51,7 @@ pub fn check_captcha(
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
         "{CHECK_CAPTCHA}?{}&{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
-        format_args!("callback={CALLBACK_NAME}",),
+        format_args!("callback={CALLBACK_NAME}", ),
         format_args!("captchaId={}", captcha_id),
         format_args!("token={}", token),
         format_args!("textClickArr=%5B%7B%22x%22%3A{}%7D%5D", x),
