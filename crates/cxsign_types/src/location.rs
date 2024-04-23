@@ -7,6 +7,31 @@ use cxsign_user::Session;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
+pub trait LocationPreprocessorTrait: Send + Sync {
+    fn do_preprocess(&self, location: Location) -> Location;
+}
+struct DefaultLocationPreprocessor;
+impl LocationPreprocessorTrait for DefaultLocationPreprocessor {
+    fn do_preprocess(&self, location: Location) -> Location {
+        location
+    }
+}
+static mut LOCATION_PREPROCESSOR: &dyn LocationPreprocessorTrait = &DefaultLocationPreprocessor;
+pub fn do_location_preprocessor(location: Location) -> Location {
+    unsafe { LOCATION_PREPROCESSOR.do_preprocess(location) }
+}
+pub fn set_location_preprocessor(preprocessor: &'static dyn LocationPreprocessorTrait) {
+    set_boxed_location_preprocessor_internal(|| preprocessor)
+}
+pub fn set_boxed_location_preprocessor(preprocessor: Box<dyn LocationPreprocessorTrait>) {
+    set_boxed_location_preprocessor_internal(|| Box::leak(preprocessor))
+}
+fn set_boxed_location_preprocessor_internal<F>(make_preprocessor: F)
+where
+    F: FnOnce() -> &'static dyn LocationPreprocessorTrait,
+{
+    unsafe { LOCATION_PREPROCESSOR = make_preprocessor() }
+}
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct Location {
     addr: String,
@@ -135,20 +160,10 @@ impl LocationWithRange {
             / (1.0 - theta.cos().powi(2) * (lat * PI / 180.0).sin().powi(2)).sqrt();
         let lat = format!("{:.6}", ((lat * PI / 180.0) + r * theta.sin()) / PI * 180.0);
         let lon = format!("{:.6}", (lon * PI / 180.0 + r * theta.cos()) / PI * 180.0);
-        Location {
-            addr: addr.clone(),
-            lon,
-            lat,
-            alt: "1108".into(),
-        }
+        Location::new(addr, &lon, &lat, "1108")
     }
     pub fn to_location(&self) -> Location {
-        Location {
-            addr: self.addr.clone(),
-            lon: self.lon.clone(),
-            lat: self.lat.clone(),
-            alt: "1108".to_string(),
-        }
+        Location::new(&self.addr, &self.lon, &self.lat, "1108")
     }
     pub fn get_range(&self) -> u32 {
         self.range
@@ -184,12 +199,13 @@ impl Location {
         }
     }
     pub fn new(addr: &str, lon: &str, lat: &str, alt: &str) -> Location {
-        Location {
+        let location = Location {
             addr: addr.into(),
             lon: lon.into(),
             lat: lat.into(),
             alt: alt.into(),
-        }
+        };
+        do_location_preprocessor(location)
     }
     /// 地址。
     pub fn get_addr(&self) -> &str {
