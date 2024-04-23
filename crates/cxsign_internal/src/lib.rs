@@ -12,6 +12,7 @@ pub use signner::{
 
 pub mod protocol {
     pub use cxsign_activity::protocol::*;
+    pub use cxsign_captcha::protocol::*;
     pub use cxsign_login::protocol::*;
     pub use cxsign_pan::protocol::*;
     pub use cxsign_types::protocol::*;
@@ -27,7 +28,9 @@ pub mod store {
 }
 pub mod utils {
     pub use crate::signner::utils::*;
+    pub use cxsign_captcha::utils::*;
     pub use cxsign_dir::*;
+    pub use cxsign_imageproc::*;
     pub use cxsign_login::{des_enc, load_json, login_enc};
     pub use cxsign_utils::*;
 }

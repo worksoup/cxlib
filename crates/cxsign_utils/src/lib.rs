@@ -1,4 +1,5 @@
 use log::info;
+use std::io::Read;
 use unicode_width::UnicodeWidthStr;
 pub fn now_string() -> String {
     chrono::DateTime::<chrono::Local>::from(std::time::SystemTime::now())
@@ -48,3 +49,19 @@ pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
 //         println!("{}", crate::utils::pwd_des("0123456789."));
 //     }
 // }
+
+pub fn zlib_encode(text: &str) -> Vec<u8> {
+    use flate2::write::ZlibEncoder;
+    use flate2::Compression;
+    use std::io::prelude::*;
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(text.as_bytes()).unwrap();
+    encoder.finish().unwrap()
+}
+pub fn zlib_decode<R: Read>(r: R) -> String {
+    let mut decoder = ZlibDecoder::new(r);
+    use flate2::read::ZlibDecoder;
+    let mut decompressed_data = String::new();
+    decoder.read_to_string(&mut decompressed_data).unwrap();
+    decompressed_data
+}

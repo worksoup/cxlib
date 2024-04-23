@@ -11,4 +11,4 @@ proc-macro = true
 #syn = "*"
 quote = "*"
 proc-macro2 = "*"
-flate2 = "*"
+cxsign_utils = { path = "../cxsign_utils" }

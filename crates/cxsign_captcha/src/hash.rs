@@ -1,11 +1,11 @@
 use rand::Rng;
 
-use cxsign_obfuscate::_f1;
+use cxsign_obfuscate::__define;
 
 // 混淆代码，不过仅仅在仓库中不可见。
 // 如果你使用 IDE 或者对 rust 比较
 // 熟悉的话应该很容易看到源码。
-_f1!();
+__define!();
 // let mut s = String::new();
 // for i in (0..0x20 * a.len()).step_by(0x8) {
 //     s.push(((a[i >> 5] >> (i % 0x20 & 0xff)) & 0xff) as u8 as char)

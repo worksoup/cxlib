@@ -1,6 +1,5 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use std::io::Read;
 
 const _10: [u32; 64] = [
     0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
@@ -60,7 +59,7 @@ static _02: [u8; 68] = [
     164, 212, 104, 132, 139, 224, 216, 195, 34, 169, 47, 78, 19, 171, 127, 115, 108, 157, 94, 11,
     52, 0, 252, 156, 19, 76,
 ];
-fn f0_() -> String {
+fn f0() -> String {
     let mut x = String::new();
     for i in 0..64 {
         let a = (4 - i % 4) % 4;
@@ -85,24 +84,10 @@ fn f0_() -> String {
     }
     x
 }
-fn _f0(text: &str) -> Vec<u8> {
-    use flate2::write::ZlibEncoder;
-    use flate2::Compression;
-    use std::io::prelude::*;
-    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(text.as_bytes()).unwrap();
-    encoder.finish().unwrap()
-}
-fn f1_<R: Read>(r: R) -> String {
-    let mut decoder = ZlibDecoder::new(r);
-    use flate2::read::ZlibDecoder;
-    let mut decompressed_data = String::new();
-    decoder.read_to_string(&mut decompressed_data).unwrap();
-    decompressed_data
-}
 #[proc_macro]
-pub fn _f1(_input: TokenStream) -> TokenStream {
-    let r = f1_(&_00[..]) + &f1_(&_01[..]) + &f0_() + &f1_(&_02[..]);
+pub fn __define(_input: TokenStream) -> TokenStream {
+    use cxsign_utils::zlib_decode;
+    let r = zlib_decode(&_00[..]) + &zlib_decode(&_01[..]) + &f0() + &zlib_decode(&_02[..]);
     let mut tokens = proc_macro2::TokenStream::new();
     let token: proc_macro2::TokenStream = r.parse().unwrap();
     tokens.extend(quote! {
