@@ -39,7 +39,17 @@ pub struct Location {
     lat: String,
     alt: String,
 }
-
+impl Location {
+    pub fn to_owned_fields(self) -> [String; 4] {
+        let Location {
+            addr,
+            lon,
+            lat,
+            alt,
+        } = self;
+        [addr, lon, lat, alt]
+    }
+}
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct LocationWithRange {
     #[serde(rename = "address")]
