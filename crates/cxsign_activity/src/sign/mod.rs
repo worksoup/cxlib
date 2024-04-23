@@ -53,7 +53,7 @@ impl PreSignResult {
 ///
 /// 其中原始签到类型是还未区分签到类型的签到。
 ///
-/// 签到类型的划分依据主要是签到所需信息。
+/// 签到类型的划分主要依据前人的工作。
 ///
 /// 细节详见各签到的文档。
 pub trait SignTrait: Ord {
@@ -61,9 +61,11 @@ pub trait SignTrait: Ord {
     /// [`RawSign`] 的各字段均为 `pub`,
     /// 故可以通过本函数获取一些签到通用的信息。
     fn as_inner(&self) -> &RawSign;
+    /// 用来判断是否可以安全调用 [`SignTrait::sign_unchecked`].
     fn is_ready_for_sign(&self) -> bool {
         true
     }
+    /// 判断签到活动是否有效（目前认定两小时内未结束的签到为有效签到）。
     fn is_valid(&self) -> bool {
         let time = std::time::SystemTime::from(
             chrono::DateTime::from_timestamp(self.as_inner().start_timestamp, 0).unwrap(),
@@ -72,6 +74,7 @@ pub trait SignTrait: Ord {
         self.as_inner().status_code == 1
             && std::time::SystemTime::now().duration_since(time).unwrap() < two_hours
     }
+    /// 获取签到后状态。参见返回类型 [`SignState`].
     fn get_sign_state(&self, session: &Session) -> Result<SignState, Box<ureq::Error>> {
         let r = crate::protocol::get_attend_info(session, &self.as_inner().active_id)?;
         #[derive(Deserialize)]
@@ -87,17 +90,17 @@ pub trait SignTrait: Ord {
         } = r.into_json().unwrap();
         Ok(status.into())
     }
-    fn get_sign_detail(&self, session: &Session) -> Result<SignDetail, Box<ureq::Error>> {
-        RawSign::get_sign_detail(&self.as_inner().active_id, session)
-    }
+    /// 通过签到结果的字符串判断签到结果如何。
     fn guess_sign_result_by_text(&self, text: &str) -> SignResult {
         crate::utils::guess_sign_result_by_text(text)
     }
+    /// 预签到。
     fn pre_sign(&self, session: &Session) -> Result<PreSignResult, Box<ureq::Error>> {
         self.as_inner().pre_sign(session)
     }
     /// # Safety
     /// 签到类型中有一些 `Option` 枚举，而本函数会使用 `unwrap_unchecked`.
+    /// 调用之前请设置相关信息（通过各签到类型的方法），保险起见可以调用 [`SignTrait::is_ready_for_sign`] 进行判断。
     unsafe fn sign_unchecked(
         &self,
         session: &Session,
@@ -105,6 +108,9 @@ pub trait SignTrait: Ord {
     ) -> Result<SignResult, Box<ureq::Error>> {
         unsafe { self.as_inner().sign_unchecked(session, pre_sign_result) }
     }
+    /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
+    /// 调用 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 进行判断，如果真，则调用 [`sign_unchecked`](SignTrait::sign_unchecked), 否则返回
+    /// [`SignResult::Fail`]{msg: "签到未准备好！".to_string()}
     fn sign(
         &self,
         session: &Session,
@@ -118,26 +124,28 @@ pub trait SignTrait: Ord {
             })
         }
     }
+    /// 预签到并签到。
     fn pre_sign_and_sign(&self, session: &Session) -> Result<SignResult, Box<ureq::Error>> {
         let r = self.pre_sign(session)?;
         self.sign(session, r)
     }
 }
+/// 总体的签到类型。是一个枚举，可以通过 [`RawSign::to_sign`] 获取。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum Sign {
-    // 拍照签到
+    /// 拍照签到
     Photo(PhotoSign),
-    // 普通签到
+    /// 普通签到
     Normal(NormalSign),
-    // 二维码签到
+    /// 二维码签到
     QrCode(QrCodeSign),
-    // 手势签到
+    /// 手势签到
     Gesture(GestureSign),
-    // 位置签到
+    /// 位置签到
     Location(LocationSign),
-    // 签到码签到
+    /// 签到码签到
     Signcode(SigncodeSign),
-    // 未知
+    /// 未知
     Unknown(RawSign),
 }
 impl SignTrait for Sign {
@@ -215,12 +223,23 @@ impl SignTrait for Sign {
         }
     }
 }
+/// 签到的结果。为枚举类型。
+/// ``` rust
+/// #[derive(Debug)]
+/// pub enum SignResult {
+///     Susses,
+///     Fail { msg: String },
+/// }
+///```
 #[derive(Debug)]
 pub enum SignResult {
+    /// 签到成功。
     Susses,
+    /// 签到失败以及失败原因。
     Fail { msg: String },
 }
 impl SignResult {
+    /// 签到是否成功。
     pub fn is_susses(&self) -> bool {
         match self {
             SignResult::Susses => true,
@@ -228,7 +247,7 @@ impl SignResult {
         }
     }
 }
-
+/// 签到后状态。
 #[derive(num_enum::FromPrimitive, num_enum::IntoPrimitive)]
 #[repr(i64)]
 pub enum SignState {
@@ -246,6 +265,7 @@ pub enum SignState {
     公假 = 12,
 }
 
+/// 签到以及其他活动的原始类型。不应使用。
 #[derive(Debug)]
 pub struct SignActivityRaw {
     pub id: String,
@@ -255,14 +275,19 @@ pub struct SignActivityRaw {
     pub status: i32,
     pub start_time_secs: i64,
 }
-
+/// 区分签到类型时获取的一些签到的信息。
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SignDetail {
     is_photo: bool,
     is_refresh_qrcode: bool,
     c: String,
 }
+
+/// 为手势签到和签到码签到实现的一个特型，方便复用代码。
+///
+/// 这两种签到除签到码格式以外没有任何不同之处。
 pub trait GestureOrSigncodeSignTrait: SignTrait {
+    /// 设置签到时所需的签到码或手势。
     fn set_signcode(&mut self, signcode: String);
 }
 

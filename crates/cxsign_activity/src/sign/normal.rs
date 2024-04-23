@@ -1,6 +1,6 @@
 use crate::sign::{RawSign, SignTrait};
 use serde::{Deserialize, Serialize};
-
+/// 普通签到。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct NormalSign {
     pub(crate) raw_sign: RawSign,

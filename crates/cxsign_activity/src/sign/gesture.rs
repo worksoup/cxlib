@@ -1,18 +1,27 @@
 use crate::sign::{PreSignResult, RawSign, SignResult, SignTrait};
 use cxsign_user::Session;
 use serde::{Deserialize, Serialize};
-
+/// 手势签到。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct GestureSign {
     pub(crate) raw_sign: RawSign,
     pub(crate) gesture: Option<String>,
 }
 impl GestureSign {
+    /// 检查签到码是否正确而不进行签到。
     pub fn check(&self, session: &Session) -> bool {
         self.gesture.as_ref().map_or(false, |signcode| {
             RawSign::check_signcode(session, &self.raw_sign.active_id, signcode).unwrap_or(false)
         })
     }
+    /// 设置手势。
+    ///
+    /// 九宫格对应数字如下：
+    /// ``` matlab
+    /// 1 2 3
+    /// 4 5 6
+    /// 7 8 9
+    /// ```
     pub fn set_gesture(&mut self, gesture: String) {
         self.gesture = Some(gesture)
     }

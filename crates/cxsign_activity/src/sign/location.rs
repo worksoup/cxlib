@@ -11,9 +11,13 @@ pub struct LocationSign {
     pub(crate) location: Location,
 }
 impl LocationSign {
+    /// 设置位置信息。
     pub fn set_location(&mut self, location: Location) {
         self.location = location
     }
+    /// 获取预设的位置，同时可以选择传入一个字符串，用来设置位置的名称。
+    ///
+    /// 注意该函数不会调用 [`set_location`](Self::set_location), 请手动调用。
     pub fn get_preset_location(&self, addr: Option<&str>) -> Option<Location> {
         if let Some(location) = self.preset_location.as_ref() {
             let mut location = location.to_location();
