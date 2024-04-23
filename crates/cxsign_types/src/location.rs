@@ -49,7 +49,107 @@ impl Location {
         } = self;
         [addr, lon, lat, alt]
     }
+    pub fn from_owned_fields([addr, lon, lat, alt]: [String; 4]) -> Self {
+        Location {
+            addr,
+            lon,
+            lat,
+            alt,
+        }
+    }
+    pub fn get_none_location() -> Self {
+        Location {
+            addr: "".to_string(),
+            lon: "".to_string(),
+            lat: "".to_string(),
+            alt: "".to_string(),
+        }
+    }
+    pub fn parse(location_str: &str) -> Result<Self, String> {
+        let location_str: Vec<&str> = location_str.split(',').map(|item| item.trim()).collect();
+        if location_str.len() == 4 {
+            Ok(Self::new(
+                location_str[0],
+                location_str[1],
+                location_str[2],
+                location_str[3],
+            ))
+        } else {
+            Err("位置信息格式错误！格式为：`地址,经度,纬度,海拔`.".to_string())
+        }
+    }
+    pub fn new(addr: &str, lon: &str, lat: &str, alt: &str) -> Location {
+        let location = Location {
+            addr: addr.into(),
+            lon: lon.into(),
+            lat: lat.into(),
+            alt: alt.into(),
+        };
+        do_location_preprocessor(location)
+    }
+    /// 地址。
+    pub fn get_addr(&self) -> &str {
+        &self.addr
+    }
+    /// 经度。
+    pub fn get_lon(&self) -> &str {
+        &self.lon
+    }
+    /// 纬度。
+    pub fn get_lat(&self) -> &str {
+        &self.lat
+    }
+    /// 海拔。
+    pub fn get_alt(&self) -> &str {
+        &self.alt
+    }
+    /// 地址。
+    pub fn set_addr(&mut self, addr: &str) {
+        addr.clone_into(&mut self.addr)
+    }
+    /// 经度。
+    pub fn set_lon(&mut self, lon: &str) {
+        lon.clone_into(&mut self.lon)
+    }
+    /// 纬度。
+    pub fn set_lat(&mut self, lat: &str) {
+        lat.clone_into(&mut self.lat)
+    }
+    /// 海拔。
+    pub fn set_alt(&mut self, alt: &str) {
+        alt.clone_into(&mut self.alt)
+    }
 }
+
+impl std::fmt::Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{},{},{},{}", self.addr, self.lon, self.lat, self.alt)
+    }
+}
+impl FromStr for Location {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Location::parse(s)
+    }
+}
+
+// pub fn 为数据库添加位置(
+//     db: &super::sql::DataBase, course_id: i64, 位置: &Location
+// ) -> i64 {
+//     // 为指定课程添加位置。
+//     let mut 位置id = 0_i64;
+//     loop {
+//         if db.是否存在为某id的位置(位置id) {
+//             位置id += 1;
+//             continue;
+//         }
+//         db.添加位置_失败后则(位置id, course_id, 位置, |_, _, _, _| {});
+//         break;
+//     }
+//     位置id
+// }
+
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct LocationWithRange {
     #[serde(rename = "address")]
@@ -179,99 +279,6 @@ impl LocationWithRange {
         self.range
     }
 }
-impl FromStr for Location {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Location::parse(s)
-    }
-}
-impl Location {
-    pub fn get_none_location() -> Self {
-        Location {
-            addr: "".to_string(),
-            lon: "".to_string(),
-            lat: "".to_string(),
-            alt: "".to_string(),
-        }
-    }
-    pub fn parse(location_str: &str) -> Result<Self, String> {
-        let location_str: Vec<&str> = location_str.split(',').map(|item| item.trim()).collect();
-        if location_str.len() == 4 {
-            Ok(Self::new(
-                location_str[0],
-                location_str[1],
-                location_str[2],
-                location_str[3],
-            ))
-        } else {
-            Err("位置信息格式错误！格式为：`地址,经度,纬度,海拔`.".to_string())
-        }
-    }
-    pub fn new(addr: &str, lon: &str, lat: &str, alt: &str) -> Location {
-        let location = Location {
-            addr: addr.into(),
-            lon: lon.into(),
-            lat: lat.into(),
-            alt: alt.into(),
-        };
-        do_location_preprocessor(location)
-    }
-    /// 地址。
-    pub fn get_addr(&self) -> &str {
-        &self.addr
-    }
-    /// 经度。
-    pub fn get_lon(&self) -> &str {
-        &self.lon
-    }
-    /// 纬度。
-    pub fn get_lat(&self) -> &str {
-        &self.lat
-    }
-    /// 海拔。
-    pub fn get_alt(&self) -> &str {
-        &self.alt
-    }
-    /// 地址。
-    pub fn set_addr(&mut self, addr: &str) {
-        addr.clone_into(&mut self.addr)
-    }
-    /// 经度。
-    pub fn set_lon(&mut self, lon: &str) {
-        lon.clone_into(&mut self.lon)
-    }
-    /// 纬度。
-    pub fn set_lat(&mut self, lat: &str) {
-        lat.clone_into(&mut self.lat)
-    }
-    /// 海拔。
-    pub fn set_alt(&mut self, alt: &str) {
-        alt.clone_into(&mut self.alt)
-    }
-}
-
-impl std::fmt::Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{},{},{},{}", self.addr, self.lon, self.lat, self.alt)
-    }
-}
-
-// pub fn 为数据库添加位置(
-//     db: &super::sql::DataBase, course_id: i64, 位置: &Location
-// ) -> i64 {
-//     // 为指定课程添加位置。
-//     let mut 位置id = 0_i64;
-//     loop {
-//         if db.是否存在为某id的位置(位置id) {
-//             位置id += 1;
-//             continue;
-//         }
-//         db.添加位置_失败后则(位置id, course_id, 位置, |_, _, _, _| {});
-//         break;
-//     }
-//     位置id
-// }
 #[cfg(test)]
 mod tests {
     use crate::LocationWithRange;
