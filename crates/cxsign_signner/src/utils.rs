@@ -1,7 +1,7 @@
 use cxsign_activity::sign::{LocationSign, QrCodeSign, SignTrait};
 use cxsign_error::Error;
 use cxsign_imageproc::cut_picture;
-use log::warn;
+use log::{debug, warn};
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 use log::{error, info};
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
@@ -232,7 +232,7 @@ pub fn capture_screen_for_enc(is_refresh: bool, precise: bool) -> Option<String>
             return if precise && is_refresh && inquire_confirm("二维码图片是否就绪？", "本程序已在屏幕上找到签到二维码。请不要改变该二维码的位置，待二维码刷新后按下回车进行签到。") {
                 // 如果是定时刷新的二维码，等待二维码刷新。
                 let 二维码在屏幕上的位置 = get_rect_contains_vertex(r.getPoints());
-                info!("二维码位置：{:?}", 二维码在屏幕上的位置);
+                debug!("二维码位置：{:?}", 二维码在屏幕上的位置);
                 let pic = screen
                     .capture_image()
                     .unwrap_or_else(|e| panic!("{e:?}"));
