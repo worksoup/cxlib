@@ -1,17 +1,31 @@
+use chrono::TimeDelta;
 use log::info;
 use std::io::Read;
+use std::ops::Add;
+use std::time::{Duration, SystemTime};
 use unicode_width::UnicodeWidthStr;
-pub fn now_string() -> String {
-    chrono::DateTime::<chrono::Local>::from(std::time::SystemTime::now())
-        .format("%+")
-        .to_string()
-}
 
 pub fn print_now() {
     let str = now_string();
     info!("{str}");
 }
-
+pub fn now_string() -> String {
+    time_string(SystemTime::now())
+}
+pub fn time_string(t: SystemTime) -> String {
+    chrono::DateTime::<chrono::Local>::from(t)
+        .format("%+")
+        .to_string()
+}
+pub fn time_string_from_mills(mills: u64) -> String {
+    time_string(std::time::UNIX_EPOCH.add(Duration::from_millis(mills)))
+}
+pub fn time_delta_since_to_now(mills: u64) -> TimeDelta {
+    let start_time = std::time::UNIX_EPOCH + Duration::from_millis(mills);
+    let now = SystemTime::now();
+    let duration = now.duration_since(start_time).unwrap();
+    TimeDelta::from_std(duration).unwrap()
+}
 pub fn inquire_confirm(inquire: &str, tips: &str) -> bool {
     inquire::Confirm::new(inquire)
         .with_help_message(tips)
@@ -43,13 +57,6 @@ pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
     }
 }
 
-// mod test {
-//     #[test]
-//     fn test_des() {
-//         println!("{}", crate::utils::pwd_des("0123456789."));
-//     }
-// }
-
 pub fn zlib_encode(text: &str) -> Vec<u8> {
     use flate2::write::ZlibEncoder;
     use flate2::Compression;
@@ -64,4 +71,12 @@ pub fn zlib_decode<R: Read>(r: R) -> String {
     let mut decompressed_data = String::new();
     decoder.read_to_string(&mut decompressed_data).unwrap();
     decompressed_data
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_des() {
+        println!("{}", crate::now_string());
+    }
 }

@@ -1,7 +1,7 @@
 use crate::protocol;
 use crate::sign::{
-    GestureSign, LocationSign, NormalSign, PhotoSign, PreSignResult, QrCodeSign, Sign,
-    SignDetail, SignResult, SignTrait, SigncodeSign,
+    GestureSign, LocationSign, NormalSign, PhotoSign, PreSignResult, QrCodeSign, Sign, SignDetail,
+    SignResult, SignTrait, SigncodeSign,
 };
 use cxsign_types::{Course, Dioption, Location, LocationWithRange};
 use cxsign_user::Session;
@@ -13,7 +13,7 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct RawSign {
-    pub start_timestamp: i64,
+    pub start_time_mills: u64,
     pub active_id: String,
     pub name: String,
     pub course: Course,
@@ -57,7 +57,7 @@ impl Display for RawSign {
             self.active_id,
             self.name,
             self.status_code,
-            chrono::DateTime::from_timestamp(self.start_timestamp, 0).unwrap(),
+            cxsign_utils::time_string_from_mills(self.start_time_mills),
             self.is_valid(),
             self.course.get_id(),
             self.course.get_name(),
@@ -192,7 +192,7 @@ impl RawSign {
             self.active_id,
             self.name,
             self.status_code,
-            chrono::DateTime::from_timestamp(self.start_timestamp, 0).unwrap(),
+            cxsign_utils::time_string_from_mills(self.start_time_mills),
             self.is_valid(),
             width = name_width,
         )

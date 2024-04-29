@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::hash_map::OccupiedError;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 pub type ActivitiesSessionsMap = (
     HashMap<RawSign, Vec<Session>>,
@@ -42,9 +43,7 @@ impl Activity {
         let mut dont_exclude = false;
         for activity in activities {
             if let Self::RawSign(sign) = activity {
-                let start_time = chrono::DateTime::from_timestamp(sign.start_timestamp, 0).unwrap();
-                let now = chrono::DateTime::<chrono::Local>::from(std::time::SystemTime::now());
-                if now.signed_duration_since(start_time).num_days() < 160 {
+                if cxsign_utils::time_delta_since_to_now(sign.start_time_mills).num_days() < 160 {
                     dont_exclude = true;
                 }
                 if sign.is_valid() {
@@ -109,13 +108,10 @@ impl Activity {
                         for activity in activities {
                             if let Self::RawSign(sign) = activity {
                                 if set_excludes {
-                                    let start_time =
-                                        chrono::DateTime::from_timestamp(sign.start_timestamp, 0)
-                                            .unwrap();
-                                    let now = chrono::DateTime::<chrono::Local>::from(
-                                        std::time::SystemTime::now(),
-                                    );
-                                    if now.signed_duration_since(start_time).num_days() < 160 {
+                                    if cxsign_utils::time_delta_since_to_now(sign.start_time_mills)
+                                        .num_days()
+                                        < 160
+                                    {
                                         dont_exclude = true;
                                     }
                                 }
@@ -221,7 +217,7 @@ impl Activity {
                                 course: c.clone(),
                                 other_id,
                                 status_code: ar.status,
-                                start_timestamp: (ar.start_time / 1000) as i64,
+                                start_time_mills: ar.start_time_mills,
                             };
                             activities.lock().unwrap().push(Self::RawSign(base_sign))
                         } else {
@@ -230,7 +226,7 @@ impl Activity {
                                 name: ar.name_one,
                                 course: c.clone(),
                                 status: ar.status,
-                                start_time_secs: (ar.start_time / 1000) as i64,
+                                start_time_mills: ar.start_time_mills,
                             }))
                         }
                     });
@@ -252,7 +248,7 @@ pub struct OtherActivity {
     pub name: String,
     pub course: Course,
     pub status: i32,
-    pub start_time_secs: i64,
+    pub start_time_mills: u64,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -264,7 +260,7 @@ struct ActivityRaw {
     other_id: Option<String>,
     status: i32,
     #[serde(rename = "startTime")]
-    start_time: u64,
+    start_time_mills: u64,
 }
 
 #[derive(Deserialize, Serialize)]

@@ -13,6 +13,7 @@ pub use photo::*;
 pub use qrcode::*;
 pub use raw::*;
 pub use signcode::*;
+use std::ops::Add;
 
 use cxsign_types::{Course, Dioption, LocationWithRange};
 use cxsign_user::Session;
@@ -67,12 +68,13 @@ pub trait SignTrait: Ord {
     }
     /// 判断签到活动是否有效（目前认定两小时内未结束的签到为有效签到）。
     fn is_valid(&self) -> bool {
-        let time = std::time::SystemTime::from(
-            chrono::DateTime::from_timestamp(self.as_inner().start_timestamp, 0).unwrap(),
-        );
+        let time = std::time::Duration::from_millis(self.as_inner().start_time_mills);
         let two_hours = std::time::Duration::from_secs(7200);
         self.as_inner().status_code == 1
-            && std::time::SystemTime::now().duration_since(time).unwrap() < two_hours
+            && std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH.add(time))
+                .unwrap()
+                < two_hours
     }
     /// 获取签到后状态。参见返回类型 [`SignState`].
     fn get_sign_state(&self, session: &Session) -> Result<SignState, Box<ureq::Error>> {
