@@ -37,7 +37,7 @@ impl SignTrait for GestureSign {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
             _ => self

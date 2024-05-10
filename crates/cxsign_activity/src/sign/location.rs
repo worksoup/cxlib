@@ -38,7 +38,7 @@ impl SignTrait for LocationSign {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
             PreSignResult::Data(captcha_id) => {
@@ -61,7 +61,7 @@ impl SignTrait for LocationSign {
             }
         }
     }
-    fn pre_sign_and_sign(&self, session: &Session) -> Result<SignResult, Box<ureq::Error>> {
+    fn pre_sign_and_sign(&self, session: &Session) -> Result<SignResult, cxsign_error::Error> {
         let r = self.pre_sign(session)?;
         self.sign(session, r)
     }

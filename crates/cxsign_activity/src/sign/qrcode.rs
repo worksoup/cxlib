@@ -12,7 +12,7 @@ fn sign_unchecked<T: SignTrait>(
     preset_location: &Option<LocationWithRange>,
     captcha_id: Option<CaptchaId>,
     session: &Session,
-) -> Result<SignResult, Box<ureq::Error>> {
+) -> Result<SignResult, cxsign_error::Error> {
     let url_getter = |l: &Location| {
         protocol::qrcode_sign_url(session, enc, sign.as_inner().active_id.as_str(), Some(l))
     };
@@ -53,7 +53,7 @@ impl SignTrait for QrCodeSign {
     fn is_ready_for_sign(&self) -> bool {
         self.enc.is_some()
     }
-    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, Box<ureq::Error>> {
+    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxsign_error::Error> {
         let enc = self.enc.as_deref().unwrap_or("");
         let raw = self.as_inner();
         let active_id = raw.active_id.as_str();
@@ -73,7 +73,7 @@ impl SignTrait for QrCodeSign {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
             PreSignResult::Data(captcha_id) => {

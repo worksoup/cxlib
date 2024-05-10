@@ -29,12 +29,12 @@ impl SignTrait for SigncodeSign {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
-            _ => self.as_inner().sign_with_signcode(session, unsafe {
+            _ => Ok(self.as_inner().sign_with_signcode(session, unsafe {
                 self.signcode.as_ref().unwrap_unchecked()
-            }),
+            })?),
         }
     }
 }

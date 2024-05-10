@@ -12,4 +12,6 @@ pub enum Error {
     EncError(String),
     #[error("无法获取位置信息！")]
     LocationError,
+    #[error("二次验证信息为空！")]
+    CaptchaEmptyError,
 }

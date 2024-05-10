@@ -9,22 +9,18 @@ pub fn secondary_verification(
     agent: &ureq::Agent,
     url: String,
     captcha_id: &Option<CaptchaId>,
-) -> Result<SignResult, Box<ureq::Error>> {
+) -> Result<SignResult, cxsign_error::Error> {
     let captcha_id = if let Some(captcha_id) = captcha_id {
         captcha_id
     } else {
         warn!("未找到滑块 ID, 使用内建值。");
         CAPTCHA_ID
     };
-    let url_param = cxsign_captcha::utils::captcha_solver(agent, captcha_id)?.get_validate_info();
-    let r = if let Some(url_param) = url_param {
+    let url_param = cxsign_captcha::utils::captcha_solver(agent, captcha_id)?;
+    let r = {
         let url = url + "&validate=" + &url_param;
         let r = protocol::ureq_get(agent, &url)?;
         guess_sign_result_by_text(&r.into_string().unwrap())
-    } else {
-        SignResult::Fail {
-            msg: "滑块验证失败，请重试。".to_string(),
-        }
     };
     Ok(r)
 }
@@ -54,7 +50,7 @@ pub(crate) fn sign_unchecked_with_location<T: SignTrait>(
     preset_location: &Option<LocationWithRange>,
     captcha_id: Option<CaptchaId>,
     session: &Session,
-) -> Result<SignResult, Box<ureq::Error>> {
+) -> Result<SignResult, cxsign_error::Error> {
     let mut locations = Vec::new();
     let addr = location.get_addr();
     locations.push(location.clone());

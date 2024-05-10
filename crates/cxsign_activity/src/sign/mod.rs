@@ -77,7 +77,7 @@ pub trait SignTrait: Ord {
                 < two_hours
     }
     /// 获取签到后状态。参见返回类型 [`SignState`].
-    fn get_sign_state(&self, session: &Session) -> Result<SignState, Box<ureq::Error>> {
+    fn get_sign_state(&self, session: &Session) -> Result<SignState, cxsign_error::Error> {
         let r = crate::protocol::get_attend_info(session, &self.as_inner().active_id)?;
         #[derive(Deserialize)]
         struct Status {
@@ -97,7 +97,7 @@ pub trait SignTrait: Ord {
         crate::utils::guess_sign_result_by_text(text)
     }
     /// 预签到。
-    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, Box<ureq::Error>> {
+    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxsign_error::Error> {
         self.as_inner().pre_sign(session)
     }
     /// # Safety
@@ -107,7 +107,7 @@ pub trait SignTrait: Ord {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         unsafe { self.as_inner().sign_unchecked(session, pre_sign_result) }
     }
     /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
@@ -117,7 +117,7 @@ pub trait SignTrait: Ord {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         if self.is_ready_for_sign() {
             unsafe { self.sign_unchecked(session, pre_sign_result) }
         } else {
@@ -127,7 +127,7 @@ pub trait SignTrait: Ord {
         }
     }
     /// 预签到并签到。
-    fn pre_sign_and_sign(&self, session: &Session) -> Result<SignResult, Box<ureq::Error>> {
+    fn pre_sign_and_sign(&self, session: &Session) -> Result<SignResult, cxsign_error::Error> {
         let r = self.pre_sign(session)?;
         self.sign(session, r)
     }
@@ -185,7 +185,7 @@ impl SignTrait for Sign {
         }
     }
 
-    fn get_sign_state(&self, session: &Session) -> Result<SignState, Box<ureq::Error>> {
+    fn get_sign_state(&self, session: &Session) -> Result<SignState, cxsign_error::Error> {
         match self {
             Sign::Photo(a) => a.get_sign_state(session),
             Sign::Normal(a) => a.get_sign_state(session),
@@ -196,7 +196,7 @@ impl SignTrait for Sign {
             Sign::Unknown(a) => a.get_sign_state(session),
         }
     }
-    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, Box<ureq::Error>> {
+    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxsign_error::Error> {
         match self {
             Sign::Photo(a) => a.pre_sign(session),
             Sign::Normal(a) => a.pre_sign(session),
@@ -211,7 +211,7 @@ impl SignTrait for Sign {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         unsafe {
             match self {
                 Sign::Photo(a) => a.sign_unchecked(session, pre_sign_result),

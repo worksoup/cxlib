@@ -25,7 +25,7 @@ impl SignTrait for RawSign {
     fn as_inner(&self) -> &RawSign {
         self
     }
-    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, Box<ureq::Error>> {
+    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxsign_error::Error> {
         let active_id = self.active_id.as_str();
         let uid = session.get_uid();
         let response_of_pre_sign =
@@ -37,7 +37,7 @@ impl SignTrait for RawSign {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
             _ => {
@@ -71,7 +71,7 @@ impl RawSign {
         session: &Session,
         active_id: &str,
         signcode: &str,
-    ) -> Result<bool, Box<ureq::Error>> {
+    ) -> Result<bool, cxsign_error::Error> {
         #[derive(Deserialize)]
         struct CheckR {
             #[allow(unused)]
@@ -85,7 +85,7 @@ impl RawSign {
     pub(crate) fn get_sign_detail(
         active_id: &str,
         session: &Session,
-    ) -> Result<SignDetail, Box<ureq::Error>> {
+    ) -> Result<SignDetail, cxsign_error::Error> {
         #[derive(Deserialize)]
         struct GetSignDetailR {
             #[serde(rename = "ifPhoto")]
@@ -209,7 +209,7 @@ impl RawSign {
         active_id: &str,
         session: &Session,
         response_of_presign: ureq::Response,
-    ) -> Result<PreSignResult, Box<ureq::Error>> {
+    ) -> Result<PreSignResult, cxsign_error::Error> {
         let html = response_of_presign.into_string().unwrap();
         trace!("预签到请求结果：{html}");
         if let Some(start_of_statuscontent_h1) = html.find("id=\"statuscontent\"") {
@@ -254,7 +254,7 @@ impl RawSign {
         &self,
         session: &Session,
         signcode: &str,
-    ) -> Result<SignResult, Box<ureq::Error>> {
+    ) -> Result<SignResult, cxsign_error::Error> {
         if Self::check_signcode(session, &self.active_id, signcode)? {
             let r = protocol::signcode_sign(session, self.active_id.as_str(), signcode)?;
             Ok(self.guess_sign_result_by_text(&r.into_string().unwrap()))

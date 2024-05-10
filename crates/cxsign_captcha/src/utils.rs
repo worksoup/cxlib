@@ -72,7 +72,7 @@ pub fn auto_solve_captcha(
 pub fn captcha_solver(
     agent: &ureq::Agent,
     captcha_id: &str,
-) -> Result<ValidateResult, Box<ureq::Error>> {
+) -> Result<String, cxsign_error::Error> {
     let time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -83,7 +83,13 @@ pub fn captcha_solver(
         t: u128,
     }
     let Tmp { t } = trim_response_to_json(r.into_string().unwrap().as_str()).unwrap();
-    auto_solve_captcha(agent, captcha_id, t)
+    // 事不过三。
+    for i in 0..3 {
+        if let Some(c) = auto_solve_captcha(agent, captcha_id, t + i)?.get_validate_info() {
+            return Ok(c);
+        }
+    }
+    Err(cxsign_error::Error::CaptchaEmptyError)
 }
 
 #[derive(Deserialize, Debug)]
