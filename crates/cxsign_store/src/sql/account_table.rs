@@ -1,14 +1,54 @@
 use cxsign_user::Session;
 
 use crate::sql::{DataBase, DataBaseTableTrait};
-use log::warn;
+use log::{info, warn};
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::str::FromStr;
 
 pub struct AccountTable<'a> {
     db: &'a DataBase,
 }
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UnameAndEncPwdPair {
+    pub uname: String,
+    pub enc_pwd: String,
+}
+impl From<(String, String)> for UnameAndEncPwdPair {
+    fn from((uname, enc_pwd): (String, String)) -> Self {
+        UnameAndEncPwdPair { uname, enc_pwd }
+    }
+}
+impl ToString for &UnameAndEncPwdPair {
+    fn to_string(&self) -> String {
+        (*self).to_string()
+    }
+}
+impl ToString for UnameAndEncPwdPair {
+    fn to_string(&self) -> String {
+        format!("{},{}", self.uname, self.enc_pwd)
+    }
+}
+impl FromStr for UnameAndEncPwdPair {
+    type Err = cxsign_error::Error;
 
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+        if s.len() < 2 {
+            return Err(cxsign_error::Error::ParseError(
+                "登录所需信息解析出错！格式为 `uname,enc_pwd`.".to_string(),
+            ));
+        } else {
+            let uname = s[0].to_string();
+            let enc_pwd = s[1].to_string();
+            return Ok(Self { uname, enc_pwd });
+        }
+    }
+}
 impl<'a> AccountTable<'a> {
     pub fn get_sessions_by_accounts_str(&self, accounts: &str) -> HashMap<String, Session> {
         let str_list = accounts.split(',').map(|a| a.trim()).collect::<Vec<&str>>();
@@ -33,11 +73,14 @@ impl<'a> AccountTable<'a> {
         let str_list = binding.keys().collect::<Vec<_>>();
         let mut s = HashMap::new();
         for account in str_list {
-            if self.has_account(account) {
-                let session = Session::load_json(&self.db.dir, account).unwrap();
-                s.insert(account.to_string(), session);
+            if self.has_account(&account.uname) {
+                let session = Session::load_json(&self.db.dir, &account.uname).unwrap();
+                s.insert(account.uname.clone(), session);
             } else {
-                warn!("没有该账号：[`{account}`]，跳过。请检查输入或登录。");
+                warn!(
+                    "没有该账号：[`{}`]，跳过。请检查输入或登录。",
+                    account.uname
+                );
             }
         }
         s
@@ -116,7 +159,7 @@ impl<'a> AccountTable<'a> {
         query.next().unwrap();
     }
 
-    pub fn get_accounts(&self) -> HashMap<String, (String, String)> {
+    pub fn get_accounts(&self) -> HashMap<UnameAndEncPwdPair, String> {
         let mut query = self
             .db
             .prepare(format!("SELECT * FROM {};", Self::TABLE_NAME))
@@ -127,7 +170,7 @@ impl<'a> AccountTable<'a> {
                 let uname: &str = row.read("uname");
                 let pwd: &str = row.read("pwd");
                 let name: &str = row.read("name");
-                accounts.insert(uname.into(), (pwd.into(), name.into()));
+                accounts.insert((uname.into(), pwd.into()).into(), name.into());
             } else {
                 warn!("账号解析行出错：{c:?}.");
             }
@@ -137,7 +180,7 @@ impl<'a> AccountTable<'a> {
         }
         accounts
     }
-    pub fn get_account(&self, account: &str) -> Option<(String, (String, String))> {
+    pub fn get_account(&self, account: &str) -> Option<(UnameAndEncPwdPair, String)> {
         let mut query = self
             .db
             .prepare(format!("SELECT * FROM {} WHERE uname=?;", Self::TABLE_NAME))
@@ -148,7 +191,7 @@ impl<'a> AccountTable<'a> {
                 let uname: &str = row.read("uname");
                 let pwd: &str = row.read("pwd");
                 let name: &str = row.read("name");
-                return Some((uname.into(), (pwd.into(), name.into())));
+                return Some(((uname.into(), pwd.into()).into(), name.into()));
             } else {
                 warn!("账号解析行出错：{c:?}.");
             }
@@ -168,8 +211,9 @@ impl<'a> AccountTable<'a> {
         Ok(session)
     }
     pub fn relogin(&self, uname: String, enc_pwd: &str) -> Result<Session, cxsign_error::Error> {
-        let session = Session::login(&cxsign_dir::DIR, &uname, enc_pwd)?;
+        let session = Session::relogin(&uname, enc_pwd)?;
         self.delete_account(&uname);
+        session.store_json(&cxsign_dir::DIR);
         let name = session.get_stu_name();
         self.add_account_or(&uname, enc_pwd, name, AccountTable::update_account);
         Ok(session)
@@ -183,6 +227,25 @@ impl<'a> DataBaseTableTrait<'a> for AccountTable<'a> {
 
     fn from_ref(db: &'a DataBase) -> Self {
         Self { db }
+    }
+
+    fn import(db: &'a DataBase, data: String) -> Self {
+        let table = db.add_table::<Self>();
+        let data = crate::io::parse::<cxsign_error::Error, UnameAndEncPwdPair>(data);
+        for UnameAndEncPwdPair { uname, enc_pwd } in data {
+            match table.relogin(uname.clone(), &enc_pwd) {
+                Ok(session) => info!(
+                    "账号 [{uname}]（用户名：{}）导入成功！",
+                    session.get_stu_name()
+                ),
+                Err(e) => warn!("账号 [{uname}] 导入失败！错误信息：{e}."),
+            }
+        }
+        table
+    }
+
+    fn export(self) -> String {
+        crate::io::to_string(self.get_accounts().keys())
     }
 }
 

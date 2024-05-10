@@ -9,11 +9,7 @@ mod utils;
 pub use utils::*;
 static UA: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 (schild:eaf4fb193ec970c0a9775e2a27b0232b) (device:iPhone11,2) Language/zh-Hans com.ssreader.ChaoXingStudy/ChaoXingStudy_3_6.0.2_ios_phone_202209281930_99 (@Kalimdor)_1665876591620212942";
 
-pub fn login_enc<P: AsRef<Path>>(
-    account: &str,
-    enc_passwd: &str,
-    store_path: Option<P>,
-) -> Result<Agent, Error> {
+pub fn login_enc(account: &str, enc_passwd: &str) -> Result<Agent, Error> {
     let cookie_store = cookie_store::CookieStore::new(None);
     let client = AgentBuilder::new()
         .user_agent(UA)
@@ -49,13 +45,6 @@ pub fn login_enc<P: AsRef<Path>>(
             warn!("{mes:?}");
         }
         return Err(Error::LoginError(format!("{mes:?}")));
-    }
-    if let Some(store_path) = store_path {
-        // Write store back to disk
-        let mut writer = std::fs::File::create(store_path)
-            .map(std::io::BufWriter::new)
-            .unwrap();
-        client.cookie_store().save_json(&mut writer).unwrap();
     }
     Ok(client)
 }

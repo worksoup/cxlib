@@ -74,6 +74,19 @@ impl<'a> DataBaseTableTrait<'a> for ExcludeTable<'a> {
     fn from_ref(db: &'a DataBase) -> Self {
         Self { db }
     }
+
+    fn import(db: &'a DataBase, data: String) -> Self {
+        let table = Self::from_ref(db);
+        let data = crate::io::parse(data);
+        for id in data {
+            table.add_exclude(id)
+        }
+        table
+    }
+
+    fn export(self) -> String {
+        crate::io::to_string(self.get_excludes().into_iter())
+    }
 }
 impl<'a> Deref for ExcludeTable<'a> {
     type Target = DataBase;

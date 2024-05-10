@@ -12,11 +12,11 @@ use sqlite::Connection;
 use std::fs::File;
 use std::ops::Deref;
 
-pub trait DataBaseTableTrait<'a>: Deref<Target = DataBase> {
+pub trait DataBaseTableTrait<'a>: Deref<Target = DataBase> + Sized {
     const TABLE_ARGS: &'static str;
     const TABLE_NAME: &'static str;
     fn from_ref(db: &'a DataBase) -> Self;
-    fn create(db: &DataBase) {
+    fn create(db: &'a DataBase) -> Self {
         if !Self::is_existed(db) {
             db.execute(format!(
                 "CREATE TABLE {} ({});",
@@ -25,6 +25,7 @@ pub trait DataBaseTableTrait<'a>: Deref<Target = DataBase> {
             ))
             .unwrap();
         }
+        Self::from_ref(db)
     }
     fn is_existed(db: &DataBase) -> bool {
         let mut query = db
@@ -42,6 +43,12 @@ pub trait DataBaseTableTrait<'a>: Deref<Target = DataBase> {
             .unwrap();
         query.next().unwrap();
         info!("已删除数据表 {}。", Self::TABLE_NAME);
+    }
+    fn import(db: &'a DataBase, _: String) -> Self {
+        Self::from_ref(db)
+    }
+    fn export(self) -> String {
+        String::new()
     }
 }
 
@@ -67,8 +74,7 @@ impl DataBase {
         Self { connection, dir }
     }
     pub fn add_table<'a, T: DataBaseTableTrait<'a>>(&'a self) -> T {
-        T::create(self);
-        T::from_ref(self)
+        T::create(self)
     }
 }
 impl Default for DataBase {

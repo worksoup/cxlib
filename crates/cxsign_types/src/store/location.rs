@@ -1,13 +1,63 @@
 use crate::location::Location;
 use cxsign_store::{AliasTable, DataBase, DataBaseTableTrait};
-use log::warn;
+use log::{debug, warn};
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::str::FromStr;
 
 pub struct LocationTable<'a> {
     db: &'a DataBase,
 }
+pub struct LocationAndAliasesPair {
+    pub course: i64,
+    pub location: Location,
+    pub aliases: Vec<String>,
+}
+impl FromStr for LocationAndAliasesPair {
+    type Err = cxsign_error::Error;
 
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data: Vec<&str> = s.split('$').collect();
+
+        if data.len() > 1 {
+            let course = match data[0].trim().parse::<i64>() {
+                Ok(course_id) => course_id,
+                Err(e) => {
+                    warn!("课程号解析失败，回退为 `-1`! 错误信息：{e}.");
+                    -1_i64
+                }
+            };
+            match Location::parse(data[1]) {
+                Ok(location) => {
+                    let aliases: Vec<_> = if data.len() > 2 {
+                        data[2].split('/').map(|s| s.trim().to_string()).collect()
+                    } else {
+                        vec![]
+                    };
+                    Ok(LocationAndAliasesPair {
+                        course,
+                        location,
+                        aliases,
+                    })
+                }
+                Err(e) => Err(cxsign_error::Error::ParseError(format!(
+                    "位置解析出错：{e}."
+                ))),
+            }
+        } else {
+            Err(cxsign_error::Error::ParseError(format!(
+                "格式应为 `课程号$地址,经度,纬度,海拔$别名/...`"
+            )))
+        }
+    }
+}
+impl ToString for LocationAndAliasesPair {
+    fn to_string(&self) -> String {
+        let aliases_contents = self.aliases.join("/");
+        debug!("{:?}", self.aliases);
+        format!("{}${}${}", self.course, self.location, aliases_contents)
+    }
+}
 impl<'a> LocationTable<'a> {
     pub fn has_location(&self, location_id: i64) -> bool {
         let mut query = self
@@ -77,6 +127,7 @@ impl<'a> LocationTable<'a> {
             alias_table.delete_alias(&alias)
         }
     }
+    /// location_id, (course_id, location)
     pub fn get_locations(&self) -> HashMap<i64, (i64, Location)> {
         let mut query = self
             .db
@@ -176,6 +227,44 @@ impl<'a> DataBaseTableTrait<'a> for LocationTable<'a> {
 
     fn from_ref(db: &'a DataBase) -> Self {
         Self { db }
+    }
+
+    fn import(db: &'a DataBase, data: String) -> Self {
+        let location_table = Self::from_ref(db);
+        let alias_table = AliasTable::from_ref(db);
+        let data = cxsign_store::parse::<cxsign_error::Error, LocationAndAliasesPair>(data);
+        for LocationAndAliasesPair {
+            course,
+            location,
+            aliases,
+        } in data
+        {
+            let location_id = location_table.insert_location(course, &location);
+            for alias in aliases {
+                if !alias.is_empty() {
+                    alias_table.add_alias_or(&alias, location_id, |t, a, l| {
+                        t.update_alias(a, l);
+                    })
+                }
+            }
+        }
+        location_table
+    }
+
+    fn export(self) -> String {
+        let alias_table = AliasTable::from_ref(&self);
+        let data = self
+            .get_locations()
+            .into_iter()
+            .map(|(location_id, (course, location))| {
+                let aliases = alias_table.get_aliases(location_id);
+                LocationAndAliasesPair {
+                    course,
+                    location,
+                    aliases,
+                }
+            });
+        cxsign_store::to_string(data)
     }
 }
 impl<'a> Deref for LocationTable<'a> {
