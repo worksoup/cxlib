@@ -3,6 +3,7 @@ use cxsign_user::Session;
 use crate::sql::{DataBase, DataBaseTableTrait};
 use log::{info, warn};
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::ops::Deref;
 use std::str::FromStr;
 
@@ -19,14 +20,9 @@ impl From<(String, String)> for UnameAndEncPwdPair {
         UnameAndEncPwdPair { uname, enc_pwd }
     }
 }
-impl ToString for &UnameAndEncPwdPair {
-    fn to_string(&self) -> String {
-        (*self).to_string()
-    }
-}
-impl ToString for UnameAndEncPwdPair {
-    fn to_string(&self) -> String {
-        format!("{},{}", self.uname, self.enc_pwd)
+impl Display for UnameAndEncPwdPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{},{}", self.uname, self.enc_pwd)
     }
 }
 impl FromStr for UnameAndEncPwdPair {
@@ -39,13 +35,13 @@ impl FromStr for UnameAndEncPwdPair {
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>();
         if s.len() < 2 {
-            return Err(cxsign_error::Error::ParseError(
+            Err(cxsign_error::Error::ParseError(
                 "登录所需信息解析出错！格式为 `uname,enc_pwd`.".to_string(),
-            ));
+            ))
         } else {
             let uname = s[0].to_string();
             let enc_pwd = s[1].to_string();
-            return Ok(Self { uname, enc_pwd });
+            Ok(Self { uname, enc_pwd })
         }
     }
 }

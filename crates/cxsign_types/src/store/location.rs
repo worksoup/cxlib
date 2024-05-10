@@ -2,6 +2,7 @@ use crate::location::Location;
 use cxsign_store::{AliasTable, DataBase, DataBaseTableTrait};
 use log::{debug, warn};
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::ops::Deref;
 use std::str::FromStr;
 
@@ -45,17 +46,17 @@ impl FromStr for LocationAndAliasesPair {
                 ))),
             }
         } else {
-            Err(cxsign_error::Error::ParseError(format!(
-                "格式应为 `课程号$地址,经度,纬度,海拔$别名/...`"
-            )))
+            Err(cxsign_error::Error::ParseError(
+                "格式应为 `课程号$地址,经度,纬度,海拔$别名/...`".to_string(),
+            ))
         }
     }
 }
-impl ToString for LocationAndAliasesPair {
-    fn to_string(&self) -> String {
+impl Display for LocationAndAliasesPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let aliases_contents = self.aliases.join("/");
         debug!("{:?}", self.aliases);
-        format!("{}${}${}", self.course, self.location, aliases_contents)
+        write!(f, "{}${}${}", self.course, self.location, aliases_contents)
     }
 }
 impl<'a> LocationTable<'a> {
