@@ -48,7 +48,7 @@ impl QrCodeSign {
 }
 impl SignTrait for QrCodeSign {
     fn as_inner(&self) -> &RawSign {
-        &self.raw_sign.as_inner()
+        self.raw_sign.as_inner()
     }
     fn is_ready_for_sign(&self) -> bool {
         self.enc.is_some()

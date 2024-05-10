@@ -1,5 +1,6 @@
 use crate::SignnerTrait;
 use cxsign_activity::sign::{QrCodeSign, SignResult, SignTrait};
+use cxsign_error::Error;
 use cxsign_store::DataBase;
 use cxsign_types::Location;
 use cxsign_user::Session;
@@ -7,7 +8,6 @@ use log::warn;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use cxsign_error::Error;
 
 pub struct DefaultQrCodeSignner<'a> {
     db: &'a DataBase,
@@ -91,12 +91,8 @@ impl<'l> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'l> {
         Ok(map)
     }
 
-    fn sign_single(
-        sign: &mut QrCodeSign,
-        session: &Session,
-        _: (),
-    ) -> Result<SignResult, Error> {
+    fn sign_single(sign: &mut QrCodeSign, session: &Session, _: ()) -> Result<SignResult, Error> {
         let r = sign.pre_sign(session).map_err(Error::from)?;
-        Ok(unsafe { sign.sign_unchecked(session, r) }.map_err(Error::from)?)
+        unsafe { sign.sign_unchecked(session, r) }.map_err(Error::from)
     }
 }

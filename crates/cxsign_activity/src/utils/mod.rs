@@ -38,12 +38,10 @@ pub fn guess_sign_result_by_text(text: &str) -> SignResult {
                     msg:
                     "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
                 }
+            } else if msg == "您已签到过了" {
+                SignResult::Susses
             } else {
-                if msg == "您已签到过了" {
-                    SignResult::Susses
-                } else {
-                    SignResult::Fail { msg: msg.into() }
-                }
+                SignResult::Fail { msg: msg.into() }
             }
         }
     }

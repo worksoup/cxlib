@@ -21,9 +21,9 @@ impl LocationSign {
     pub fn get_preset_location(&self, addr: Option<&str>) -> Option<Location> {
         if let Some(location) = self.preset_location.as_ref() {
             let mut location = location.to_location();
-            addr.map(|addr| {
-                location.set_addr(addr);
-            });
+            if let Some(addr) = addr {
+                location.set_addr(addr)
+            }
             Some(location)
         } else {
             None

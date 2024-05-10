@@ -64,12 +64,7 @@ pub(crate) fn uuid() -> String {
         hex[index]
     });
     v[0x0e] = b'4';
-    let i =
-        (0x3 & if (b'0'..=b'9').contains(&v[0x13]) {
-            v[0x13]
-        } else {
-            0
-        }) | 0x8;
+    let i = (0x3 & if v[0x13].is_ascii_digit() { v[0x13] } else { 0 }) | 0x8;
     v[0x13] = hex[i as usize];
     for i in [0x08, 0x0d, 0x12, 0x17] {
         v[i] = b'-';

@@ -25,7 +25,7 @@ impl<'a> SignnerTrait<LocationSign> for DefaultLocationSignner<'a> {
         sign: &mut LocationSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'b Session, SignResult>, Error> {
-        let location = crate::utils::get_locations(&sign, self.db, self.location_str);
+        let location = crate::utils::get_locations(sign, self.db, self.location_str);
         if location == Location::get_none_location() {
             error!("未获取到位置信息，请检查位置列表或检查输入。");
             return Err(Error::LocationError);

@@ -36,7 +36,7 @@ pub fn auto_solve_captcha(
     time: u128,
 ) -> Result<ValidateResult, Box<ureq::Error>> {
     let (key, tmp_token) = generate_secrets(captcha_id, time, "slide");
-    let r = get_captcha(&agent, captcha_id, &key, &tmp_token, time + 1)?;
+    let r = get_captcha(agent, captcha_id, &key, &tmp_token, time + 1)?;
     #[derive(Deserialize)]
     struct Images {
         #[serde(rename = "shadeImage")]
@@ -83,7 +83,7 @@ pub fn captcha_solver(
         t: u128,
     }
     let Tmp { t } = trim_response_to_json(r.into_string().unwrap().as_str()).unwrap();
-    auto_solve_captcha(&agent, captcha_id, t)
+    auto_solve_captcha(agent, captcha_id, t)
 }
 
 #[derive(Deserialize, Debug)]

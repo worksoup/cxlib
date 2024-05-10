@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::hash_map::OccupiedError;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 pub type ActivitiesSessionsMap = (
     HashMap<RawSign, Vec<Session>>,
@@ -107,14 +106,14 @@ impl Activity {
                         let mut dont_exclude = false;
                         for activity in activities {
                             if let Self::RawSign(sign) = activity {
-                                if set_excludes {
-                                    if cxsign_utils::time_delta_since_to_now(sign.start_time_mills)
+                                if set_excludes
+                                    && cxsign_utils::time_delta_since_to_now(sign.start_time_mills)
                                         .num_days()
                                         < 160
-                                    {
-                                        dont_exclude = true;
-                                    }
+                                {
+                                    dont_exclude = true;
                                 }
+
                                 if sign.is_valid() {
                                     v.push(sign);
                                 } else {

@@ -6,7 +6,7 @@ use crate::sign::{
 use cxsign_types::{Course, Dioption, Location, LocationWithRange};
 use cxsign_user::Session;
 use cxsign_utils::get_width_str_should_be;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
@@ -135,7 +135,10 @@ impl RawSign {
                 1 => Sign::Unknown(self),
                 2 => {
                     let mut preset_locations = LocationWithRange::from_log(session, &self.course)
-                        .unwrap_or(HashMap::new());
+                        .unwrap_or_else(|e| {
+                            warn!("获取预设位置失败！错误信息：{e}.");
+                            HashMap::new()
+                        });
                     let preset_location = preset_locations.remove(&self.active_id);
                     let raw_sign = self;
                     let location = if let Some(preset_location) = preset_location.as_ref() {
@@ -162,7 +165,10 @@ impl RawSign {
                 }),
                 4 => {
                     let mut preset_locations = LocationWithRange::from_log(session, &self.course)
-                        .unwrap_or(HashMap::new());
+                        .unwrap_or_else(|e| {
+                            warn!("获取预设位置失败！错误信息：{e}.");
+                            HashMap::new()
+                        });
                     let preset_location = preset_locations.remove(&self.active_id);
                     let location = if let Some(preset_location) = preset_location.as_ref() {
                         preset_location.to_location()

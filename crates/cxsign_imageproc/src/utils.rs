@@ -1,11 +1,13 @@
-use image::{DynamicImage, GenericImage, GrayImage, ImageBuffer, Luma, LumaA, Pixel, Primitive, Rgba};
+use image::{
+    DynamicImage, GenericImage, GrayImage, ImageBuffer, Luma, LumaA, Pixel, Primitive, Rgba,
+};
 use imageproc::definitions::Image;
 use imageproc::map::{map_colors, map_colors2};
 pub use imageproc::point::Point;
 use num_traits::NumCast;
 use std::ops::Deref;
 
-pub fn get_rect_contains_vertex<T: Primitive, V: Iterator<Item=Point<T>>>(
+pub fn get_rect_contains_vertex<T: Primitive, V: Iterator<Item = Point<T>>>(
     vertex: V,
 ) -> (Point<T>, Point<T>) {
     let mut x_max = T::min_value();
@@ -48,7 +50,7 @@ pub fn cut_picture(
 }
 
 pub fn find_contour_rects<T: Primitive + Eq>(img: &GrayImage) -> Vec<(Point<T>, Point<T>)> {
-    let contours = imageproc::contours::find_contours::<T>(&img);
+    let contours = imageproc::contours::find_contours::<T>(img);
     contours
         .into_iter()
         .map(|c| get_rect_contains_vertex(c.points.into_iter()))
@@ -63,8 +65,8 @@ pub fn image_mean(image: &GrayImage) -> f32 {
 }
 
 pub fn image_sum<P: Primitive, Container>(image: &ImageBuffer<Luma<P>, Container>) -> f32
-    where
-        Container: Deref<Target=[<Luma<P> as Pixel>::Subpixel]>,
+where
+    Container: Deref<Target = [<Luma<P> as Pixel>::Subpixel]>,
 {
     let sum = image
         .pixels()
@@ -73,27 +75,30 @@ pub fn image_sum<P: Primitive, Container>(image: &ImageBuffer<Luma<P>, Container
 }
 
 pub fn rgb_alpha_channel<I, C>(image: &I) -> Image<Luma<C>>
-    where
-        I: GenericImage<Pixel=Rgba<C>>,
-        Rgba<C>: Pixel<Subpixel=C>,
-        C: Primitive,
+where
+    I: GenericImage<Pixel = Rgba<C>>,
+    Rgba<C>: Pixel<Subpixel = C>,
+    C: Primitive,
 {
     map_colors(image, |p| Luma([p[3]]))
 }
 
 pub fn luma_alpha_channel<I, C>(image: &I) -> Image<Luma<C>>
-    where
-        I: GenericImage<Pixel=LumaA<C>>,
-        LumaA<C>: Pixel<Subpixel=C>,
-        C: Primitive,
+where
+    I: GenericImage<Pixel = LumaA<C>>,
+    LumaA<C>: Pixel<Subpixel = C>,
+    C: Primitive,
 {
     map_colors(image, |p| Luma([p[1]]))
 }
 
-pub fn download_image(agent: &ureq::Agent, image_url: &str) -> Result<DynamicImage, Box<ureq::Error>> {
+pub fn download_image(
+    agent: &ureq::Agent,
+    image_url: &str,
+) -> Result<DynamicImage, Box<ureq::Error>> {
     let mut v = Vec::new();
     agent
-        .get(&image_url)
+        .get(image_url)
         .call()?
         .into_reader()
         .read_to_end(&mut v)
@@ -110,7 +115,7 @@ pub fn find_sub_image(big_image: &DynamicImage, small_image: &DynamicImage) -> u
     let small_image_alpha = crate::rgb_alpha_channel(small_image);
     let rects = crate::find_contour_rects::<u32>(&small_image_alpha);
     let (lt, rb) = rects[0];
-    let small_image = crate::cut_picture(&small_image, lt, rb - lt);
+    let small_image = crate::cut_picture(small_image, lt, rb - lt);
     let small_image = small_image.to_luma8();
     let mean = image_mean(&small_image);
     let small_image = map_colors(&small_image, |p| Luma([p[0] as f32 - mean]));
@@ -119,7 +124,7 @@ pub fn find_sub_image(big_image: &DynamicImage, small_image: &DynamicImage) -> u
     let small_w = small_image.width();
     let big_w = big_image.width();
     let big_img = crate::cut_picture(
-        &big_image,
+        big_image,
         lt,
         Point {
             x: big_w - small_w,
@@ -137,7 +142,7 @@ pub fn find_sub_image(big_image: &DynamicImage, small_image: &DynamicImage) -> u
                 y: small_image.height(),
             },
         )
-            .to_luma8();
+        .to_luma8();
         let window_mean = image_mean(&window);
         let window = map_colors(&window, |p| Luma([p[0] as f32 - window_mean]));
         let a = map_colors2(&window, &small_image, |w, t| Luma([w[0] * t[0]]));

@@ -26,11 +26,10 @@ pub fn get_locations(
                 if let Some(location) = sign.get_preset_location(Some(&位置字符串)) {
                     return location;
                 }
-            } else {
-                if let Some(location) = sign.get_preset_location(None) {
-                    return location;
-                }
+            } else if let Some(location) = sign.get_preset_location(None) {
+                return location;
             }
+
             let table = LocationTable::from_ref(db);
             if let Some(location) = table
                 .get_location_list_by_course(sign.as_inner().course.get_id())
@@ -161,7 +160,7 @@ pub fn pic_path_to_qrcode_result(pic_path: &str) -> Option<String> {
 
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 fn get_rect_contains_vertex(
-    vertex: &Vec<Point>,
+    vertex: &[Point],
 ) -> (cxsign_imageproc::Point<u32>, cxsign_imageproc::Point<u32>) {
     let (lt, rb) = cxsign_imageproc::get_rect_contains_vertex(vertex.iter().map(|vertex| {
         cxsign_imageproc::Point {

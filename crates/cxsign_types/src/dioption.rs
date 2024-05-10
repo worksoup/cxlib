@@ -50,10 +50,7 @@ impl<T1, T2> Dioption<T1, T2> {
         }
     }
     pub fn is_both(&self) -> bool {
-        match self {
-            Dioption::Both(_, _) => true,
-            _ => false,
-        }
+        matches!(self, Dioption::Both(_, _))
     }
     pub fn map<B1, B2, FF, SF>(self, mut ff: FF, mut sf: SF) -> Dioption<B1, B2>
     where
