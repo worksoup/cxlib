@@ -1,6 +1,7 @@
-use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{cell::SyncUnsafeCell, collections::HashMap};
 
 use crate::Course;
 use cxsign_user::Session;
@@ -16,21 +17,60 @@ impl LocationPreprocessorTrait for DefaultLocationPreprocessor {
         location
     }
 }
-static mut LOCATION_PREPROCESSOR: &dyn LocationPreprocessorTrait = &DefaultLocationPreprocessor;
-pub fn do_location_preprocessor(location: Location) -> Location {
-    unsafe { LOCATION_PREPROCESSOR.do_preprocess(location) }
+static LOCATION_PREPROCESSOR: SyncUnsafeCell<&dyn LocationPreprocessorTrait> =
+    SyncUnsafeCell::new(&DefaultLocationPreprocessor);
+static STATE: AtomicUsize = AtomicUsize::new(0);
+const UNINITIALIZED: usize = 0;
+const INITIALIZING: usize = 1;
+const INITIALIZED: usize = 2;
+pub fn get_location_preprocessor() -> &'static dyn LocationPreprocessorTrait {
+    if STATE.load(Ordering::Acquire) != INITIALIZED {
+        static NOP: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
+        &NOP
+    } else {
+        unsafe { *LOCATION_PREPROCESSOR.get() }
+    }
 }
-pub fn set_location_preprocessor(preprocessor: &'static dyn LocationPreprocessorTrait) {
+pub fn do_location_preprocessor(location: Location) -> Location {
+    get_location_preprocessor().do_preprocess(location)
+}
+
+pub fn set_location_preprocessor(
+    preprocessor: &'static dyn LocationPreprocessorTrait,
+) -> Result<(), ()> {
     set_boxed_location_preprocessor_internal(|| preprocessor)
 }
-pub fn set_boxed_location_preprocessor(preprocessor: Box<dyn LocationPreprocessorTrait>) {
+pub fn set_boxed_location_preprocessor(
+    preprocessor: Box<dyn LocationPreprocessorTrait>,
+) -> Result<(), ()> {
     set_boxed_location_preprocessor_internal(|| Box::leak(preprocessor))
 }
-fn set_boxed_location_preprocessor_internal<F>(make_preprocessor: F)
+fn set_boxed_location_preprocessor_internal<F>(make_preprocessor: F) -> Result<(), ()>
 where
     F: FnOnce() -> &'static dyn LocationPreprocessorTrait,
 {
-    unsafe { LOCATION_PREPROCESSOR = make_preprocessor() }
+    let old_state = match STATE.compare_exchange(
+        UNINITIALIZED,
+        INITIALIZING,
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+    ) {
+        Ok(s) | Err(s) => s,
+    };
+    match old_state {
+        UNINITIALIZED => {
+            unsafe { *LOCATION_PREPROCESSOR.get() = make_preprocessor() }
+            STATE.store(INITIALIZED, Ordering::SeqCst);
+            Ok(())
+        }
+        INITIALIZING => {
+            while STATE.load(Ordering::SeqCst) == INITIALIZING {
+                std::hint::spin_loop()
+            }
+            Err(())
+        }
+        _ => Err(()),
+    }
 }
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct Location {
