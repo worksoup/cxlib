@@ -126,3 +126,23 @@ impl<T1, T2> Dioption<T1, T2> {
         }
     }
 }
+
+impl<T> Dioption<T, T> {
+    pub fn push(&mut self, value: T) -> bool {
+        match self {
+            Dioption::None => {
+                *self = Dioption::First(value);
+                true
+            }
+            Dioption::First(f) => {
+                *self = Dioption::Both(steal(f), value);
+                true
+            }
+            Dioption::Second(f) => {
+                *self = Dioption::Both(value, steal(f));
+                true
+            }
+            _ => false,
+        }
+    }
+}
