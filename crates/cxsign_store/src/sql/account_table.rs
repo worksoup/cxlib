@@ -240,7 +240,7 @@ impl<'a> DataBaseTableTrait<'a> for AccountTable<'a> {
         table
     }
 
-    fn export(self) -> String {
+    fn export(&self) -> String {
         crate::io::to_string(self.get_accounts().keys())
     }
 }

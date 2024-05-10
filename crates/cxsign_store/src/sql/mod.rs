@@ -47,7 +47,7 @@ pub trait DataBaseTableTrait<'a>: Deref<Target = DataBase> + Sized {
     fn import(db: &'a DataBase, _: String) -> Self {
         Self::from_ref(db)
     }
-    fn export(self) -> String {
+    fn export(&self) -> String {
         String::new()
     }
 }
