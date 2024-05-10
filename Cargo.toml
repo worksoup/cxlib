@@ -18,13 +18,14 @@ authors = ["worksoup"]
 #anyhow = "1.0"
 chrono = "0.4"
 cookie_store = "0.21"
+hex = "0.4"
 image = "0.25"
 log = { version = "0.4", features = ["release_max_level_info"] }
 percent-encoding = "2.3"
 rand = "0.8"
 serde = "1.0"
 serde_json = "1.0"
-sqlite = "0.34"
+sqlite = "0.36"
 thiserror = "1.0"
 ureq = "2.9"
 

@@ -16,4 +16,4 @@ log.workspace = true
 rxing = "0.5"
 image.workspace = true
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
-xcap = { version = "0.0.8" }
+xcap = { version = "0.0.9" }
