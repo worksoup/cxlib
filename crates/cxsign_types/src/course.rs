@@ -1,6 +1,6 @@
 use crate::protocol;
 use cxsign_user::Session;
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::OccupiedError;
 use std::collections::HashMap;
@@ -33,7 +33,13 @@ impl Course {
     ) -> Result<HashMap<Course, Vec<Session>>, Box<ureq::Error>> {
         let mut courses = HashMap::new();
         for session in sessions {
-            let courses_ = Course::get_session_courses(session)?;
+            let courses_ = Course::get_session_courses(session).unwrap_or_else(|e| {
+                warn!(
+                    "未能获取用户[{}]的课程，错误信息：{e}.",
+                    session.get_stu_name()
+                );
+                Default::default()
+            });
             for course in courses_ {
                 if let Err(OccupiedError {
                     mut entry,
