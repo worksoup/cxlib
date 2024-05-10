@@ -1,5 +1,5 @@
 use chrono::TimeDelta;
-use log::info;
+use log::{info, warn};
 use std::io::Read;
 use std::ops::Add;
 use std::time::{Duration, SystemTime};
@@ -48,7 +48,22 @@ pub fn inquire_confirm(inquire: &str, tips: &str) -> bool {
         .prompt()
         .unwrap()
 }
-
+pub fn inquire_pwd(pwd: Option<String>) -> Option<String> {
+    Some(if let Some(pwd) = pwd {
+        pwd
+    } else {
+        match inquire::Password::new("密码：")
+            .without_confirmation()
+            .prompt()
+        {
+            Ok(pwd) => pwd,
+            Err(e) => {
+                warn!("输入的密码无法解析：{e}.");
+                return None;
+            }
+        }
+    })
+}
 pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
     if UnicodeWidthStr::width(s) > width {
         width

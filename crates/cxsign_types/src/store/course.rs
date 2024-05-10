@@ -1,5 +1,6 @@
 use crate::course::Course;
 use cxsign_store::{DataBase, DataBaseTableTrait};
+use cxsign_user::Session;
 use log::warn;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -52,6 +53,13 @@ impl<'a> CourseTable<'a> {
             }
         }
         courses
+    }
+    pub fn refresh_courses(&self, session: &Session) -> Result<(), cxsign_error::Error> {
+        let courses = Course::get_courses(session)?;
+        for c in courses {
+            self.add_course_or(&c, |_, _| {});
+        }
+        Ok(())
     }
 }
 

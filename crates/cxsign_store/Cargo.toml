@@ -8,6 +8,9 @@ authors.workspace = true
 
 [dependencies]
 cxsign_dir = { path = "../cxsign_dir" }
+cxsign_error = { path = "../cxsign_error" }
+cxsign_login = { path = "../cxsign_login" }
 cxsign_user = { path = "../cxsign_user" }
+cxsign_utils = { path = "../cxsign_utils" }
 log.workspace = true
 sqlite.workspace = true

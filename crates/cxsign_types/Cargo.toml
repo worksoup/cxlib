@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 cxsign_dir = { path = "../cxsign_dir" }
+cxsign_error = { path = "../cxsign_error" }
 cxsign_pan = { path = "../cxsign_pan" }
 cxsign_store = { path = "../cxsign_store" }
 cxsign_user = { path = "../cxsign_user" }

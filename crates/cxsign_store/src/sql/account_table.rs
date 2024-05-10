@@ -155,6 +155,25 @@ impl<'a> AccountTable<'a> {
         }
         None
     }
+    pub fn login(
+        &self,
+        uname: String,
+        pwd: Option<String>,
+    ) -> Result<Session, cxsign_error::Error> {
+        let pwd = pwd.ok_or(cxsign_error::Error::LoginError("没有密码！".to_string()))?;
+        let enc_pwd = cxsign_login::des_enc(&pwd);
+        let session = Session::login(&cxsign_dir::DIR, &uname, &enc_pwd)?;
+        let name = session.get_stu_name();
+        self.add_account_or(&uname, &enc_pwd, name, AccountTable::update_account);
+        Ok(session)
+    }
+    pub fn relogin(&self, uname: String, enc_pwd: &str) -> Result<Session, cxsign_error::Error> {
+        let session = Session::login(&cxsign_dir::DIR, &uname, enc_pwd)?;
+        self.delete_account(&uname);
+        let name = session.get_stu_name();
+        self.add_account_or(&uname, enc_pwd, name, AccountTable::update_account);
+        Ok(session)
+    }
 }
 
 impl<'a> DataBaseTableTrait<'a> for AccountTable<'a> {
