@@ -2,6 +2,8 @@ use crate::protocol;
 use cxsign_user::Session;
 use log::info;
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::OccupiedError;
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Deref;
 use ureq::serde_json;
@@ -26,13 +28,30 @@ impl Display for Course {
 }
 
 impl Course {
-    pub fn get_courses(session: &Session) -> Result<Vec<Course>, Box<ureq::Error>> {
+    pub fn get_courses<'a, Sessions: Iterator<Item = &'a Session>>(
+        sessions: Sessions,
+    ) -> Result<HashMap<Course, Vec<Session>>, Box<ureq::Error>> {
+        let mut courses = HashMap::new();
+        for session in sessions {
+            let courses_ = Course::get_session_courses(session)?;
+            for course in courses_ {
+                if let Err(OccupiedError {
+                    mut entry,
+                    value: _,
+                }) = courses.try_insert(course, vec![session.clone()])
+                {
+                    entry.get_mut().push(session.clone());
+                }
+            }
+        }
+        Ok(courses)
+    }
+    pub fn get_session_courses(session: &Session) -> Result<Vec<Course>, Box<ureq::Error>> {
         let r = protocol::back_clazz_data(session.deref())?;
         let courses = Course::get_list_from_response(r)?;
         info!("用户[{}]已获取课程列表。", session.get_stu_name());
         Ok(courses)
     }
-
     fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, Box<ureq::Error>> {
         let r: GetCoursesR = r.into_json().unwrap();
         let mut arr = Vec::new();

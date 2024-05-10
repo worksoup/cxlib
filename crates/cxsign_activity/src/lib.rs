@@ -13,7 +13,6 @@ use cxsign_types::Course;
 use cxsign_user::Session;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::OccupiedError;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -68,8 +67,14 @@ impl Activity {
         set_excludes: bool,
         courses: HashMap<Course, Vec<Session>>,
     ) -> Result<ActivitiesSessionsMap, Box<ureq::Error>> {
+        let excludes = table.get_excludes();
+        let set_excludes = set_excludes || excludes.is_empty();
         let course_sessions_map = courses;
-        let courses = course_sessions_map.keys().cloned().collect::<Vec<_>>();
+        let courses = course_sessions_map
+            .keys()
+            .filter(|course| set_excludes || !excludes.contains(&course.get_id()))
+            .cloned()
+            .collect::<Vec<_>>();
         let excludes = Arc::new(Mutex::new(Vec::new()));
         let valid_signs = Arc::new(Mutex::new(HashMap::new()));
         let other_signs = Arc::new(Mutex::new(HashMap::new()));
@@ -161,22 +166,7 @@ impl Activity {
         sessions: Sessions,
         set_excludes: bool,
     ) -> Result<ActivitiesSessionsMap, Box<ureq::Error>> {
-        let excludes = table.get_excludes();
-        let set_excludes = set_excludes || excludes.is_empty();
-        let mut courses = HashMap::new();
-        for session in sessions.clone() {
-            let courses_ = Course::get_courses(session)?;
-            for course in courses_ {
-                if (set_excludes || !excludes.contains(&course.get_id()))
-                    && let Err(OccupiedError {
-                        mut entry,
-                        value: _,
-                    }) = courses.try_insert(course, vec![session.clone()])
-                {
-                    entry.get_mut().push(session.clone());
-                }
-            }
-        }
+        let courses = Course::get_courses(sessions)?;
         Self::get_activities(table, set_excludes, courses)
     }
     pub fn get_list_from_course(

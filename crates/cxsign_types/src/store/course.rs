@@ -55,7 +55,7 @@ impl<'a> CourseTable<'a> {
         courses
     }
     pub fn refresh_courses(&self, session: &Session) -> Result<(), cxsign_error::Error> {
-        let courses = Course::get_courses(session)?;
+        let courses = Course::get_session_courses(session)?;
         for c in courses {
             self.add_course_or(&c, |_, _| {});
         }

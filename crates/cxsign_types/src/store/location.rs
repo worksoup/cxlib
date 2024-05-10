@@ -253,7 +253,7 @@ impl<'a> DataBaseTableTrait<'a> for LocationTable<'a> {
     }
 
     fn export(&self) -> String {
-        let alias_table = AliasTable::from_ref(&self);
+        let alias_table = AliasTable::from_ref(self);
         let data = self
             .get_locations()
             .into_iter()
