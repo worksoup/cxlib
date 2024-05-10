@@ -1,4 +1,4 @@
-use log::debug;
+use log::{debug, warn};
 use serde::Deserialize;
 
 use crate::hash::{encode, hash, uuid};
@@ -87,6 +87,8 @@ pub fn captcha_solver(
     for i in 0..3 {
         if let Some(c) = auto_solve_captcha(agent, captcha_id, t + i)?.get_validate_info() {
             return Ok(c);
+        } else {
+            warn!("滑块验证失败，即将重试。")
         }
     }
     Err(cxsign_error::Error::CaptchaEmptyError)
