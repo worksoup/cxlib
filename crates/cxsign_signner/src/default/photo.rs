@@ -85,6 +85,6 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
         session: &Session,
         _: Self::ExtData<'_>,
     ) -> Result<SignResult, Error> {
-        Ok(sign.pre_sign_and_sign(session)?)
+        sign.pre_sign_and_sign(session)
     }
 }

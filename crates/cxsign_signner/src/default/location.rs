@@ -40,6 +40,6 @@ impl<'a> SignnerTrait<LocationSign> for DefaultLocationSignner<'a> {
     }
 
     fn sign_single(sign: &mut LocationSign, session: &Session, _: ()) -> Result<SignResult, Error> {
-        Ok(sign.pre_sign_and_sign(session)?)
+        sign.pre_sign_and_sign(session)
     }
 }

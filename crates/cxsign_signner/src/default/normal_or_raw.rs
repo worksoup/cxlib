@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub struct DefaultNormalOrRawSignner;
 
 fn sign_single_(sign: &RawSign, session: &Session) -> Result<SignResult, Error> {
-    Ok(sign.pre_sign_and_sign(session)?)
+    sign.pre_sign_and_sign(session)
 }
 fn sign_<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
     sign: &RawSign,

@@ -14,4 +14,6 @@ pub enum Error {
     LocationError,
     #[error("二次验证信息为空！")]
     CaptchaEmptyError,
+    #[error("设置位置预处理错误！")]
+    SetLocationPreprocessorError,
 }

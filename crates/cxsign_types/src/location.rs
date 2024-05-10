@@ -37,15 +37,17 @@ pub fn do_location_preprocessor(location: Location) -> Location {
 
 pub fn set_location_preprocessor(
     preprocessor: &'static dyn LocationPreprocessorTrait,
-) -> Result<(), ()> {
+) -> Result<(), cxsign_error::Error> {
     set_boxed_location_preprocessor_internal(|| preprocessor)
 }
 pub fn set_boxed_location_preprocessor(
     preprocessor: Box<dyn LocationPreprocessorTrait>,
-) -> Result<(), ()> {
+) -> Result<(), cxsign_error::Error> {
     set_boxed_location_preprocessor_internal(|| Box::leak(preprocessor))
 }
-fn set_boxed_location_preprocessor_internal<F>(make_preprocessor: F) -> Result<(), ()>
+fn set_boxed_location_preprocessor_internal<F>(
+    make_preprocessor: F,
+) -> Result<(), cxsign_error::Error>
 where
     F: FnOnce() -> &'static dyn LocationPreprocessorTrait,
 {
@@ -67,9 +69,9 @@ where
             while STATE.load(Ordering::SeqCst) == INITIALIZING {
                 std::hint::spin_loop()
             }
-            Err(())
+            Err(cxsign_error::Error::SetLocationPreprocessorError)
         }
-        _ => Err(()),
+        _ => Err(cxsign_error::Error::SetLocationPreprocessorError),
     }
 }
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
