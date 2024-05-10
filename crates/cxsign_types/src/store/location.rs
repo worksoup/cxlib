@@ -2,6 +2,7 @@ use crate::location::Location;
 use cxsign_store::{AliasTable, DataBase, DataBaseTableTrait};
 use log::warn;
 use std::collections::HashMap;
+use std::ops::Deref;
 
 pub struct LocationTable<'a> {
     db: &'a DataBase,
@@ -175,5 +176,12 @@ impl<'a> DataBaseTableTrait<'a> for LocationTable<'a> {
 
     fn from_ref(db: &'a DataBase) -> Self {
         Self { db }
+    }
+}
+impl<'a> Deref for LocationTable<'a> {
+    type Target = DataBase;
+
+    fn deref(&self) -> &Self::Target {
+        self.db
     }
 }

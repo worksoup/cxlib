@@ -1,5 +1,6 @@
 use crate::sql::{DataBase, DataBaseTableTrait};
 use log::warn;
+use std::ops::Deref;
 
 pub struct AliasTable<'a> {
     db: &'a DataBase,
@@ -105,5 +106,12 @@ impl<'a> DataBaseTableTrait<'a> for AliasTable<'a> {
 
     fn from_ref(db: &'a DataBase) -> Self {
         Self { db }
+    }
+}
+impl<'a> Deref for AliasTable<'a> {
+    type Target = DataBase;
+
+    fn deref(&self) -> &Self::Target {
+        self.db
     }
 }

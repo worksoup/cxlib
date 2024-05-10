@@ -1,5 +1,6 @@
 use crate::sql::{DataBase, DataBaseTableTrait};
 use log::warn;
+use std::ops::Deref;
 
 pub struct ExcludeTable<'a> {
     db: &'a DataBase,
@@ -72,5 +73,12 @@ impl<'a> DataBaseTableTrait<'a> for ExcludeTable<'a> {
 
     fn from_ref(db: &'a DataBase) -> Self {
         Self { db }
+    }
+}
+impl<'a> Deref for ExcludeTable<'a> {
+    type Target = DataBase;
+
+    fn deref(&self) -> &Self::Target {
+        self.db
     }
 }

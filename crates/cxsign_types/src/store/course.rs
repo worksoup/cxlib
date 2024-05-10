@@ -2,6 +2,7 @@ use crate::course::Course;
 use cxsign_store::{DataBase, DataBaseTableTrait};
 use log::warn;
 use std::collections::HashMap;
+use std::ops::Deref;
 
 pub struct CourseTable<'a> {
     db: &'a DataBase,
@@ -60,5 +61,12 @@ impl<'a> DataBaseTableTrait<'a> for CourseTable<'a> {
 
     fn from_ref(db: &'a DataBase) -> Self {
         Self { db }
+    }
+}
+impl<'a> Deref for CourseTable<'a> {
+    type Target = DataBase;
+
+    fn deref(&self) -> &Self::Target {
+        self.db
     }
 }

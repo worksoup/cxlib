@@ -12,7 +12,7 @@ use sqlite::Connection;
 use std::fs::File;
 use std::ops::Deref;
 
-pub trait DataBaseTableTrait<'a> {
+pub trait DataBaseTableTrait<'a>: Deref<Target = DataBase> {
     const TABLE_ARGS: &'static str;
     const TABLE_NAME: &'static str;
     fn from_ref(db: &'a DataBase) -> Self;
