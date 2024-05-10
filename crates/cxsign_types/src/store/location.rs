@@ -49,6 +49,20 @@ impl<'a> LocationTable<'a> {
             Err(_) => or(self, location_id, course_id, location),
         }
     }
+    /// 添加位置，返回 LocationId.
+    pub fn insert_location(&self, course_id: i64, location: &Location) -> i64 {
+        // 为指定课程添加位置。
+        let mut lid = 0_i64;
+        loop {
+            if self.has_location(lid) {
+                lid += 1;
+                continue;
+            }
+            self.add_location_or(lid, course_id, location, |_, _, _, _| {});
+            break;
+        }
+        lid
+    }
     pub fn delete_location(&self, location_id: i64) {
         self.db
             .execute(format!(
