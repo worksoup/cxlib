@@ -1,5 +1,5 @@
 use chrono::TimeDelta;
-use log::{info, warn};
+use log::warn;
 use std::io::Read;
 use std::ops::Add;
 use std::time::{Duration, SystemTime};
