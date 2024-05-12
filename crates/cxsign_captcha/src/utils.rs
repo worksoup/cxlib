@@ -5,7 +5,7 @@ use crate::hash::{encode, hash, uuid};
 use crate::protocol::{check_captcha, get_captcha, get_server_time};
 
 // Doesn't matter.
-pub(crate) static CALLBACK_NAME: &str = "jQuery_114514_1919810";
+static CALLBACK_NAME: &str = "jQuery_114514_1919810";
 
 pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, ureq::serde_json::Error>
 where

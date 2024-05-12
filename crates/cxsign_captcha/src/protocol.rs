@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use crate::utils::CALLBACK_NAME;
-
 pub static CAPTCHA_ID: &str = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
 // 获取滑块。
 static GET_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/get/verification/image";
@@ -9,6 +7,8 @@ static GET_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/get/verificatio
 static CHECK_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/check/verification/result";
 // 获取服务器时间。
 static GET_SERVER_TIME: &str = "https://captcha.chaoxing.com/captcha/get/conf";
+// Doesn't matter.
+static CALLBACK_NAME: &str = "jQuery_114514_1919810";
 
 pub fn get_server_time(
     agent: &ureq::Agent,
