@@ -4,12 +4,11 @@ use crate::utils::CALLBACK_NAME;
 
 pub static CAPTCHA_ID: &str = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
 // 获取滑块。
-pub(crate) static GET_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/get/verification/image";
+static GET_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/get/verification/image";
 // 滑块验证。
-pub(crate) static CHECK_CAPTCHA: &str =
-    "https://captcha.chaoxing.com/captcha/check/verification/result";
+static CHECK_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/check/verification/result";
 // 获取服务器时间。
-pub(crate) static GET_SERVER_TIME: &str = "https://captcha.chaoxing.com/captcha/get/conf";
+static GET_SERVER_TIME: &str = "https://captcha.chaoxing.com/captcha/get/conf";
 
 pub fn get_server_time(
     agent: &ureq::Agent,
@@ -51,7 +50,7 @@ pub fn check_captcha(
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
         "{CHECK_CAPTCHA}?{}&{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
-        format_args!("callback={CALLBACK_NAME}", ),
+        format_args!("callback={CALLBACK_NAME}",),
         format_args!("captchaId={}", captcha_id),
         format_args!("token={}", token),
         format_args!("textClickArr=%5B%7B%22x%22%3A{}%7D%5D", x),
