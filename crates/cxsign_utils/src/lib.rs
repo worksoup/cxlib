@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthStr;
 
 pub fn print_now() {
     let str = now_string();
-    info!("{str}");
+    println!("{str}");
 }
 pub fn now_string() -> String {
     time_string(SystemTime::now())
