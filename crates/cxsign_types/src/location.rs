@@ -23,28 +23,6 @@ static STATE: AtomicUsize = AtomicUsize::new(0);
 const UNINITIALIZED: usize = 0;
 const INITIALIZING: usize = 1;
 const INITIALIZED: usize = 2;
-pub fn get_location_preprocessor() -> &'static dyn LocationPreprocessorTrait {
-    if STATE.load(Ordering::Acquire) != INITIALIZED {
-        static NOP: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
-        &NOP
-    } else {
-        unsafe { *LOCATION_PREPROCESSOR.get() }
-    }
-}
-pub fn do_location_preprocessor(location: Location) -> Location {
-    get_location_preprocessor().do_preprocess(location)
-}
-
-pub fn set_location_preprocessor(
-    preprocessor: &'static dyn LocationPreprocessorTrait,
-) -> Result<(), cxsign_error::Error> {
-    set_boxed_location_preprocessor_internal(|| preprocessor)
-}
-pub fn set_boxed_location_preprocessor(
-    preprocessor: Box<dyn LocationPreprocessorTrait>,
-) -> Result<(), cxsign_error::Error> {
-    set_boxed_location_preprocessor_internal(|| Box::leak(preprocessor))
-}
 fn set_boxed_location_preprocessor_internal<F>(
     make_preprocessor: F,
 ) -> Result<(), cxsign_error::Error>
@@ -82,6 +60,28 @@ pub struct Location {
     alt: String,
 }
 impl Location {
+    pub fn get_location_preprocessor() -> &'static dyn LocationPreprocessorTrait {
+        if STATE.load(Ordering::Acquire) != INITIALIZED {
+            static NOP: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
+            &NOP
+        } else {
+            unsafe { *LOCATION_PREPROCESSOR.get() }
+        }
+    }
+    pub fn to_preprocessed(self) -> Location {
+        Self::get_location_preprocessor().do_preprocess(self)
+    }
+
+    pub fn set_location_preprocessor(
+        preprocessor: &'static dyn LocationPreprocessorTrait,
+    ) -> Result<(), cxsign_error::Error> {
+        set_boxed_location_preprocessor_internal(|| preprocessor)
+    }
+    pub fn set_boxed_location_preprocessor(
+        preprocessor: Box<dyn LocationPreprocessorTrait>,
+    ) -> Result<(), cxsign_error::Error> {
+        set_boxed_location_preprocessor_internal(|| Box::leak(preprocessor))
+    }
     pub fn to_owned_fields(self) -> [String; 4] {
         let Location {
             addr,
@@ -127,7 +127,7 @@ impl Location {
             lat: lat.into(),
             alt: alt.into(),
         };
-        do_location_preprocessor(location)
+        location.to_preprocessed()
     }
     /// 地址。
     pub fn get_addr(&self) -> &str {

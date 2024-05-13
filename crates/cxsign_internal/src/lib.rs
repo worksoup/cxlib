@@ -34,8 +34,5 @@ pub mod utils {
     pub use cxsign_dir::*;
     pub use cxsign_imageproc::*;
     pub use cxsign_login::{des_enc, load_json, login_enc};
-    pub use cxsign_types::{
-        do_location_preprocessor, set_boxed_location_preprocessor, set_location_preprocessor,
-    };
     pub use cxsign_utils::*;
 }
