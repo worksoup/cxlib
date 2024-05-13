@@ -10,7 +10,7 @@ mod config_dir_info_state {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     pub static CONFIG_DIR_INFO: SyncUnsafeCell<(&str, &str, &str, &str)> =
-        SyncUnsafeCell::new(("TEST_CXSIGN", "rt.lea", "worksoup", "cxsign"));
+        SyncUnsafeCell::new(("TEST_CXSIGN", "up.workso", "Worksoup", "cxsign"));
     static STATE: AtomicUsize = AtomicUsize::new(0);
     pub fn set_config_dir_info(
         env_arg: &'static str,
@@ -49,18 +49,12 @@ mod config_dir_state {
     static STATE: AtomicUsize = AtomicUsize::new(0);
 
     pub fn uninit() -> bool {
-        let state = match STATE.compare_exchange(
-            UNINITIALIZED,
-            INITIALIZING,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
-            Ok(s) | Err(s) => s,
-        };
+        let state = STATE.load(Ordering::SeqCst);
         match state {
             UNINITIALIZED => true,
             INITIALIZING => {
                 while STATE.load(Ordering::SeqCst) == INITIALIZING {
+                    println!("adasd");
                     std::hint::spin_loop()
                 }
                 false

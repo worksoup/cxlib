@@ -1,8 +1,8 @@
 use cxsign_activity::sign;
 pub use cxsign_activity::{Activity, OtherActivity};
 pub use cxsign_default_impl::signner::{
-    DefaultGestureOrSigncodeSignner, DefaultLocationSignner, DefaultNormalOrRawSignner,
-    DefaultPhotoSignner, DefaultQrCodeSignner,
+    DefaultGestureOrSigncodeSignner, DefaultLocationInfoGetter, DefaultLocationSignner,
+    DefaultNormalOrRawSignner, DefaultPhotoSignner, DefaultQrCodeSignner, LocationInfoGetterTrait,
 };
 pub use cxsign_error::*;
 pub use cxsign_signner::*;
@@ -34,5 +34,6 @@ pub mod utils {
     pub use cxsign_dir::*;
     pub use cxsign_imageproc::*;
     pub use cxsign_login::{des_enc, load_json, login_enc};
+    pub use cxsign_qrcode_utils::*;
     pub use cxsign_utils::*;
 }

@@ -5,7 +5,9 @@ use log::{debug, error, info, warn};
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 use rxing::Point;
 use std::collections::HashMap;
-
+pub fn is_enc_qrcode_url(url: &str) -> bool {
+    url.contains(protocol::QRCODE_PAT) && url.contains("&enc=")
+}
 pub fn scan_qrcode(
     image: image::DynamicImage,
     hints: &mut rxing::DecodingHintDictionary,
@@ -74,7 +76,7 @@ pub fn capture_screen_for_enc(is_refresh: bool, precise: bool) -> Option<String>
         for r in &results {
             let url = r.getText();
             // 如果符合要求的二维码。
-            if !(url.contains(protocol::QRCODE_PAT) && url.contains("&enc=")) {
+            if !is_enc_qrcode_url(url) {
                 warn!("{url:?}不是有效的签到二维码！");
                 continue;
             }

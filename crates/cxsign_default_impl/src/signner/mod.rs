@@ -17,6 +17,11 @@ impl<'a> DefaultLocationInfoGetter<'a> {
         Self(db)
     }
 }
+impl<'a> From<&'a DataBase> for DefaultLocationInfoGetter<'a> {
+    fn from(db: &'a DataBase) -> Self {
+        Self::new(db)
+    }
+}
 
 impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
     fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location {
