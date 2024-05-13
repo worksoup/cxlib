@@ -8,7 +8,7 @@ static CHECK_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/check/verific
 // 获取服务器时间。
 static GET_SERVER_TIME: &str = "https://captcha.chaoxing.com/captcha/get/conf";
 // Doesn't matter.
-static CALLBACK_NAME: &str = "jQuery_114514_1919810";
+pub(crate) static CALLBACK_NAME: &str = "jQuery_114514_1919810";
 
 pub fn get_server_time(
     agent: &ureq::Agent,

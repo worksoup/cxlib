@@ -4,14 +4,11 @@ use serde::Deserialize;
 use crate::hash::{encode, hash, uuid};
 use crate::protocol::{check_captcha, get_captcha, get_server_time};
 
-// Doesn't matter.
-static CALLBACK_NAME: &str = "jQuery_114514_1919810";
-
 pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, ureq::serde_json::Error>
 where
-    T: ureq::serde::de::Deserialize<'a>,
+    T: serde::de::Deserialize<'a>,
 {
-    let s = &text[CALLBACK_NAME.len() + 1..text.len() - 1];
+    let s = &text[crate::protocol::CALLBACK_NAME.len() + 1..text.len() - 1];
     debug!("{s}");
     ureq::serde_json::from_str(s)
 }
