@@ -58,7 +58,7 @@ impl<'a> AccountTable<'a> {
     }
     pub fn get_session(&self, account: &str) -> Option<Session> {
         if self.has_account(account) {
-            Some(Session::load_json(&self.db.dir, account).unwrap())
+            Some(Session::load_json(account).unwrap())
         } else {
             warn!("没有该账号：[`{account}`]，请检查输入或登录。");
             None
@@ -70,7 +70,7 @@ impl<'a> AccountTable<'a> {
         let mut s = HashMap::new();
         for account in str_list {
             if self.has_account(&account.uname) {
-                let session = Session::load_json(&self.db.dir, &account.uname).unwrap();
+                let session = Session::load_json(&account.uname).unwrap();
                 s.insert(account.uname.clone(), session);
             } else {
                 warn!(
@@ -103,7 +103,7 @@ impl<'a> AccountTable<'a> {
             query.bind((1, uname)).unwrap();
             query.next().unwrap();
         }
-        std::fs::remove_file(self.db.dir.get_json_file_path(uname)).unwrap();
+        std::fs::remove_file(cxsign_dir::Dir::get_json_file_path(uname)).unwrap();
     }
 
     pub fn add_account_or<O: Fn(&Self, &str, &str, &str)>(
@@ -201,7 +201,7 @@ impl<'a> AccountTable<'a> {
     ) -> Result<Session, cxsign_error::Error> {
         let pwd = pwd.ok_or(cxsign_error::Error::LoginError("没有密码！".to_string()))?;
         let enc_pwd = cxsign_login::des_enc(&pwd);
-        let session = Session::login(&cxsign_dir::DIR, &uname, &enc_pwd)?;
+        let session = Session::login(&uname, &enc_pwd)?;
         let name = session.get_stu_name();
         self.add_account_or(&uname, &enc_pwd, name, AccountTable::update_account);
         Ok(session)
@@ -209,7 +209,7 @@ impl<'a> AccountTable<'a> {
     pub fn relogin(&self, uname: String, enc_pwd: &str) -> Result<Session, cxsign_error::Error> {
         let session = Session::relogin(&uname, enc_pwd)?;
         self.delete_account(&uname);
-        session.store_json(&cxsign_dir::DIR);
+        session.store_json();
         let name = session.get_stu_name();
         self.add_account_or(&uname, enc_pwd, name, AccountTable::update_account);
         Ok(session)

@@ -6,7 +6,7 @@ pub use account_table::*;
 pub use alias_table::*;
 pub use exclude_table::*;
 
-use cxsign_dir::{Dir, DIR};
+use cxsign_dir::Dir;
 use log::info;
 use sqlite::Connection;
 use std::fs::File;
@@ -54,7 +54,6 @@ pub trait DataBaseTableTrait<'a>: Deref<Target = DataBase> + Sized {
 
 pub struct DataBase {
     connection: Connection,
-    dir: Dir,
 }
 impl Deref for DataBase {
     type Target = Connection;
@@ -65,13 +64,13 @@ impl Deref for DataBase {
 }
 // self
 impl DataBase {
-    pub fn new(dir: Dir) -> Self {
-        let db_dir = dir.get_database_dir();
+    pub fn new() -> Self {
+        let db_dir = Dir::get_database_dir();
         if db_dir.metadata().is_err() {
             File::create(db_dir.clone()).unwrap();
         }
         let connection = Connection::open(db_dir.to_str().unwrap()).unwrap();
-        Self { connection, dir }
+        Self { connection }
     }
     pub fn add_table<'a, T: DataBaseTableTrait<'a>>(&'a self) -> T {
         T::create(self)
@@ -79,6 +78,6 @@ impl DataBase {
 }
 impl Default for DataBase {
     fn default() -> Self {
-        Self::new(DIR.clone())
+        Self::new()
     }
 }

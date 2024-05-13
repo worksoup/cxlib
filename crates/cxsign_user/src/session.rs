@@ -32,8 +32,8 @@ impl Hash for Session {
 }
 
 impl Session {
-    pub fn load_json(dir: &Dir, uname: &str) -> Result<Self, Box<ureq::Error>> {
-        let client = cxsign_login::load_json(dir.get_json_file_path(uname));
+    pub fn load_json(uname: &str) -> Result<Self, Box<ureq::Error>> {
+        let client = cxsign_login::load_json(Dir::get_json_file_path(uname));
         let cookies = UserCookies::new(&client);
         let stu_name = Self::find_stu_name_in_html(&client)?;
         info!("用户[{}]加载 Cookies 成功！", stu_name);
@@ -57,13 +57,13 @@ impl Session {
         };
         Ok(session)
     }
-    pub fn login(dir: &Dir, uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
+    pub fn login(uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
         let session = Session::relogin(uname, enc_passwd)?;
-        session.store_json(dir);
+        session.store_json();
         Ok(session)
     }
-    pub fn store_json(&self, dir: &Dir) {
-        let store_path = dir.get_json_file_path(self.get_uname());
+    pub fn store_json(&self) {
+        let store_path = Dir::get_json_file_path(self.get_uname());
         let mut writer = std::fs::File::create(store_path)
             .map(std::io::BufWriter::new)
             .unwrap();
