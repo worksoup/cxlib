@@ -1,7 +1,7 @@
-use cxsign_signner::SignnerTrait;
+use crate::signner::LocationInfoGetterTrait;
 use cxsign_activity::sign::{QrCodeSign, SignResult, SignTrait};
 use cxsign_error::Error;
-use cxsign_store::DataBase;
+use cxsign_signner::SignnerTrait;
 use cxsign_types::Location;
 use cxsign_user::Session;
 use log::warn;
@@ -9,17 +9,17 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-pub struct DefaultQrCodeSignner<'a> {
-    db: &'a DataBase,
+pub struct DefaultQrCodeSignner<'a, T: LocationInfoGetterTrait> {
+    location_info_getter: T,
     location_str: &'a Option<String>,
     path: &'a Option<PathBuf>,
     enc: &'a Option<String>,
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     precisely: bool,
 }
-impl<'a> DefaultQrCodeSignner<'a> {
+impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
     pub fn new(
-        db: &'a DataBase,
+        db: T,
         location_str: &'a Option<String>,
         path: &'a Option<PathBuf>,
         enc: &'a Option<String>,
@@ -27,7 +27,7 @@ impl<'a> DefaultQrCodeSignner<'a> {
         precisely: bool,
     ) -> Self {
         Self {
-            db,
+            location_info_getter: db,
             location_str,
             path,
             enc,
@@ -37,7 +37,7 @@ impl<'a> DefaultQrCodeSignner<'a> {
     }
 }
 
-impl<'l> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'l> {
+impl<'l, T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'l, T> {
     type ExtData<'e> = ();
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
@@ -45,8 +45,9 @@ impl<'l> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'l> {
         sign: &mut QrCodeSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, Error> {
-        let location =
-            crate::utils::get_locations(sign.as_location_sign_mut(), self.db, self.location_str);
+        let location = self
+            .location_info_getter
+            .get_locations(sign.as_location_sign_mut(), self.location_str);
         if location == Location::get_none_location() {
             warn!("未获取到位置信息，请检查位置列表或检查输入。");
         }

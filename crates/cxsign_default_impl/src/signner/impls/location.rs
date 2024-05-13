@@ -1,23 +1,26 @@
-use cxsign_signner::SignnerTrait;
+use crate::signner::LocationInfoGetterTrait;
 use cxsign_activity::sign::{LocationSign, SignResult, SignTrait};
 use cxsign_error::Error;
-use cxsign_store::DataBase;
+use cxsign_signner::SignnerTrait;
 use cxsign_types::Location;
 use cxsign_user::Session;
 use log::error;
 use std::collections::HashMap;
 
-pub struct DefaultLocationSignner<'a> {
-    db: &'a DataBase,
+pub struct DefaultLocationSignner<'a, T: LocationInfoGetterTrait> {
+    location_info_getter: T,
     location_str: &'a Option<String>,
 }
 
-impl<'a> DefaultLocationSignner<'a> {
-    pub fn new(db: &'a DataBase, location_str: &'a Option<String>) -> Self {
-        Self { db, location_str }
+impl<'a, T: LocationInfoGetterTrait> DefaultLocationSignner<'a, T> {
+    pub fn new(location_info_getter: T, location_str: &'a Option<String>) -> Self {
+        Self {
+            location_info_getter,
+            location_str,
+        }
     }
 }
-impl<'a> SignnerTrait<LocationSign> for DefaultLocationSignner<'a> {
+impl<'a, T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationSignner<'a, T> {
     type ExtData<'e> = ();
 
     fn sign<'b, Sessions: Iterator<Item = &'b Session> + Clone>(
@@ -25,7 +28,9 @@ impl<'a> SignnerTrait<LocationSign> for DefaultLocationSignner<'a> {
         sign: &mut LocationSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'b Session, SignResult>, Error> {
-        let location = crate::utils::get_locations(sign, self.db, self.location_str);
+        let location = self
+            .location_info_getter
+            .get_locations(sign, self.location_str);
         if location == Location::get_none_location() {
             error!("未获取到位置信息，请检查位置列表或检查输入。");
             return Err(Error::LocationError);
