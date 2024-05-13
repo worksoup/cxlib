@@ -1,4 +1,4 @@
-use crate::SignnerTrait;
+use cxsign_signner::SignnerTrait;
 use cxsign_activity::sign::{QrCodeSign, SignResult, SignTrait};
 use cxsign_error::Error;
 use cxsign_store::DataBase;

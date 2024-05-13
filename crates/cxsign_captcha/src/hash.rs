@@ -115,8 +115,8 @@ mod tests {
         let k = "12121212";
         println!("{:?}", pre_hash(k));
         let k = hash_(pre_hash(k), k.len());
-        println!("{:?}", 0x0e + (((32 + 64) >> 9) << 4));
-        println!("{:?}", 128 << 32 % 32);
+        // println!("{:?}", 0x0e + (((32 + 64) >> 9) << 4));
+        // println!("{:?}", 128 << 32 % 32);
         println!("{:?}", to_bytes(k));
         println!("{:?}", encode(to_bytes(k)));
         let k = k.map(|a| a as i32);

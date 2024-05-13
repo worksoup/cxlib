@@ -87,6 +87,21 @@ pub fn zlib_decode<R: Read>(r: R) -> String {
     decoder.read_to_string(&mut decompressed_data).unwrap();
     decompressed_data
 }
+pub fn find_qrcode_sign_enc_in_url(url: &str) -> Option<String> {
+    // 在二维码图片中会有一个参数 `c`, 二维码预签到时需要。
+    // 但是该参数似乎暂时可以从 `signDetail` 接口获取到。所以此处先注释掉。
+    // let beg = r.find("&c=").unwrap();
+    // let c = &r[beg + 3..beg + 9];
+    // (c.to_owned(), enc.to_owned())
+    // 有时二维码里没有参数，原因不明。
+    let r = url
+        .find("&enc=")
+        .map(|beg| url[beg + 5..beg + 37].to_owned());
+    if r.is_none() {
+        warn!("{url:?}中没有找到二维码！")
+    }
+    r
+}
 
 #[cfg(test)]
 mod test {

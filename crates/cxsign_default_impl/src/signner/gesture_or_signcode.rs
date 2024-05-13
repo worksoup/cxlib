@@ -1,6 +1,6 @@
-use crate::SignnerTrait;
 use cxsign_activity::sign::{GestureSign, SignResult, SignTrait, SigncodeSign};
 use cxsign_error::Error;
+use cxsign_signner::SignnerTrait;
 use cxsign_user::Session;
 use std::collections::HashMap;
 

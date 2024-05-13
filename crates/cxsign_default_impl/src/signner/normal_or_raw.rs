@@ -1,4 +1,4 @@
-use crate::SignnerTrait;
+use cxsign_signner::SignnerTrait;
 use cxsign_activity::sign::{NormalSign, RawSign, SignResult, SignTrait};
 use cxsign_error::Error;
 use cxsign_user::Session;
