@@ -8,10 +8,11 @@ pub use impls::*;
 use utils::location_str_to_location;
 
 pub trait LocationInfoGetterTrait {
-    fn get_location(
+    fn get_preset_location(&self, sign: &LocationSign) -> Option<Location>;
+    fn get_location<GetPresetLocation: FnOnce() -> Option<Location>>(
         &self,
-        sign: &LocationSign,
         location_str: &Option<String>,
+        get_preset_location: GetPresetLocation,
     ) -> Option<Location>;
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location>;
     fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location;
@@ -30,26 +31,24 @@ impl<'a> From<&'a DataBase> for DefaultLocationInfoGetter<'a> {
 }
 
 impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
-    fn get_location(
+    fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
+        sign.get_preset_location(None)
+    }
+    fn get_location<GetPresetLocation: FnOnce() -> Option<Location>>(
         &self,
-        sign: &LocationSign,
         location_str: &Option<String>,
+        get_preset_location: GetPresetLocation,
     ) -> Option<Location> {
         match location_str_to_location(self.0, location_str) {
             Ok(location) => Some(location),
-            Err(location_str) => {
-                if !location_str.is_empty()
-                    && let Some(location) = sign.get_preset_location(Some(&location_str))
-                {
-                    Some(location)
-                } else if location_str.is_empty()
-                    && let Some(location) = sign.get_preset_location(None)
-                {
-                    Some(location)
+            Err(location_str) => get_preset_location().map(|mut l| {
+                if location_str.is_empty() {
+                    l
                 } else {
-                    None
+                    l.set_addr(&location_str);
+                    l
                 }
-            }
+            }),
         }
     }
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location> {
@@ -60,7 +59,7 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
             .or_else(|| table.get_location_list_by_course(-1).pop())
     }
     fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location {
-        self.get_location(sign, location_str)
+        self.get_location(location_str, || self.get_preset_location(sign))
             .or_else(|| self.get_fallback_location(sign))
             .unwrap_or_else(Location::get_none_location)
     }
