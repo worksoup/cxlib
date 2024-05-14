@@ -5,12 +5,14 @@ use cxsign_activity::sign::{LocationSign, SignTrait};
 use cxsign_store::{DataBase, DataBaseTableTrait};
 use cxsign_types::{Location, LocationTable};
 pub use impls::*;
+use log::warn;
 use utils::location_str_to_location;
 
 pub trait LocationInfoGetterTrait {
     fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
         sign.get_preset_location()
     }
+    fn map_location_str(&self, location_str: &str) -> Option<Location>;
     fn get_location_or(
         &self,
         location_str: &Option<String>,
@@ -38,6 +40,29 @@ impl<'a> From<&'a DataBase> for DefaultLocationInfoGetter<'a> {
 }
 
 impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
+    fn map_location_str(&self, location_str: &str) -> Option<Location> {
+        let table = LocationTable::from_ref(self.0);
+        let location_str = location_str.trim();
+        location_str
+            .parse()
+            .ok()
+            .or_else(|| table.get_location_by_alias(location_str))
+            .or_else(|| {
+                location_str
+                    .parse()
+                    .map(|location_id| {
+                        if table.has_location(location_id) {
+                            let (_, location) = table.get_location(location_id);
+                            Some(location)
+                        } else {
+                            None
+                        }
+                    })
+                    .ok()
+                    .flatten()
+            })
+    }
+
     fn get_location_or(
         &self,
         location_str: &Option<String>,
