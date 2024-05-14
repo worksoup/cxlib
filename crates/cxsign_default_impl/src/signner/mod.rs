@@ -5,8 +5,6 @@ use cxsign_activity::sign::{LocationSign, SignTrait};
 use cxsign_store::{DataBase, DataBaseTableTrait};
 use cxsign_types::{Location, LocationTable};
 pub use impls::*;
-use log::warn;
-use utils::location_str_to_location;
 
 pub trait LocationInfoGetterTrait {
     fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
@@ -17,14 +15,34 @@ pub trait LocationInfoGetterTrait {
         &self,
         location_str: &Option<String>,
         preset_location: Option<Location>,
-    ) -> Option<Location>;
+    ) -> Option<Location> {
+        self.get_location_or_else(location_str, || preset_location)
+    }
+
     fn get_location_or_else<GetPresetLocation: FnOnce() -> Option<Location>>(
         &self,
         location_str: &Option<String>,
         get_preset_location: GetPresetLocation,
-    ) -> Option<Location>;
+    ) -> Option<Location> {
+        location_str.as_ref().and_then(|location_str| {
+            self.map_location_str(location_str).or_else(|| {
+                get_preset_location().map(|mut l| {
+                    if location_str.is_empty() {
+                        l
+                    } else {
+                        l.set_addr(location_str);
+                        l
+                    }
+                })
+            })
+        })
+    }
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location>;
-    fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location;
+    fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location {
+        self.get_location_or_else(location_str, || self.get_preset_location(sign))
+            .or_else(|| self.get_fallback_location(sign))
+            .unwrap_or_else(Location::get_none_location)
+    }
 }
 
 pub struct DefaultLocationInfoGetter<'a>(&'a DataBase);
@@ -62,52 +80,11 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
                     .flatten()
             })
     }
-
-    fn get_location_or(
-        &self,
-        location_str: &Option<String>,
-        preset_location: Option<Location>,
-    ) -> Option<Location> {
-        match location_str_to_location(self.0, location_str) {
-            Ok(location) => Some(location),
-            Err(location_str) => preset_location.map(|mut l| {
-                if location_str.is_empty() {
-                    l
-                } else {
-                    l.set_addr(&location_str);
-                    l
-                }
-            }),
-        }
-    }
-
-    fn get_location_or_else<GetPresetLocation: FnOnce() -> Option<Location>>(
-        &self,
-        location_str: &Option<String>,
-        get_preset_location: GetPresetLocation,
-    ) -> Option<Location> {
-        match location_str_to_location(self.0, location_str) {
-            Ok(location) => Some(location),
-            Err(location_str) => get_preset_location().map(|mut l| {
-                if location_str.is_empty() {
-                    l
-                } else {
-                    l.set_addr(&location_str);
-                    l
-                }
-            }),
-        }
-    }
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location> {
         let table = LocationTable::from_ref(self.0);
         table
             .get_location_list_by_course(sign.as_inner().course.get_id())
             .pop()
             .or_else(|| table.get_location_list_by_course(-1).pop())
-    }
-    fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location {
-        self.get_location_or_else(location_str, || self.get_preset_location(sign))
-            .or_else(|| self.get_fallback_location(sign))
-            .unwrap_or_else(Location::get_none_location)
     }
 }
