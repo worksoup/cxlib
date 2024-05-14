@@ -60,19 +60,8 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
             .or_else(|| table.get_location_list_by_course(-1).pop())
     }
     fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location {
-        match location_str_to_location(self.0, location_str) {
-            Ok(location) => location,
-            Err(location_str) => {
-                if !location_str.is_empty() {
-                    if let Some(location) = sign.get_preset_location(Some(&location_str)) {
-                        return location;
-                    }
-                } else if let Some(location) = sign.get_preset_location(None) {
-                    return location;
-                }
-                self.get_one_stored_location(sign)
-                    .unwrap_or_else(Location::get_none_location)
-            }
-        }
+        self.get_preset_location(sign, location_str)
+            .or_else(|| self.get_one_stored_location(sign))
+            .unwrap_or_else(Location::get_none_location)
     }
 }
