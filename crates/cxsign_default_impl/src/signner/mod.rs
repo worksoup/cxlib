@@ -9,7 +9,12 @@ use utils::location_str_to_location;
 
 pub trait LocationInfoGetterTrait {
     fn get_preset_location(&self, sign: &LocationSign) -> Option<Location>;
-    fn get_location<GetPresetLocation: FnOnce() -> Option<Location>>(
+    fn get_location_or(
+        &self,
+        location_str: &Option<String>,
+        preset_location: Option<Location>,
+    ) -> Option<Location>;
+    fn get_location_or_else<GetPresetLocation: FnOnce() -> Option<Location>>(
         &self,
         location_str: &Option<String>,
         get_preset_location: GetPresetLocation,
@@ -34,7 +39,26 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
     fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
         sign.get_preset_location(None)
     }
-    fn get_location<GetPresetLocation: FnOnce() -> Option<Location>>(
+
+    fn get_location_or(
+        &self,
+        location_str: &Option<String>,
+        preset_location: Option<Location>,
+    ) -> Option<Location> {
+        match location_str_to_location(self.0, location_str) {
+            Ok(location) => Some(location),
+            Err(location_str) => preset_location.map(|mut l| {
+                if location_str.is_empty() {
+                    l
+                } else {
+                    l.set_addr(&location_str);
+                    l
+                }
+            }),
+        }
+    }
+
+    fn get_location_or_else<GetPresetLocation: FnOnce() -> Option<Location>>(
         &self,
         location_str: &Option<String>,
         get_preset_location: GetPresetLocation,
@@ -59,7 +83,7 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
             .or_else(|| table.get_location_list_by_course(-1).pop())
     }
     fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location {
-        self.get_location(location_str, || self.get_preset_location(sign))
+        self.get_location_or_else(location_str, || self.get_preset_location(sign))
             .or_else(|| self.get_fallback_location(sign))
             .unwrap_or_else(Location::get_none_location)
     }
