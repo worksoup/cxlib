@@ -314,9 +314,6 @@ impl LocationWithRange {
         let lon = format!("{:.6}", (lon * PI / 180.0 + r * theta.cos()) / PI * 180.0);
         Location::new(addr, &lon, &lat, "1108")
     }
-    pub fn to_location(&self) -> Location {
-        Location::new(&self.addr, &self.lon, &self.lat, "1108")
-    }
     pub fn get_range(&self) -> u32 {
         self.range
     }

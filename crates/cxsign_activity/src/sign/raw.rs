@@ -142,7 +142,7 @@ impl RawSign {
                     let preset_location = preset_locations.remove(&self.active_id);
                     let raw_sign = self;
                     let location = if let Some(preset_location) = preset_location.as_ref() {
-                        preset_location.to_location()
+                        preset_location.to_shifted_location()
                     } else {
                         Location::get_none_location()
                     };
@@ -171,7 +171,7 @@ impl RawSign {
                         });
                     let preset_location = preset_locations.remove(&self.active_id);
                     let location = if let Some(preset_location) = preset_location.as_ref() {
-                        preset_location.to_location()
+                        preset_location.to_shifted_location()
                     } else {
                         Location::get_none_location()
                     };

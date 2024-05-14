@@ -8,7 +8,9 @@ pub use impls::*;
 use utils::location_str_to_location;
 
 pub trait LocationInfoGetterTrait {
-    fn get_preset_location(&self, sign: &LocationSign) -> Option<Location>;
+    fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
+        sign.get_preset_location()
+    }
     fn get_location_or(
         &self,
         location_str: &Option<String>,
@@ -36,10 +38,6 @@ impl<'a> From<&'a DataBase> for DefaultLocationInfoGetter<'a> {
 }
 
 impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
-    fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
-        sign.get_preset_location(None)
-    }
-
     fn get_location_or(
         &self,
         location_str: &Option<String>,

@@ -18,16 +18,10 @@ impl LocationSign {
     /// 获取预设的位置，同时可以选择传入一个字符串，用来设置位置的名称。
     ///
     /// 注意该函数不会调用 [`set_location`](Self::set_location), 请手动调用。
-    pub fn get_preset_location(&self, addr: Option<&str>) -> Option<Location> {
-        if let Some(location) = self.preset_location.as_ref() {
-            let mut location = location.to_location();
-            if let Some(addr) = addr {
-                location.set_addr(addr)
-            }
-            Some(location)
-        } else {
-            None
-        }
+    pub fn get_preset_location(&self) -> Option<Location> {
+        self.preset_location
+            .as_ref()
+            .map(|l| l.to_shifted_location())
     }
 }
 impl SignTrait for LocationSign {

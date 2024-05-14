@@ -55,7 +55,7 @@ pub(crate) fn sign_unchecked_with_location<T: SignTrait>(
     let addr = location.get_addr();
     locations.push(location.clone());
     if let Some(location) = preset_location {
-        let mut location = location.to_location();
+        let mut location = location.to_shifted_location();
         if !addr.is_empty() {
             location.set_addr(addr);
         }
