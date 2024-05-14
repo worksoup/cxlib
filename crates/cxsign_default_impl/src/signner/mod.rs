@@ -8,6 +8,11 @@ pub use impls::*;
 use utils::location_str_to_location;
 
 pub trait LocationInfoGetterTrait {
+    fn get_preset_location(
+        &self,
+        sign: &LocationSign,
+        location_str: &Option<String>,
+    ) -> Option<Location>;
     fn get_one_stored_location(&self, sign: &LocationSign) -> Option<Location>;
     fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location;
 }
@@ -25,6 +30,28 @@ impl<'a> From<&'a DataBase> for DefaultLocationInfoGetter<'a> {
 }
 
 impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
+    fn get_preset_location(
+        &self,
+        sign: &LocationSign,
+        location_str: &Option<String>,
+    ) -> Option<Location> {
+        match location_str_to_location(self.0, location_str) {
+            Ok(location) => Some(location),
+            Err(location_str) => {
+                if !location_str.is_empty()
+                    && let Some(location) = sign.get_preset_location(Some(&location_str))
+                {
+                    Some(location)
+                } else if location_str.is_empty()
+                    && let Some(location) = sign.get_preset_location(None)
+                {
+                    Some(location)
+                } else {
+                    None
+                }
+            }
+        }
+    }
     fn get_one_stored_location(&self, sign: &LocationSign) -> Option<Location> {
         let table = LocationTable::from_ref(self.0);
         table
