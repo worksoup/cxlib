@@ -19,7 +19,7 @@ pub struct DefaultQrCodeSignner<'a, T: LocationInfoGetterTrait> {
 }
 impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
     pub fn new(
-        db: T,
+        location_info_getter: T,
         location_str: &'a Option<String>,
         path: &'a Option<PathBuf>,
         enc: &'a Option<String>,
@@ -27,7 +27,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
         precisely: bool,
     ) -> Self {
         Self {
-            location_info_getter: db,
+            location_info_getter,
             location_str,
             path,
             enc,
