@@ -4,11 +4,6 @@ use ureq::Response;
 
 // 签到
 static PPT_SIGN: &str = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax";
-
-pub fn ureq_get(agent: &ureq::Agent, url: &str) -> Result<Response, Box<ureq::Error>> {
-    Ok(agent.get(url).call()?)
-}
-
 pub fn general_sign(session: &Session, active_id: &str) -> Result<Response, Box<ureq::Error>> {
     let uid = session.get_uid();
     let fid = session.get_fid();

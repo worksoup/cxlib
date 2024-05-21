@@ -1,6 +1,8 @@
-use crate::sign::{PreSignResult, RawSign, SignResult, SignTrait};
+use crate::sign::{GestureOrSigncodeSignTrait, RawSign};
+use cxsign_sign::{PreSignResult, SignResult, SignTrait};
 use cxsign_user::Session;
 use serde::{Deserialize, Serialize};
+
 /// 手势签到。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct GestureSign {
@@ -11,7 +13,7 @@ impl GestureSign {
     /// 检查签到码是否正确而不进行签到。
     pub fn check(&self, session: &Session) -> bool {
         self.gesture.as_ref().map_or(false, |signcode| {
-            RawSign::check_signcode(session, &self.raw_sign.active_id, signcode).unwrap_or(false)
+            Self::check_signcode(session, &self.raw_sign.active_id, signcode).unwrap_or(false)
         })
     }
     /// 设置手势。
@@ -41,7 +43,6 @@ impl SignTrait for GestureSign {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
             _ => self
-                .as_inner()
                 .sign_with_signcode(session, unsafe { self.gesture.as_ref().unwrap_unchecked() }),
         }
     }

@@ -1,4 +1,4 @@
-use crate::protocol;
+use crate::sign::utils::sign_unchecked_with_location;
 use crate::sign::{CaptchaId, LocationSign, PreSignResult, RawSign, SignResult, SignTrait};
 use cxsign_types::{Location, LocationWithRange};
 use cxsign_user::Session;
@@ -14,16 +14,14 @@ fn sign_unchecked<T: SignTrait>(
     session: &Session,
 ) -> Result<SignResult, cxsign_error::Error> {
     let url_getter = |l: &Location| {
-        protocol::qrcode_sign_url(session, enc, sign.as_inner().active_id.as_str(), Some(l))
+        cxsign_sign::protocol::qrcode_sign_url(
+            session,
+            enc,
+            sign.as_inner().active_id.as_str(),
+            Some(l),
+        )
     };
-    crate::utils::sign_unchecked_with_location(
-        sign,
-        url_getter,
-        location,
-        preset_location,
-        captcha_id,
-        session,
-    )
+    sign_unchecked_with_location::<T>(url_getter, location, preset_location, captcha_id, session)
 }
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct QrCodeSign {
@@ -58,7 +56,7 @@ impl SignTrait for QrCodeSign {
         let raw = self.as_inner();
         let active_id = raw.active_id.as_str();
         let uid = session.get_uid();
-        let response_of_presign = protocol::pre_sign_for_qrcode_sign(
+        let response_of_presign = cxsign_sign::protocol::pre_sign_for_qrcode_sign(
             session,
             raw.course.clone(),
             active_id,
@@ -67,7 +65,7 @@ impl SignTrait for QrCodeSign {
             enc,
         )?;
         info!("用户[{}]预签到已请求。", session.get_stu_name());
-        raw.analysis_after_presign(active_id, session, response_of_presign)
+        cxsign_sign::utils::analysis_after_presign(active_id, session, response_of_presign)
     }
     unsafe fn sign_unchecked(
         &self,

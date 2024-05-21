@@ -1,4 +1,3 @@
-use crate::protocol;
 use crate::sign::{PreSignResult, RawSign, SignResult, SignTrait};
 use cxsign_types::Photo;
 use cxsign_user::Session;
@@ -31,12 +30,12 @@ impl SignTrait for PhotoSign {
             PreSignResult::Susses => Ok(SignResult::Susses),
             _ => {
                 let photo = self.photo.as_ref().unwrap();
-                let r = protocol::photo_sign(
+                let r = cxsign_sign::protocol::photo_sign(
                     session,
                     self.raw_sign.active_id.as_str(),
                     photo.get_object_id(),
                 )?;
-                Ok(self.guess_sign_result_by_text(&r.into_string().unwrap()))
+                Ok(Self::guess_sign_result_by_text(&r.into_string().unwrap()))
             }
         }
     }

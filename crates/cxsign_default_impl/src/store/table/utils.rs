@@ -2,7 +2,7 @@ use std::{error::Error as ErrorTrait, str::FromStr};
 
 use log::warn;
 
-pub fn parse<E: ErrorTrait, T: FromStr<Err = E>>(contents: String) -> Vec<T> {
+pub fn parse<E: ErrorTrait, T: FromStr<Err = E>>(contents: &str) -> Vec<T> {
     let contents = contents.split('\n');
     let mut line_count = 1_i64;
     let mut r = vec![];

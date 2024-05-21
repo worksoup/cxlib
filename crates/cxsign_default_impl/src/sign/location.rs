@@ -1,4 +1,4 @@
-use crate::protocol;
+use crate::sign::utils::sign_unchecked_with_location;
 use crate::sign::{PreSignResult, RawSign, SignResult, SignTrait};
 use cxsign_types::{Location, LocationWithRange};
 use cxsign_user::Session;
@@ -37,15 +37,14 @@ impl SignTrait for LocationSign {
             PreSignResult::Susses => Ok(SignResult::Susses),
             PreSignResult::Data(captcha_id) => {
                 let url_getter = |l: &Location| {
-                    protocol::location_sign_url(
+                    cxsign_sign::protocol::location_sign_url(
                         session,
                         l,
                         self.raw_sign.active_id.as_str(),
                         self.preset_location.is_some(),
                     )
                 };
-                crate::utils::sign_unchecked_with_location(
-                    self,
+                sign_unchecked_with_location::<Self>(
                     url_getter,
                     &self.location,
                     &self.preset_location,

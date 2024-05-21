@@ -1,6 +1,7 @@
+use crate::sign::LocationSign;
 use crate::signner::LocationInfoGetterTrait;
-use cxsign_activity::sign::{LocationSign, SignResult, SignTrait};
 use cxsign_error::Error;
+use cxsign_sign::{SignResult, SignTrait};
 use cxsign_signner::SignnerTrait;
 use cxsign_types::Location;
 use cxsign_user::Session;

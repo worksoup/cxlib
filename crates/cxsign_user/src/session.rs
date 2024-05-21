@@ -1,5 +1,6 @@
 use crate::{cookies::UserCookies, protocol};
 use cxsign_dir::Dir;
+use cxsign_login::LoginTrait;
 use log::{info, trace};
 use std::{
     hash::Hash,
@@ -33,7 +34,7 @@ impl Hash for Session {
 
 impl Session {
     pub fn load_json(uname: &str) -> Result<Self, Box<ureq::Error>> {
-        let client = cxsign_login::load_json(Dir::get_json_file_path(uname));
+        let client = Agent::load_json(Dir::get_json_file_path(uname));
         let cookies = UserCookies::new(&client);
         let stu_name = Self::find_stu_name_in_html(&client)?;
         info!("用户[{}]加载 Cookies 成功！", stu_name);
@@ -45,7 +46,7 @@ impl Session {
         })
     }
     pub fn relogin(uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
-        let client = cxsign_login::login_enc(uname, enc_passwd)?;
+        let client = Agent::login_enc(uname, enc_passwd)?;
         let cookies = UserCookies::new(&client);
         let stu_name = Self::find_stu_name_in_html(&client)?;
         info!("用户[{}]登录成功！", stu_name);

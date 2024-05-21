@@ -14,6 +14,7 @@ cxsign_imageproc = { path = "../cxsign_imageproc" }
 cxsign_login = { path = "../cxsign_login" }
 cxsign_pan = { path = "../cxsign_pan" }
 cxsign_qrcode_utils = { path = "../cxsign_qrcode_utils" }
+cxsign_sign = { path = "../cxsign_sign" }
 cxsign_signner = { path = "../cxsign_signner" }
 cxsign_store = { path = "../cxsign_store" }
 cxsign_types = { path = "../cxsign_types" }

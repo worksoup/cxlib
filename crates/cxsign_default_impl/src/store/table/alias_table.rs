@@ -1,15 +1,12 @@
-use crate::sql::{DataBase, DataBaseTableTrait};
+use crate::store::{DataBase, DataBaseTableTrait};
+use cxsign_store::StorageTableCommandTrait;
 use log::warn;
-use std::ops::Deref;
 
-pub struct AliasTable<'a> {
-    db: &'a DataBase,
-}
+pub struct AliasTable;
 
-impl<'a> AliasTable<'a> {
-    pub fn has_alias(&self, alias: &str) -> bool {
-        let mut query = self
-            .db
+impl AliasTable {
+    pub fn has_alias(db: &DataBase, alias: &str) -> bool {
+        let mut query = db
             .prepare(format!(
                 "SELECT count(*) FROM {} WHERE name=?;",
                 Self::TABLE_NAME
@@ -20,18 +17,21 @@ impl<'a> AliasTable<'a> {
         query.read::<i64, _>(0).unwrap() > 0
     }
 
-    pub fn delete_alias(&self, alias: &str) {
-        let mut query = self
-            .db
+    pub fn delete_alias(db: &DataBase, alias: &str) {
+        let mut query = db
             .prepare(format!("DELETE FROM {} WHERE name=?;", Self::TABLE_NAME))
             .unwrap();
         query.bind((1, alias)).unwrap();
         query.next().unwrap();
     }
 
-    pub fn add_alias_or<O: Fn(&Self, &str, i64)>(&self, alias: &str, location_id: i64, or: O) {
-        let mut query = self
-            .db
+    pub fn add_alias_or<O: Fn(&DataBase, &str, i64)>(
+        db: &DataBase,
+        alias: &str,
+        location_id: i64,
+        or: O,
+    ) {
+        let mut query = db
             .prepare(format!(
                 "INSERT INTO {}(name,lid) values(:name,:lid);",
                 Self::TABLE_NAME
@@ -44,12 +44,11 @@ impl<'a> AliasTable<'a> {
             .unwrap();
         match query.next() {
             Ok(_) => (),
-            Err(_) => or(self, alias, location_id),
+            Err(_) => or(db, alias, location_id),
         };
     }
-    pub fn update_alias(&self, alias: &str, location_id: i64) {
-        let mut query = self
-            .db
+    pub fn update_alias(db: &DataBase, alias: &str, location_id: i64) {
+        let mut query = db
             .prepare(format!(
                 "UPDATE {} SET name=:name,lid=:lid WHERE name=:name;",
                 Self::TABLE_NAME
@@ -62,9 +61,8 @@ impl<'a> AliasTable<'a> {
             .unwrap();
         query.next().unwrap();
     }
-    pub fn get_aliases(&self, location_id: i64) -> Vec<String> {
-        let mut query = self
-            .db
+    pub fn get_aliases(db: &DataBase, location_id: i64) -> Vec<String> {
+        let mut query = db
             .prepare(format!("SELECT * FROM {} WHERE lid=?;", Self::TABLE_NAME))
             .unwrap();
         query.bind((1, location_id)).unwrap();
@@ -80,10 +78,9 @@ impl<'a> AliasTable<'a> {
         aliases
     }
 
-    pub fn get_location_id(&self, alias: &str) -> Option<i64> {
-        if self.has_alias(alias) {
-            let mut query = self
-                .db
+    pub fn get_location_id(db: &DataBase, alias: &str) -> Option<i64> {
+        if Self::has_alias(db, alias) {
+            let mut query = db
                 .prepare(format!("SELECT * FROM {} WHERE name=?;", Self::TABLE_NAME))
                 .unwrap();
             query.bind((1, alias)).unwrap();
@@ -100,18 +97,25 @@ impl<'a> AliasTable<'a> {
     }
 }
 
-impl<'a> DataBaseTableTrait<'a> for AliasTable<'a> {
-    const TABLE_ARGS: &'static str = "name CHAR (50) UNIQUE NOT NULL,lid INTEGER NOT NULL";
-    const TABLE_NAME: &'static str = "alias";
-
-    fn from_ref(db: &'a DataBase) -> Self {
-        Self { db }
+impl StorageTableCommandTrait<DataBase> for AliasTable {
+    fn init(storage: &DataBase) {
+        <Self as DataBaseTableTrait>::init(storage);
+    }
+    fn uninit(storage: &DataBase) -> bool {
+        !Self::is_existed(storage)
+    }
+    fn clear(storage: &DataBase) {
+        Self::delete(storage);
+    }
+    fn import(storage: &DataBase, content: &str) {
+        <Self as DataBaseTableTrait>::import(storage, content);
+    }
+    fn export(storage: &DataBase) -> String {
+        <Self as DataBaseTableTrait>::export(storage)
     }
 }
-impl<'a> Deref for AliasTable<'a> {
-    type Target = DataBase;
 
-    fn deref(&self) -> &Self::Target {
-        self.db
-    }
+impl DataBaseTableTrait for AliasTable {
+    const TABLE_ARGS: &'static str = "name CHAR (50) UNIQUE NOT NULL,lid INTEGER NOT NULL";
+    const TABLE_NAME: &'static str = "alias";
 }

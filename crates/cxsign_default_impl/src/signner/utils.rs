@@ -1,4 +1,4 @@
-use cxsign_activity::sign::QrCodeSign;
+use crate::sign::QrCodeSign;
 use cxsign_error::Error;
 use cxsign_utils::*;
 use std::path::PathBuf;

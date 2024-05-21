@@ -1,6 +1,7 @@
-use cxsign_signner::SignnerTrait;
-use cxsign_activity::sign::{PhotoSign, SignResult, SignTrait};
+use crate::sign::PhotoSign;
 use cxsign_error::Error;
+use cxsign_sign::{SignResult, SignTrait};
+use cxsign_signner::SignnerTrait;
 use cxsign_types::Photo;
 use cxsign_user::Session;
 use log::warn;

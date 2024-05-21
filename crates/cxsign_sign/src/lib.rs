@@ -1,46 +1,16 @@
-mod gesture;
-mod location;
-mod normal;
-mod photo;
-mod qrcode;
-mod raw;
-mod signcode;
-
-pub use gesture::*;
-pub use location::*;
-pub use normal::*;
-pub use photo::*;
-pub use qrcode::*;
-pub use raw::*;
-pub use signcode::*;
+use log::info;
 use std::ops::Add;
 
+use cxsign_activity::RawSign;
 use cxsign_types::{Course, Dioption, LocationWithRange};
 use cxsign_user::Session;
 use serde::Deserialize;
 
+pub mod protocol;
+pub mod utils;
+
 pub type CaptchaId = String;
 
-/// # [`PreSignResult`]
-/// 预签到结果，可能包含了一些签到时需要的信息。
-pub enum PreSignResult {
-    Susses,
-    Data(Dioption<CaptchaId, LocationWithRange>),
-}
-impl PreSignResult {
-    pub fn is_susses(&self) -> bool {
-        match self {
-            PreSignResult::Susses => true,
-            PreSignResult::Data(_) => false,
-        }
-    }
-    pub fn to_result(self) -> SignResult {
-        match self {
-            PreSignResult::Susses => SignResult::Susses,
-            PreSignResult::Data(_) => unreachable!(),
-        }
-    }
-}
 /// # [`SignTrait`]
 /// 所有的签到均实现了该 trait, 方便统一签到的流程。
 ///
@@ -93,8 +63,22 @@ pub trait SignTrait: Ord {
         Ok(status.into())
     }
     /// 通过签到结果的字符串判断签到结果如何。
-    fn guess_sign_result_by_text(&self, text: &str) -> SignResult {
-        crate::utils::guess_sign_result_by_text(text)
+    fn guess_sign_result_by_text(text: &str) -> SignResult {
+        match text {
+            "success" => SignResult::Susses,
+            msg => {
+                if msg.is_empty() {
+                    SignResult::Fail {
+                        msg:
+                        "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
+                    }
+                } else if msg == "您已签到过了" {
+                    SignResult::Susses
+                } else {
+                    SignResult::Fail { msg: msg.into() }
+                }
+            }
+        }
     }
     /// 预签到。
     fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxsign_error::Error> {
@@ -132,96 +116,51 @@ pub trait SignTrait: Ord {
         self.sign(session, r)
     }
 }
-/// 总体的签到类型。是一个枚举，可以通过 [`RawSign::to_sign`] 获取。
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub enum Sign {
-    /// 拍照签到
-    Photo(PhotoSign),
-    /// 普通签到
-    Normal(NormalSign),
-    /// 二维码签到
-    QrCode(QrCodeSign),
-    /// 手势签到
-    Gesture(GestureSign),
-    /// 位置签到
-    Location(LocationSign),
-    /// 签到码签到
-    Signcode(SigncodeSign),
-    /// 未知
-    Unknown(RawSign),
-}
-impl SignTrait for Sign {
-    fn as_inner(&self) -> &RawSign {
-        match self {
-            Sign::Photo(a) => a.as_inner(),
-            Sign::Normal(a) => a.as_inner(),
-            Sign::QrCode(a) => a.as_inner(),
-            Sign::Gesture(a) => a.as_inner(),
-            Sign::Location(a) => a.as_inner(),
-            Sign::Signcode(a) => a.as_inner(),
-            Sign::Unknown(a) => a.as_inner(),
-        }
-    }
-    fn is_ready_for_sign(&self) -> bool {
-        match self {
-            Sign::Photo(a) => a.is_ready_for_sign(),
-            Sign::Normal(a) => a.is_ready_for_sign(),
-            Sign::QrCode(a) => a.is_ready_for_sign(),
-            Sign::Gesture(a) => a.is_ready_for_sign(),
-            Sign::Location(a) => a.is_ready_for_sign(),
-            Sign::Signcode(a) => a.is_ready_for_sign(),
-            Sign::Unknown(a) => a.is_ready_for_sign(),
-        }
-    }
-    fn is_valid(&self) -> bool {
-        match self {
-            Sign::Photo(a) => a.is_valid(),
-            Sign::Normal(a) => a.is_valid(),
-            Sign::QrCode(a) => a.is_valid(),
-            Sign::Gesture(a) => a.is_valid(),
-            Sign::Location(a) => a.is_valid(),
-            Sign::Signcode(a) => a.is_valid(),
-            Sign::Unknown(a) => a.is_valid(),
-        }
-    }
 
-    fn get_sign_state(&self, session: &Session) -> Result<SignState, cxsign_error::Error> {
-        match self {
-            Sign::Photo(a) => a.get_sign_state(session),
-            Sign::Normal(a) => a.get_sign_state(session),
-            Sign::QrCode(a) => a.get_sign_state(session),
-            Sign::Gesture(a) => a.get_sign_state(session),
-            Sign::Location(a) => a.get_sign_state(session),
-            Sign::Signcode(a) => a.get_sign_state(session),
-            Sign::Unknown(a) => a.get_sign_state(session),
-        }
+impl SignTrait for RawSign {
+    fn as_inner(&self) -> &RawSign {
+        self
     }
     fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxsign_error::Error> {
-        match self {
-            Sign::Photo(a) => a.pre_sign(session),
-            Sign::Normal(a) => a.pre_sign(session),
-            Sign::QrCode(a) => a.pre_sign(session),
-            Sign::Gesture(a) => a.pre_sign(session),
-            Sign::Location(a) => a.pre_sign(session),
-            Sign::Signcode(a) => a.pre_sign(session),
-            Sign::Unknown(a) => a.pre_sign(session),
-        }
+        let active_id = self.active_id.as_str();
+        let uid = session.get_uid();
+        let response_of_pre_sign =
+            protocol::pre_sign(session, self.course.clone(), active_id, uid)?;
+        info!("用户[{}]预签到已请求。", session.get_stu_name());
+        utils::analysis_after_presign(active_id, session, response_of_pre_sign)
     }
     unsafe fn sign_unchecked(
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
     ) -> Result<SignResult, cxsign_error::Error> {
-        unsafe {
-            match self {
-                Sign::Photo(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Normal(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::QrCode(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Gesture(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Location(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Signcode(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Unknown(a) => a.sign_unchecked(session, pre_sign_result),
+        match pre_sign_result {
+            PreSignResult::Susses => Ok(SignResult::Susses),
+            _ => {
+                let r = protocol::general_sign(session, self.active_id.as_str())?;
+                Ok(Self::guess_sign_result_by_text(&r.into_string().unwrap()))
             }
+        }
+    }
+}
+
+/// # [`PreSignResult`]
+/// 预签到结果，可能包含了一些签到时需要的信息。
+pub enum PreSignResult {
+    Susses,
+    Data(Dioption<CaptchaId, LocationWithRange>),
+}
+impl PreSignResult {
+    pub fn is_susses(&self) -> bool {
+        match self {
+            PreSignResult::Susses => true,
+            PreSignResult::Data(_) => false,
+        }
+    }
+    pub fn to_result(self) -> SignResult {
+        match self {
+            PreSignResult::Susses => SignResult::Susses,
+            PreSignResult::Data(_) => unreachable!(),
         }
     }
 }
@@ -283,24 +222,4 @@ pub struct SignDetail {
     is_photo: bool,
     is_refresh_qrcode: bool,
     c: String,
-}
-
-/// 为手势签到和签到码签到实现的一个特型，方便复用代码。
-///
-/// 这两种签到除签到码格式以外没有任何不同之处。
-pub trait GestureOrSigncodeSignTrait: SignTrait {
-    /// 设置签到时所需的签到码或手势。
-    fn set_signcode(&mut self, signcode: String);
-}
-
-impl GestureOrSigncodeSignTrait for GestureSign {
-    fn set_signcode(&mut self, signcode: String) {
-        self.set_gesture(signcode)
-    }
-}
-
-impl GestureOrSigncodeSignTrait for SigncodeSign {
-    fn set_signcode(&mut self, signcode: String) {
-        SigncodeSign::set_signcode(self, signcode)
-    }
 }

@@ -1,11 +1,12 @@
 [package]
-name = "cxsign_activity"
+name = "cxsign_sign"
 edition = "2021"
 version.workspace = true
 authors.workspace = true
 
 [dependencies]
 chrono.workspace = true
+cxsign_activity = { path = "../cxsign_activity" }
 cxsign_captcha = { path = "../cxsign_captcha" }
 cxsign_error = { path = "../cxsign_error" }
 #cxsign_store = { path = "../cxsign_store" }

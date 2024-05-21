@@ -1,14 +1,12 @@
-use crate::location::Location;
-use cxsign_store::{AliasTable, DataBase, DataBaseTableTrait};
+use crate::store::{AliasTable, DataBase, DataBaseTableTrait};
+use cxsign_store::StorageTableCommandTrait;
+use cxsign_types::Location;
 use log::{debug, warn};
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::ops::Deref;
 use std::str::FromStr;
 
-pub struct LocationTable<'a> {
-    db: &'a DataBase,
-}
+pub struct LocationTable;
 pub struct LocationAndAliasesPair {
     pub course: i64,
     pub location: Location,
@@ -21,13 +19,10 @@ impl FromStr for LocationAndAliasesPair {
         let data: Vec<&str> = s.split('$').collect();
 
         if data.len() > 1 {
-            let course = match data[0].trim().parse::<i64>() {
-                Ok(course_id) => course_id,
-                Err(e) => {
-                    warn!("课程号解析失败，回退为 `-1`! 错误信息：{e}.");
-                    -1_i64
-                }
-            };
+            let course = data[0].trim().parse::<i64>().unwrap_or_else(|e| {
+                warn!("课程号解析失败，回退为 `-1`! 错误信息：{e}.");
+                -1_i64
+            });
             match Location::parse(data[1]) {
                 Ok(location) => {
                     let aliases: Vec<_> = if data.len() > 2 {
@@ -59,10 +54,9 @@ impl Display for LocationAndAliasesPair {
         write!(f, "{}${}${}", self.course, self.location, aliases_contents)
     }
 }
-impl<'a> LocationTable<'a> {
-    pub fn has_location(&self, location_id: i64) -> bool {
-        let mut query = self
-            .db
+impl LocationTable {
+    pub fn has_location(db: &DataBase, location_id: i64) -> bool {
+        let mut query = db
             .prepare(format!(
                 "SELECT count(*) FROM {} WHERE lid=?;",
                 Self::TABLE_NAME
@@ -72,8 +66,8 @@ impl<'a> LocationTable<'a> {
         query.next().unwrap();
         query.read::<i64, _>(0).unwrap() > 0
     }
-    pub fn add_location_or<O: Fn(&Self, i64, i64, &Location)>(
-        &self,
+    pub fn add_location_or<O: Fn(&DataBase, i64, i64, &Location)>(
+        db: &DataBase,
         location_id: i64,
         course_id: i64,
         location: &Location,
@@ -83,7 +77,7 @@ impl<'a> LocationTable<'a> {
         let lat = location.get_lat();
         let lon = location.get_lon();
         let alt = location.get_alt();
-        let mut query =self.db.prepare(format!("INSERT INTO {}(lid,courseid,addr,lat,lon,alt) values(:lid,:courseid,:addr,:lat,:lon,:alt);",Self::TABLE_NAME)).unwrap();
+        let mut query =db.prepare(format!("INSERT INTO {}(lid,courseid,addr,lat,lon,alt) values(:lid,:courseid,:addr,:lat,:lon,:alt);",Self::TABLE_NAME)).unwrap();
         query
             .bind::<&[(_, sqlite::Value)]>(
                 &[
@@ -98,40 +92,37 @@ impl<'a> LocationTable<'a> {
             .unwrap();
         match query.next() {
             Ok(_) => (),
-            Err(_) => or(self, location_id, course_id, location),
+            Err(_) => or(db, location_id, course_id, location),
         }
     }
     /// 添加位置，返回 LocationId.
-    pub fn insert_location(&self, course_id: i64, location: &Location) -> i64 {
+    pub fn insert_location(db: &DataBase, course_id: i64, location: &Location) -> i64 {
         // 为指定课程添加位置。
         let mut lid = 0_i64;
         loop {
-            if self.has_location(lid) {
+            if Self::has_location(db, lid) {
                 lid += 1;
                 continue;
             }
-            self.add_location_or(lid, course_id, location, |_, _, _, _| {});
+            Self::add_location_or(db, lid, course_id, location, |_, _, _, _| {});
             break;
         }
         lid
     }
-    pub fn delete_location(&self, location_id: i64) {
-        self.db
-            .execute(format!(
-                "DELETE FROM {} WHERE lid={location_id};",
-                Self::TABLE_NAME
-            ))
-            .unwrap();
-        let alias_table = AliasTable::from_ref(self.db);
-        let aliases = alias_table.get_aliases(location_id);
+    pub fn delete_location(db: &DataBase, location_id: i64) {
+        db.execute(format!(
+            "DELETE FROM {} WHERE lid={location_id};",
+            Self::TABLE_NAME
+        ))
+        .unwrap();
+        let aliases = AliasTable::get_aliases(db, location_id);
         for alias in aliases {
-            alias_table.delete_alias(&alias)
+            AliasTable::delete_alias(db, &alias)
         }
     }
     /// location_id, (course_id, location)
-    pub fn get_locations(&self) -> HashMap<i64, (i64, Location)> {
-        let mut query = self
-            .db
+    pub fn get_locations(db: &DataBase) -> HashMap<i64, (i64, Location)> {
+        let mut query = db
             .prepare(format!("SELECT * FROM {};", Self::TABLE_NAME))
             .unwrap();
         let mut location_map = HashMap::new();
@@ -150,9 +141,8 @@ impl<'a> LocationTable<'a> {
         }
         location_map
     }
-    pub fn get_location(&self, location_id: i64) -> (i64, Location) {
-        let mut query = self
-            .db
+    pub fn get_location(db: &DataBase, location_id: i64) -> (i64, Location) {
+        let mut query = db
             .prepare(format!("SELECT * FROM {} WHERE lid=?;", Self::TABLE_NAME))
             .unwrap();
         query.bind((1, location_id)).unwrap();
@@ -168,14 +158,11 @@ impl<'a> LocationTable<'a> {
         let course_id = row.read("courseid");
         (course_id, Location::new(addr, lon, lat, alt))
     }
-    pub fn get_location_by_alias(&self, alias: &str) -> Option<Location> {
-        AliasTable::from_ref(self.db)
-            .get_location_id(alias)
-            .map(|id| self.get_location(id).1)
+    pub fn get_location_by_alias(db: &DataBase, alias: &str) -> Option<Location> {
+        AliasTable::get_location_id(db, alias).map(|id| Self::get_location(db, id).1)
     }
-    pub fn get_location_map_by_course(&self, course_id: i64) -> HashMap<i64, Location> {
-        let mut query = self
-            .db
+    pub fn get_location_map_by_course(db: &DataBase, course_id: i64) -> HashMap<i64, Location> {
+        let mut query = db
             .prepare(format!(
                 "SELECT * FROM {} WHERE courseid=?;",
                 Self::TABLE_NAME
@@ -197,9 +184,8 @@ impl<'a> LocationTable<'a> {
         }
         location_map
     }
-    pub fn get_location_list_by_course(&self, course_id: i64) -> Vec<Location> {
-        let mut query = self
-            .db
+    pub fn get_location_list_by_course(db: &DataBase, course_id: i64) -> Vec<Location> {
+        let mut query = db
             .prepare(format!(
                 "SELECT * FROM {} WHERE courseid=?;",
                 Self::TABLE_NAME
@@ -221,57 +207,55 @@ impl<'a> LocationTable<'a> {
         location_list
     }
 }
-
-impl<'a> DataBaseTableTrait<'a> for LocationTable<'a> {
+impl StorageTableCommandTrait<DataBase> for LocationTable {
+    fn init(storage: &DataBase) {
+        <Self as DataBaseTableTrait>::init(storage);
+    }
+    fn uninit(storage: &DataBase) -> bool {
+        !Self::is_existed(storage)
+    }
+    fn clear(storage: &DataBase) {
+        Self::delete(storage);
+    }
+    fn import(storage: &DataBase, content: &str) {
+        <Self as DataBaseTableTrait>::import(storage, content);
+    }
+    fn export(storage: &DataBase) -> String {
+        <Self as DataBaseTableTrait>::export(storage)
+    }
+}
+impl DataBaseTableTrait for LocationTable {
     const TABLE_ARGS: &'static str = "lid INTEGER UNIQUE NOT NULL,courseid INTEGER NOT NULL,addr TEXT NOT NULL,lon TEXT NOT NULL,lat TEXT NOT NULL,alt TEXT NOT NULL";
     const TABLE_NAME: &'static str = "location";
 
-    fn from_ref(db: &'a DataBase) -> Self {
-        Self { db }
-    }
-
-    fn import(db: &'a DataBase, data: String) -> Self {
-        let location_table = Self::from_ref(db);
-        let alias_table = AliasTable::from_ref(db);
-        let data = cxsign_store::parse::<cxsign_error::Error, LocationAndAliasesPair>(data);
+    fn import(db: &DataBase, data: &str) {
+        let data = crate::utils::parse::<cxsign_error::Error, LocationAndAliasesPair>(data);
         for LocationAndAliasesPair {
             course,
             location,
             aliases,
         } in data
         {
-            let location_id = location_table.insert_location(course, &location);
+            let location_id = Self::insert_location(db, course, &location);
             for alias in aliases {
                 if !alias.is_empty() {
-                    alias_table.add_alias_or(&alias, location_id, |t, a, l| {
-                        t.update_alias(a, l);
-                    })
+                    AliasTable::add_alias_or(db, &alias, location_id, AliasTable::update_alias)
                 }
             }
         }
-        location_table
     }
 
-    fn export(&self) -> String {
-        let alias_table = AliasTable::from_ref(self);
-        let data = self
-            .get_locations()
+    fn export(db: &DataBase) -> String {
+        let data = Self::get_locations(db)
             .into_iter()
             .map(|(location_id, (course, location))| {
-                let aliases = alias_table.get_aliases(location_id);
+                let aliases = AliasTable::get_aliases(db, location_id);
                 LocationAndAliasesPair {
                     course,
                     location,
                     aliases,
                 }
             });
-        cxsign_store::to_string(data)
-    }
-}
-impl<'a> Deref for LocationTable<'a> {
-    type Target = DataBase;
-
-    fn deref(&self) -> &Self::Target {
-        self.db
+        crate::utils::to_string(data)
     }
 }

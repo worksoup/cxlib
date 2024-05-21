@@ -1,4 +1,4 @@
-use crate::sign::{PreSignResult, RawSign, SignResult, SignTrait};
+use crate::sign::{GestureOrSigncodeSignTrait, PreSignResult, RawSign, SignResult, SignTrait};
 use cxsign_user::Session;
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +10,7 @@ pub struct SigncodeSign {
 impl SigncodeSign {
     pub fn check(&self, session: &Session) -> bool {
         self.signcode.as_ref().map_or(false, |signcode| {
-            RawSign::check_signcode(session, &self.raw_sign.active_id, signcode).unwrap_or(false)
+            Self::check_signcode(session, &self.raw_sign.active_id, signcode).unwrap_or(false)
         })
     }
     pub fn set_signcode(&mut self, signcode: String) {
@@ -32,7 +32,7 @@ impl SignTrait for SigncodeSign {
     ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
-            _ => Ok(self.as_inner().sign_with_signcode(session, unsafe {
+            _ => Ok(self.sign_with_signcode(session, unsafe {
                 self.signcode.as_ref().unwrap_unchecked()
             })?),
         }

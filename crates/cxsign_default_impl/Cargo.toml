@@ -6,12 +6,21 @@ authors.workspace = true
 
 [dependencies]
 cxsign_activity = { path = "../cxsign_activity" }
+cxsign_captcha = { path = "../cxsign_captcha" }
 cxsign_error = { path = "../cxsign_error" }
+cxsign_dir = { path = "../cxsign_dir" }
 cxsign_imageproc = { path = "../cxsign_imageproc" }
+cxsign_login = { path = "../cxsign_login" }
 cxsign_qrcode_utils = { path = "../cxsign_qrcode_utils" }
+cxsign_sign = { path = "../cxsign_sign" }
 cxsign_signner = { path = "../cxsign_signner" }
 cxsign_store = { path = "../cxsign_store" }
 cxsign_types = { path = "../cxsign_types" }
 cxsign_user = { path = "../cxsign_user" }
 cxsign_utils = { path = "../cxsign_utils" }
 log.workspace = true
+num_enum = "0.7"
+percent-encoding.workspace = true
+serde = { workspace = true, features = ["derive"] }
+sqlite.workspace = true
+ureq = { workspace = true, features = ["cookies", "json"] }

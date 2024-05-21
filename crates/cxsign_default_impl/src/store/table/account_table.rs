@@ -1,15 +1,12 @@
+use crate::store::{DataBase, DataBaseTableTrait};
+use cxsign_store::StorageTableCommandTrait;
 use cxsign_user::Session;
-
-use crate::sql::{DataBase, DataBaseTableTrait};
 use log::{info, warn};
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::ops::Deref;
 use std::str::FromStr;
 
-pub struct AccountTable<'a> {
-    db: &'a DataBase,
-}
+pub struct AccountTable;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnameAndEncPwdPair {
     pub uname: String,
@@ -45,31 +42,31 @@ impl FromStr for UnameAndEncPwdPair {
         }
     }
 }
-impl<'a> AccountTable<'a> {
-    pub fn get_sessions_by_accounts_str(&self, accounts: &str) -> HashMap<String, Session> {
+impl AccountTable {
+    pub fn get_sessions_by_accounts_str(db: &DataBase, accounts: &str) -> HashMap<String, Session> {
         let str_list = accounts.split(',').map(|a| a.trim()).collect::<Vec<&str>>();
         let mut s = HashMap::new();
         for account in str_list {
-            if let Some(session) = self.get_session(account) {
+            if let Some(session) = Self::get_session(db, account) {
                 s.insert(account.to_string(), session);
             }
         }
         s
     }
-    pub fn get_session(&self, account: &str) -> Option<Session> {
-        if self.has_account(account) {
+    pub fn get_session(db: &DataBase, account: &str) -> Option<Session> {
+        if Self::has_account(db, account) {
             Some(Session::load_json(account).unwrap())
         } else {
             warn!("没有该账号：[`{account}`]，请检查输入或登录。");
             None
         }
     }
-    pub fn get_sessions(&self) -> HashMap<String, Session> {
-        let binding = self.get_accounts();
+    pub fn get_sessions(db: &DataBase) -> HashMap<String, Session> {
+        let binding = Self::get_accounts(db);
         let str_list = binding.keys().collect::<Vec<_>>();
         let mut s = HashMap::new();
         for account in str_list {
-            if self.has_account(&account.uname) {
+            if Self::has_account(db, &account.uname) {
                 let session = Session::load_json(&account.uname).unwrap();
                 s.insert(account.uname.clone(), session);
             } else {
@@ -81,9 +78,8 @@ impl<'a> AccountTable<'a> {
         }
         s
     }
-    pub fn has_account(&self, uname: &str) -> bool {
-        let mut query = self
-            .db
+    pub fn has_account(db: &DataBase, uname: &str) -> bool {
+        let mut query = db
             .prepare(format!(
                 "SELECT count(*) FROM {} WHERE uname=?;",
                 Self::TABLE_NAME
@@ -94,10 +90,9 @@ impl<'a> AccountTable<'a> {
         query.read::<i64, _>(0).unwrap() > 0
     }
 
-    pub fn delete_account(&self, uname: &str) {
-        if self.has_account(uname) {
-            let mut query = self
-                .db
+    pub fn delete_account(db: &DataBase, uname: &str) {
+        if Self::has_account(db, uname) {
+            let mut query = db
                 .prepare(format!("DELETE FROM {} WHERE uname=?;", Self::TABLE_NAME))
                 .unwrap();
             query.bind((1, uname)).unwrap();
@@ -106,15 +101,14 @@ impl<'a> AccountTable<'a> {
         std::fs::remove_file(cxsign_dir::Dir::get_json_file_path(uname)).unwrap();
     }
 
-    pub fn add_account_or<O: Fn(&Self, &str, &str, &str)>(
-        &self,
+    pub fn add_account_or<O: Fn(&DataBase, &str, &str, &str)>(
+        db: &DataBase,
         uname: &str,
         pwd: &str,
         name: &str,
         or: O,
     ) {
-        let mut query = self
-            .db
+        let mut query = db
             .prepare(format!(
                 "INSERT INTO {}(uname,pwd,name) values(:uname,:pwd,:name);",
                 Self::TABLE_NAME
@@ -131,13 +125,12 @@ impl<'a> AccountTable<'a> {
             .unwrap();
         match query.next() {
             Ok(_) => (),
-            Err(_) => or(self, uname, pwd, name),
+            Err(_) => or(db, uname, pwd, name),
         };
     }
 
-    pub fn update_account(&self, uname: &str, pwd: &str, name: &str) {
-        let mut query = self
-            .db
+    pub fn update_account(db: &DataBase, uname: &str, pwd: &str, name: &str) {
+        let mut query = db
             .prepare(format!(
                 "UPDATE {} SET pwd=:pwd,name=:name WHERE uname=:uname;",
                 Self::TABLE_NAME
@@ -155,9 +148,8 @@ impl<'a> AccountTable<'a> {
         query.next().unwrap();
     }
 
-    pub fn get_accounts(&self) -> HashMap<UnameAndEncPwdPair, String> {
-        let mut query = self
-            .db
+    pub fn get_accounts(db: &DataBase) -> HashMap<UnameAndEncPwdPair, String> {
+        let mut query = db
             .prepare(format!("SELECT * FROM {};", Self::TABLE_NAME))
             .unwrap();
         let mut accounts = HashMap::new();
@@ -176,9 +168,8 @@ impl<'a> AccountTable<'a> {
         }
         accounts
     }
-    pub fn get_account(&self, account: &str) -> Option<(UnameAndEncPwdPair, String)> {
-        let mut query = self
-            .db
+    pub fn get_account(db: &DataBase, account: &str) -> Option<(UnameAndEncPwdPair, String)> {
+        let mut query = db
             .prepare(format!("SELECT * FROM {} WHERE uname=?;", Self::TABLE_NAME))
             .unwrap();
         query.bind((1, account)).unwrap();
@@ -195,41 +186,58 @@ impl<'a> AccountTable<'a> {
         None
     }
     pub fn login(
-        &self,
+        db: &DataBase,
         uname: String,
         pwd: Option<String>,
     ) -> Result<Session, cxsign_error::Error> {
         let pwd = pwd.ok_or(cxsign_error::Error::LoginError("没有密码！".to_string()))?;
-        let enc_pwd = cxsign_login::des_enc(&pwd);
+        let enc_pwd = cxsign_login::utils::des_enc(&pwd);
         let session = Session::login(&uname, &enc_pwd)?;
         let name = session.get_stu_name();
-        self.add_account_or(&uname, &enc_pwd, name, AccountTable::update_account);
+        Self::add_account_or(db, &uname, &enc_pwd, name, AccountTable::update_account);
         Ok(session)
     }
-    pub fn relogin(&self, uname: String, enc_pwd: &str) -> Result<Session, cxsign_error::Error> {
+    pub fn relogin(
+        db: &DataBase,
+        uname: String,
+        enc_pwd: &str,
+    ) -> Result<Session, cxsign_error::Error> {
         let session = Session::relogin(&uname, enc_pwd)?;
-        self.delete_account(&uname);
+        Self::delete_account(db, &uname);
         session.store_json();
         let name = session.get_stu_name();
-        self.add_account_or(&uname, enc_pwd, name, AccountTable::update_account);
+        Self::add_account_or(db, &uname, enc_pwd, name, AccountTable::update_account);
         Ok(session)
     }
 }
 
-impl<'a> DataBaseTableTrait<'a> for AccountTable<'a> {
+impl StorageTableCommandTrait<DataBase> for AccountTable {
+    fn init(storage: &DataBase) {
+        <Self as DataBaseTableTrait>::init(storage);
+    }
+    fn uninit(storage: &DataBase) -> bool {
+        !Self::is_existed(storage)
+    }
+    fn clear(storage: &DataBase) {
+        Self::delete(storage);
+    }
+    fn import(storage: &DataBase, content: &str) {
+        <Self as DataBaseTableTrait>::import(storage, content);
+    }
+    fn export(storage: &DataBase) -> String {
+        <Self as DataBaseTableTrait>::export(storage)
+    }
+}
+impl DataBaseTableTrait for AccountTable {
     const TABLE_ARGS: &'static str =
         "uname CHAR (50) UNIQUE NOT NULL,pwd TEXT NOT NULL,name TEXT NOT NULL";
     const TABLE_NAME: &'static str = "account";
 
-    fn from_ref(db: &'a DataBase) -> Self {
-        Self { db }
-    }
-
-    fn import(db: &'a DataBase, data: String) -> Self {
-        let table = db.add_table::<Self>();
-        let data = crate::io::parse::<cxsign_error::Error, UnameAndEncPwdPair>(data);
+    fn import(db: &DataBase, data: &str) {
+        db.add_table::<Self>();
+        let data = crate::utils::parse::<cxsign_error::Error, UnameAndEncPwdPair>(data);
         for UnameAndEncPwdPair { uname, enc_pwd } in data {
-            match table.relogin(uname.clone(), &enc_pwd) {
+            match Self::relogin(db, uname.clone(), &enc_pwd) {
                 Ok(session) => info!(
                     "账号 [{uname}]（用户名：{}）导入成功！",
                     session.get_stu_name()
@@ -237,18 +245,9 @@ impl<'a> DataBaseTableTrait<'a> for AccountTable<'a> {
                 Err(e) => warn!("账号 [{uname}] 导入失败！错误信息：{e}."),
             }
         }
-        table
     }
 
-    fn export(&self) -> String {
-        crate::io::to_string(self.get_accounts().keys())
-    }
-}
-
-impl<'a> Deref for AccountTable<'a> {
-    type Target = DataBase;
-
-    fn deref(&self) -> &Self::Target {
-        self.db
+    fn export(db: &DataBase) -> String {
+        crate::utils::to_string(Self::get_accounts(db).keys())
     }
 }

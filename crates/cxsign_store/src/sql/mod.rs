@@ -1,83 +1,35 @@
-mod account_table;
-mod alias_table;
-mod exclude_table;
-
-pub use account_table::*;
-pub use alias_table::*;
-pub use exclude_table::*;
-
-use cxsign_dir::Dir;
-use log::info;
-use sqlite::Connection;
-use std::fs::File;
-use std::ops::Deref;
-
-pub trait DataBaseTableTrait<'a>: Deref<Target = DataBase> + Sized {
-    const TABLE_ARGS: &'static str;
-    const TABLE_NAME: &'static str;
-    fn from_ref(db: &'a DataBase) -> Self;
-    fn create(db: &'a DataBase) -> Self {
-        if !Self::is_existed(db) {
-            db.execute(format!(
-                "CREATE TABLE {} ({});",
-                Self::TABLE_NAME,
-                Self::TABLE_ARGS
-            ))
-            .unwrap();
-        }
-        Self::from_ref(db)
+pub trait StorageTrait: Sized {
+    fn create<T: StorageTableCommandTrait<Self>>(&self) {
+        T::init(self);
     }
-    fn is_existed(db: &DataBase) -> bool {
-        let mut query = db
-            .prepare(format!(
-                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{}';",
-                Self::TABLE_NAME
-            ))
-            .unwrap();
-        query.next().unwrap();
-        query.read::<i64, _>(0).unwrap() == 1
+    fn is_existed<T: StorageTableCommandTrait<Self>>(&self) -> bool {
+        !T::uninit(self)
     }
-    fn delete(db: &DataBase) {
-        let mut query = db
-            .prepare(format!("DELETE FROM {};", Self::TABLE_NAME))
-            .unwrap();
-        query.next().unwrap();
-        info!("已删除数据表 {}。", Self::TABLE_NAME);
+    fn delete<T: StorageTableCommandTrait<Self>>(&self) {
+        T::clear(self);
     }
-    fn import(db: &'a DataBase, _: String) -> Self {
-        Self::from_ref(db)
+    fn import<T: StorageTableCommandTrait<Self>>(&self, content: &str) {
+        T::import(self, content);
     }
-    fn export(&self) -> String {
+    fn export<T: StorageTableCommandTrait<Self>>(&self) -> String {
+        T::export(self)
+    }
+}
+pub trait StorageTableCommandTrait<Storage: StorageTrait> {
+    fn init(storage: &Storage);
+    fn uninit(storage: &Storage) -> bool {
+        let _ = storage;
+        true
+    }
+    fn clear(storage: &Storage) {
+        let _ = storage;
+    }
+    fn import(storage: &Storage, content: &str) {
+        let _ = storage;
+        let _ = content;
+    }
+    fn export(storage: &Storage) -> String {
+        let _ = storage;
         String::new()
-    }
-}
-
-pub struct DataBase {
-    connection: Connection,
-}
-impl Deref for DataBase {
-    type Target = Connection;
-
-    fn deref(&self) -> &Self::Target {
-        &self.connection
-    }
-}
-// self
-impl DataBase {
-    pub fn new() -> Self {
-        let db_dir = Dir::get_database_dir();
-        if db_dir.metadata().is_err() {
-            File::create(db_dir.clone()).unwrap();
-        }
-        let connection = Connection::open(db_dir.to_str().unwrap()).unwrap();
-        Self { connection }
-    }
-    pub fn add_table<'a, T: DataBaseTableTrait<'a>>(&'a self) -> T {
-        T::create(self)
-    }
-}
-impl Default for DataBase {
-    fn default() -> Self {
-        Self::new()
     }
 }

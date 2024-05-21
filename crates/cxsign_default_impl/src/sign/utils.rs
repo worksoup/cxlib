@@ -1,9 +1,11 @@
-use crate::protocol;
-use crate::sign::{CaptchaId, SignResult, SignTrait};
+use crate::sign::CaptchaId;
+use cxsign_activity::RawSign;
 use cxsign_captcha::protocol::CAPTCHA_ID;
+use cxsign_sign::{SignResult, SignTrait};
 use cxsign_types::{Location, LocationWithRange};
 use cxsign_user::Session;
 use log::{debug, warn};
+use ureq::Response;
 
 pub fn secondary_verification(
     agent: &ureq::Agent,
@@ -19,32 +21,13 @@ pub fn secondary_verification(
     let url_param = cxsign_captcha::utils::captcha_solver(agent, captcha_id)?;
     let r = {
         let url = url + "&validate=" + &url_param;
-        let r = protocol::ureq_get(agent, &url)?;
-        guess_sign_result_by_text(&r.into_string().unwrap())
+        let r = ureq_get(agent, &url)?;
+        RawSign::guess_sign_result_by_text(&r.into_string().unwrap())
     };
     Ok(r)
 }
 
-pub fn guess_sign_result_by_text(text: &str) -> SignResult {
-    match text {
-        "success" => SignResult::Susses,
-        msg => {
-            if msg.is_empty() {
-                SignResult::Fail {
-                    msg:
-                    "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
-                }
-            } else if msg == "您已签到过了" {
-                SignResult::Susses
-            } else {
-                SignResult::Fail { msg: msg.into() }
-            }
-        }
-    }
-}
-
-pub(crate) fn sign_unchecked_with_location<T: SignTrait>(
-    sign: &T,
+pub fn sign_unchecked_with_location<T: SignTrait>(
     url_getter: impl Fn(&Location) -> String,
     location: &Location,
     preset_location: &Option<LocationWithRange>,
@@ -68,8 +51,8 @@ pub(crate) fn sign_unchecked_with_location<T: SignTrait>(
     }
     for location in locations {
         let url = url_getter(&location);
-        let r = protocol::ureq_get(session, &url)?;
-        match sign.guess_sign_result_by_text(&r.into_string().unwrap()) {
+        let r = ureq_get(session, &url)?;
+        match T::guess_sign_result_by_text(&r.into_string().unwrap()) {
             SignResult::Susses => return Ok(SignResult::Susses),
             SignResult::Fail { msg } => {
                 if msg.starts_with("validate") {
@@ -95,4 +78,7 @@ pub(crate) fn sign_unchecked_with_location<T: SignTrait>(
     Ok(SignResult::Fail {
         msg: "所有位置均不可用。".to_string(),
     })
+}
+pub fn ureq_get(agent: &ureq::Agent, url: &str) -> Result<Response, Box<ureq::Error>> {
+    Ok(agent.get(url).call()?)
 }

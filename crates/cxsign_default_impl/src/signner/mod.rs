@@ -1,9 +1,10 @@
 mod impls;
 pub mod utils;
 
-use cxsign_activity::sign::{LocationSign, SignTrait};
-use cxsign_store::{DataBase, DataBaseTableTrait};
-use cxsign_types::{Location, LocationTable};
+use crate::sign::LocationSign;
+use crate::store::{DataBase, LocationTable};
+use cxsign_sign::SignTrait;
+use cxsign_types::Location;
 pub use impls::*;
 
 pub trait LocationInfoGetterTrait {
@@ -59,18 +60,17 @@ impl<'a> From<&'a DataBase> for DefaultLocationInfoGetter<'a> {
 
 impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
     fn map_location_str(&self, location_str: &str) -> Option<Location> {
-        let table = LocationTable::from_ref(self.0);
         let location_str = location_str.trim();
         location_str
             .parse()
             .ok()
-            .or_else(|| table.get_location_by_alias(location_str))
+            .or_else(|| LocationTable::get_location_by_alias(self.0, location_str))
             .or_else(|| {
                 location_str
                     .parse()
                     .map(|location_id| {
-                        if table.has_location(location_id) {
-                            let (_, location) = table.get_location(location_id);
+                        if LocationTable::has_location(self.0, location_id) {
+                            let (_, location) = LocationTable::get_location(self.0, location_id);
                             Some(location)
                         } else {
                             None
@@ -81,10 +81,8 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
             })
     }
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location> {
-        let table = LocationTable::from_ref(self.0);
-        table
-            .get_location_list_by_course(sign.as_inner().course.get_id())
+        LocationTable::get_location_list_by_course(self.0, sign.as_inner().course.get_id())
             .pop()
-            .or_else(|| table.get_location_list_by_course(-1).pop())
+            .or_else(|| LocationTable::get_location_list_by_course(self.0, -1).pop())
     }
 }
