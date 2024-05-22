@@ -15,11 +15,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-pub type ActivitiesSessionsMap = (
-    HashMap<RawSign, Vec<Session>>,
-    HashMap<OtherActivity, Vec<Session>>,
-);
-pub type Activities = (Vec<RawSign>, Vec<OtherActivity>);
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Activity {
     RawSign(RawSign),
@@ -40,19 +35,14 @@ impl Activity {
         table: &impl CourseExcludeInfoTrait,
         session: &Session,
         course: &Course,
-    ) -> Result<Activities, Box<ureq::Error>> {
-        let mut v = Vec::new();
-        let mut o = Vec::new();
+    ) -> Result<Vec<Activity>, Box<ureq::Error>> {
         let activities = Self::get_list_from_course(session, course).unwrap_or_default();
         let mut dont_exclude = false;
-        for activity in activities {
+        for activity in &activities {
             if let Self::RawSign(sign) = activity {
                 if cxsign_utils::time_delta_since_to_now(sign.start_time_mills).num_days() < 160 {
                     dont_exclude = true;
                 }
-                v.push(sign);
-            } else if let Self::Other(other_activity) = activity {
-                o.push(other_activity);
             }
         }
         let id = course.get_id();
@@ -62,13 +52,13 @@ impl Activity {
         } else if !dont_exclude && !excluded {
             table.add_exclude(id);
         }
-        Ok((v, o))
+        Ok(activities)
     }
     fn get_activities(
         table: &impl CourseExcludeInfoTrait,
         set_excludes: bool,
         courses: HashMap<Course, Vec<Session>>,
-    ) -> Result<ActivitiesSessionsMap, Box<ureq::Error>> {
+    ) -> Result<HashMap<Activity, Vec<Session>>, Box<ureq::Error>> {
         let excludes = table.get_excludes();
         let set_excludes = set_excludes || excludes.is_empty();
         let course_sessions_map = courses;
@@ -79,7 +69,6 @@ impl Activity {
             .collect::<Vec<_>>();
         let excludes = Arc::new(Mutex::new(Vec::new()));
         let valid_signs = Arc::new(Mutex::new(HashMap::new()));
-        let other_activities = Arc::new(Mutex::new(HashMap::new()));
         let thread_count = 256;
         let len = courses.len();
         let chunk_rest = len % thread_count;
@@ -96,19 +85,16 @@ impl Activity {
                 if let Some(session) = &course_sessions_map[course].first() {
                     let course = course.clone();
                     let session = (*session).clone();
-                    let valid_signs = Arc::clone(&valid_signs);
-                    let other_activities = Arc::clone(&other_activities);
+                    let activities_ = Arc::clone(&valid_signs);
                     let excludes = excludes.clone();
                     let sessions = course_sessions_map[&course].clone();
                     let handle = std::thread::spawn(move || {
                         let activities =
                             Self::get_list_from_course(&session, &course).unwrap_or(vec![]);
-                        let mut v = Vec::new();
-                        let mut o = Vec::new();
                         // NOTE: 此处也会将没有过签到的课程排除掉。
                         // TODO: 需要修改。
                         let mut dont_exclude = false;
-                        for activity in activities {
+                        for activity in &activities {
                             if let Self::RawSign(sign) = activity {
                                 if set_excludes
                                     && cxsign_utils::time_delta_since_to_now(sign.start_time_mills)
@@ -117,16 +103,10 @@ impl Activity {
                                 {
                                     dont_exclude = true;
                                 }
-                                v.push(sign);
-                            } else if let Self::Other(other_activity) = activity {
-                                o.push(other_activity);
                             }
                         }
-                        for v in v {
-                            valid_signs.lock().unwrap().insert(v, sessions.clone());
-                        }
-                        for o in o {
-                            other_activities.lock().unwrap().insert(o, sessions.clone());
+                        for v in activities {
+                            activities_.lock().unwrap().insert(v, sessions.clone());
                         }
                         debug!("course: list_activities, ok.");
                         if set_excludes && !dont_exclude {
@@ -142,20 +122,16 @@ impl Activity {
             }
         }
         let valid_signs = Arc::into_inner(valid_signs).unwrap().into_inner().unwrap();
-        let other_activities = Arc::into_inner(other_activities)
-            .unwrap()
-            .into_inner()
-            .unwrap();
         if set_excludes {
             table.update_excludes(&Arc::into_inner(excludes).unwrap().into_inner().unwrap());
         }
-        Ok((valid_signs, other_activities))
+        Ok(valid_signs)
     }
     pub fn get_all_activities<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         table: &impl CourseExcludeInfoTrait,
         sessions: Sessions,
         set_excludes: bool,
-    ) -> Result<ActivitiesSessionsMap, Box<ureq::Error>> {
+    ) -> Result<HashMap<Activity, Vec<Session>>, Box<ureq::Error>> {
         let courses = Course::get_courses(sessions)?;
         Self::get_activities(table, set_excludes, courses)
     }
