@@ -59,6 +59,8 @@ impl Course {
         Ok(courses)
     }
     fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, Box<ureq::Error>> {
+        // NOTE: 此处可能在登录过期后会报错，即 `channelList` 字段为空。
+        // TODO: 添加错误处理操作，例如重新登录。
         let r: GetCoursesR = r.into_json().unwrap();
         let mut arr = Vec::new();
         for c in r.channel_list {
