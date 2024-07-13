@@ -17,7 +17,7 @@ pub use signcode::*;
 use std::collections::HashMap;
 
 use cxsign_activity::RawSign;
-use cxsign_sign::{PreSignResult, SignResult, SignState, SignTrait};
+use cxsign_sign::{PreSignResult, SignDetail, SignResult, SignState, SignTrait};
 use cxsign_types::{Location, LocationWithRange};
 use cxsign_user::Session;
 use serde::Deserialize;
@@ -137,15 +137,7 @@ impl Sign {
             is_refresh_qrcode,
             sign_code,
         } = r.into_json().unwrap();
-        Ok(SignDetail {
-            is_photo: is_photo_sign > 0,
-            is_refresh_qrcode: is_refresh_qrcode > 0,
-            c: if let Some(c) = sign_code {
-                c
-            } else {
-                "".into()
-            },
-        })
+        Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
     }
     pub fn from_raw(raw: RawSign, session: &Session) -> Self {
         if let Ok(sign_detail) = Sign::get_sign_detail(raw.active_id.as_str(), session) {
@@ -156,7 +148,7 @@ impl Sign {
             };
             match raw.other_id.parse::<u8>().unwrap_or_else(r#else) {
                 0 => {
-                    if sign_detail.is_photo {
+                    if sign_detail.is_photo() {
                         Sign::Photo(PhotoSign {
                             raw_sign: raw,
                             photo: None,
@@ -184,11 +176,12 @@ impl Sign {
                         location,
                         preset_location,
                     };
-                    let is_refresh = sign_detail.is_refresh_qrcode;
+                    let is_refresh = sign_detail.is_refresh_qrcode();
                     Sign::QrCode(QrCodeSign {
                         is_refresh,
                         enc: None,
-                        c: sign_detail.c.clone(),
+                        // TODO: bad `unwrap`.
+                        c: sign_detail.sign_code().unwrap().to_string(),
                         raw_sign,
                     })
                 }
@@ -224,13 +217,6 @@ impl Sign {
             Sign::Unknown(raw)
         }
     }
-}
-/// 区分签到类型时获取的一些签到的信息。
-#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SignDetail {
-    is_photo: bool,
-    is_refresh_qrcode: bool,
-    c: String,
 }
 
 /// 为手势签到和签到码签到实现的一个特型，方便复用代码。

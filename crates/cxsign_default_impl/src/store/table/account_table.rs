@@ -197,17 +197,17 @@ impl AccountTable {
         Self::add_account_or(db, &uname, &enc_pwd, name, AccountTable::update_account);
         Ok(session)
     }
-    pub fn relogin(
-        db: &DataBase,
-        uname: String,
-        enc_pwd: &str,
-    ) -> Result<Session, cxsign_error::Error> {
-        let session = Session::relogin(&uname, enc_pwd)?;
-        Self::delete_account(db, &uname);
-        session.store_json();
-        let name = session.get_stu_name();
-        Self::add_account_or(db, &uname, enc_pwd, name, AccountTable::update_account);
-        Ok(session)
+    pub fn relogin(db: &DataBase, uname: String) -> Result<Session, cxsign_error::Error> {
+        if let Some((UnameAndEncPwdPair { uname, enc_pwd }, _)) =
+            AccountTable::get_account(db, &uname)
+        {
+            let session = Session::relogin(&uname, &enc_pwd)?;
+            session.store_json();
+            Ok(session)
+        } else {
+            warn!("数据库中没有该用户！可能是实现错误。");
+            panic!()
+        }
     }
 }
 
@@ -237,7 +237,7 @@ impl DataBaseTableTrait for AccountTable {
         db.add_table::<Self>();
         let data = crate::utils::parse::<cxsign_error::Error, UnameAndEncPwdPair>(data);
         for UnameAndEncPwdPair { uname, enc_pwd } in data {
-            match Self::relogin(db, uname.clone(), &enc_pwd) {
+            match Session::relogin(uname.as_str(), &enc_pwd) {
                 Ok(session) => info!(
                     "账号 [{uname}]（用户名：{}）导入成功！",
                     session.get_stu_name()

@@ -58,6 +58,7 @@ impl<'l, T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeS
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         let enc = crate::utils::enc_gen(sign, self.path, self.enc)?;
         sign.set_enc(enc);
+        #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         if sign.is_refresh() {
             let sessions = sessions.collect::<Vec<&'a Session>>();

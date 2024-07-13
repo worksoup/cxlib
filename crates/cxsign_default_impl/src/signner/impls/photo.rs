@@ -37,6 +37,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, Error> {
         let mut pic_map = HashMap::new();
+        #[allow(clippy::mutable_key_type)]
         let mut session_to_index = HashMap::new();
         if let Some(pic) = self.path.as_ref() {
             for session in sessions.clone() {
@@ -62,6 +63,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
                 }
             }
         }
+        #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
             let index = session_to_index[session];

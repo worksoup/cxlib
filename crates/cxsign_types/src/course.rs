@@ -30,7 +30,7 @@ impl Display for Course {
 impl Course {
     pub fn get_courses<'a, Sessions: Iterator<Item = &'a Session>>(
         sessions: Sessions,
-    ) -> Result<HashMap<Course, Vec<Session>>, Box<ureq::Error>> {
+    ) -> Result<HashMap<Course, Vec<Session>>, cxsign_error::Error> {
         let mut courses = HashMap::new();
         for session in sessions {
             let courses_ = Course::get_session_courses(session).unwrap_or_else(|e| {
@@ -52,33 +52,37 @@ impl Course {
         }
         Ok(courses)
     }
-    pub fn get_session_courses(session: &Session) -> Result<Vec<Course>, Box<ureq::Error>> {
+    pub fn get_session_courses(session: &Session) -> Result<Vec<Course>, cxsign_error::Error> {
         let r = protocol::back_clazz_data(session.deref())?;
         let courses = Course::get_list_from_response(r)?;
         info!("用户[{}]已获取课程列表。", session.get_stu_name());
         Ok(courses)
     }
-    fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, Box<ureq::Error>> {
-        // NOTE: 此处可能在登录过期后会报错，即 `channelList` 字段为空。
-        // TODO: 添加错误处理操作，例如重新登录。
+    fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, cxsign_error::Error> {
         let r: GetCoursesR = r.into_json().unwrap();
         let mut arr = Vec::new();
-        for c in r.channel_list {
-            if let Some(data) = c.content.course {
-                for course in data.data {
-                    if c.id.is_i64() {
-                        arr.push(Course::new(
-                            course.id,
-                            c.id.as_i64().unwrap(),
-                            course.teacher.as_str(),
-                            course.image_url.unwrap_or("".into()).as_str(),
-                            course.name.as_str(),
-                        ))
+        if let Some(channel_list) = r.channel_list {
+            for c in channel_list {
+                if let Some(data) = c.content.course {
+                    for course in data.data {
+                        if c.id.is_i64() {
+                            arr.push(Course::new(
+                                course.id,
+                                c.id.as_i64().unwrap(),
+                                course.teacher.as_str(),
+                                course.image_url.unwrap_or("".into()).as_str(),
+                                course.name.as_str(),
+                            ))
+                        }
                     }
                 }
             }
+            Ok(arr)
+        } else {
+            Err(cxsign_error::Error::LoginExpired(
+                "`channelList` 字段为空!".to_string(),
+            ))
         }
-        Ok(arr)
     }
 
     pub fn new(id: i64, class_id: i64, teacher: &str, image_url: &str, name: &str) -> Course {
@@ -146,5 +150,5 @@ struct ClassRaw {
 #[derive(Deserialize, Serialize, Debug)]
 struct GetCoursesR {
     #[serde(rename = "channelList")]
-    channel_list: Vec<ClassRaw>,
+    channel_list: Option<Vec<ClassRaw>>,
 }

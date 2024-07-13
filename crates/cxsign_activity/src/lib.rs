@@ -58,7 +58,7 @@ impl Activity {
         table: &impl CourseExcludeInfoTrait,
         set_excludes: bool,
         courses: HashMap<Course, Vec<Session>>,
-    ) -> Result<HashMap<Activity, Vec<Session>>, Box<ureq::Error>> {
+    ) -> Result<HashMap<Activity, Vec<Session>>, cxsign_error::Error> {
         let excludes = table.get_excludes();
         let set_excludes = set_excludes || excludes.is_empty();
         let course_sessions_map = courses;
@@ -131,7 +131,7 @@ impl Activity {
         table: &impl CourseExcludeInfoTrait,
         sessions: Sessions,
         set_excludes: bool,
-    ) -> Result<HashMap<Activity, Vec<Session>>, Box<ureq::Error>> {
+    ) -> Result<HashMap<Activity, Vec<Session>>, cxsign_error::Error> {
         let courses = Course::get_courses(sessions)?;
         Self::get_activities(table, set_excludes, courses)
     }

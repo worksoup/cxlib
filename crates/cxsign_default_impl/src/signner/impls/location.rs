@@ -37,6 +37,7 @@ impl<'a, T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocat
             return Err(Error::LocationError);
         }
         sign.set_location(location.clone());
+        #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
             let r = Self::sign_single(sign, session, ())?;

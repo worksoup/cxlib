@@ -21,6 +21,7 @@ impl SignnerTrait<GestureSign> for DefaultGestureOrSigncodeSignner {
         sign: &mut GestureSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, Error> {
+        #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         sign.set_gesture(self.0.clone());
         for session in sessions {
@@ -48,6 +49,7 @@ impl SignnerTrait<SigncodeSign> for DefaultGestureOrSigncodeSignner {
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, Error> {
         sign.set_signcode(self.0.clone());
+        #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
             let a = Self::sign_single(sign, session, ())?;

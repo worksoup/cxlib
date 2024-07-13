@@ -15,6 +15,7 @@ fn sign_<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
     sign: &RawSign,
     sessions: Sessions,
 ) -> Result<HashMap<&'a Session, SignResult>, Error> {
+    #[allow(clippy::mutable_key_type)]
     let mut map = HashMap::new();
     for session in sessions {
         let a = sign_single_(sign, session)?;

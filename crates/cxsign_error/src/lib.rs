@@ -4,6 +4,8 @@ use thiserror::Error;
 pub enum Error {
     #[error("登录失败！")]
     LoginError(String),
+    #[error("登录过期！")]
+    LoginExpired(String),
     #[error(transparent)]
     AgentError(#[from] Box<ureq::Error>),
     #[error(transparent)]
@@ -17,5 +19,5 @@ pub enum Error {
     #[error("设置位置预处理错误！")]
     SetLocationPreprocessorError,
     #[error("数据解析失败！")]
-    ParseError(String)
+    ParseError(String),
 }

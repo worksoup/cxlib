@@ -33,7 +33,8 @@ impl Hash for Session {
 }
 
 impl Session {
-    pub fn load_json(uname: &str) -> Result<Self, Box<ureq::Error>> {
+    /// 加载本地 Cookies 并返回 [`Session`].
+    pub fn load_json(uname: &str) -> Result<Session, cxsign_error::Error> {
         let client = Agent::load_json(Dir::get_json_file_path(uname));
         let cookies = UserCookies::new(&client);
         let stu_name = Self::find_stu_name_in_html(&client)?;
@@ -45,6 +46,7 @@ impl Session {
             cookies,
         })
     }
+    /// 类似于 [`Session::load_json`], 不过须传入加密后的密码以重新登录。重新登录后将 [`Session::store_json`] 以持久化 Cookies.
     pub fn relogin(uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
         let client = Agent::login_enc(uname, enc_passwd)?;
         let cookies = UserCookies::new(&client);
@@ -56,13 +58,20 @@ impl Session {
             stu_name,
             cookies,
         };
-        Ok(session)
-    }
-    pub fn login(uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
-        let session = Session::relogin(uname, enc_passwd)?;
         session.store_json();
         Ok(session)
     }
+    /// 先尝试 [`Session::load_json`], 如果发生错误且错误为登录过期，则 [`Session::relogin`]。
+    pub fn login(uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
+        match Session::load_json(uname) {
+            Ok(s) => Ok(s),
+            Err(e) => match e {
+                cxsign_error::Error::LoginExpired(_) => Session::relogin(uname, enc_passwd),
+                _ => Err(e),
+            },
+        }
+    }
+    /// 将 Cookies 保存在某位置。具体请查看代码：[`Session::store_json`].
     pub fn store_json(&self) {
         let store_path = Dir::get_json_file_path(self.get_uname());
         let mut writer = std::fs::File::create(store_path)
@@ -76,7 +85,6 @@ impl Session {
     pub fn get_fid(&self) -> &str {
         self.cookies.get_fid()
     }
-
     pub fn get_stu_name(&self) -> &str {
         &self.stu_name
     }
@@ -86,11 +94,14 @@ impl Session {
     pub fn get_avatar_url(&self, size: usize) -> String {
         format!("https://photo.chaoxing.com/p/{}_{}", self.get_uid(), size)
     }
-    fn find_stu_name_in_html(client: &Agent) -> Result<String, Box<ureq::Error>> {
+    fn find_stu_name_in_html(client: &Agent) -> Result<String, cxsign_error::Error> {
+        let login_expired_err = || cxsign_error::Error::LoginExpired("无法获取姓名！".to_string());
         let r = protocol::account_manage(client)?;
         let html_content = r.into_string().unwrap();
         trace!("{html_content}");
-        let e = html_content.find("colorBlue").unwrap();
+        let e = html_content
+            .find("colorBlue")
+            .ok_or_else(login_expired_err)?;
         let html_content = html_content.index(e..html_content.len()).to_owned();
         let e = html_content.find('>').unwrap() + 1;
         let html_content = html_content.index(e..html_content.len()).to_owned();
