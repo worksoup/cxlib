@@ -108,6 +108,11 @@ impl Session {
         let name = html_content
             .index(0..html_content.find('<').unwrap())
             .trim();
+        if name.is_empty() {
+            return Err(cxsign_error::Error::LoginExpired(
+                "姓名为空！".to_string(),
+            ));
+        }
         Ok(name.to_owned())
     }
 }
