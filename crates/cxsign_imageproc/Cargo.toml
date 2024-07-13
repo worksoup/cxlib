@@ -6,6 +6,6 @@ authors.workspace = true
 
 [dependencies]
 image.workspace = true
-imageproc = "0.24"
+imageproc = "0.25"
 num-traits = "0.2"
 ureq = { workspace = true, features = ["cookies", "json"] }

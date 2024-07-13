@@ -21,13 +21,14 @@ cookie_store = "0.21"
 hex = "0.4"
 image = "0.25"
 log = { version = "0.4", features = ["release_max_level_info"] }
+num_enum = "0.7"
 percent-encoding = "2.3"
 rand = "0.8"
 serde = "1.0"
 serde_json = "1.0"
 sqlite = "0.36"
 thiserror = "1.0"
-ureq = "2.9"
+ureq = "2.10"
 
 [dependencies]
 cxsign_internal = { path = "crates/cxsign_internal" }
@@ -59,7 +60,6 @@ cxsign_internal = { path = "crates/cxsign_internal" }
 #tokio = { version = "1.36", features = ["full"] }
 #tokio-stream = "0.1"
 #unicode-width = "0.1"
-#num_enum = "0.7"
 
 # url = "2.4"
 # strfmt = "*"

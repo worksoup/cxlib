@@ -19,7 +19,7 @@ cxsign_types = { path = "../cxsign_types" }
 cxsign_user = { path = "../cxsign_user" }
 cxsign_utils = { path = "../cxsign_utils" }
 log.workspace = true
-num_enum = "0.7"
+num_enum.workspace = true
 percent-encoding.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sqlite.workspace = true
