@@ -67,7 +67,8 @@ impl AccountTable {
         let mut s = HashMap::new();
         for account in str_list {
             if Self::has_account(db, &account.uname) {
-                let session = Session::load_json_or_relogin(&account.uname, &account.enc_pwd).unwrap();
+                let session =
+                    Session::load_json_or_relogin(&account.uname, &account.enc_pwd).unwrap();
                 s.insert(account.uname.clone(), session);
             } else {
                 warn!(
@@ -185,6 +186,7 @@ impl AccountTable {
         }
         None
     }
+    /// 用于第一次登录。
     pub fn login(
         db: &DataBase,
         uname: String,
@@ -192,7 +194,7 @@ impl AccountTable {
     ) -> Result<Session, cxsign_error::Error> {
         let pwd = pwd.ok_or(cxsign_error::Error::LoginError("没有密码！".to_string()))?;
         let enc_pwd = cxsign_login::utils::des_enc(&pwd);
-        let session = Session::load_json_or_relogin(&uname, &enc_pwd)?;
+        let session = Session::relogin(&uname, &enc_pwd)?;
         let name = session.get_stu_name();
         Self::add_account_or(db, &uname, &enc_pwd, name, AccountTable::update_account);
         Ok(session)
