@@ -9,7 +9,7 @@ static UA: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0_3 like Mac OS X) Appl
 pub trait LoginTrait: Sized {
     fn login_enc(account: &str, enc_passwd: &str) -> Result<Self, Error>;
 
-    fn load_json<P: AsRef<Path>>(cookies_file: P) -> Self;
+    fn load_json<P: AsRef<Path>>(cookies_file: P) -> Result<Self, std::io::Error>;
 }
 impl LoginTrait for Agent {
     fn login_enc(account: &str, enc_passwd: &str) -> Result<Agent, Error> {
@@ -52,17 +52,15 @@ impl LoginTrait for Agent {
         Ok(client)
     }
 
-    fn load_json<P: AsRef<Path>>(cookies_file: P) -> Agent {
+    fn load_json<P: AsRef<Path>>(cookies_file: P) -> Result<Agent, std::io::Error> {
         let cookie_store = {
-            let file = std::fs::File::open(cookies_file)
-                .map(std::io::BufReader::new)
-                .unwrap();
+            let file = std::fs::File::open(cookies_file).map(std::io::BufReader::new)?;
             cookie_store::CookieStore::load_json(file).unwrap()
         };
-        AgentBuilder::new()
+        Ok(AgentBuilder::new()
             .user_agent(UA)
             .cookie_store(cookie_store)
-            .build()
+            .build())
     }
 }
 

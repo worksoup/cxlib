@@ -35,7 +35,7 @@ impl Hash for Session {
 impl Session {
     /// 加载本地 Cookies 并返回 [`Session`].
     pub fn load_json(uname: &str) -> Result<Session, cxsign_error::Error> {
-        let client = Agent::load_json(Dir::get_json_file_path(uname));
+        let client = Agent::load_json(Dir::get_json_file_path(uname))?;
         let cookies = UserCookies::new(&client);
         let stu_name = Self::find_stu_name_in_html(&client)?;
         info!("用户[{}]加载 Cookies 成功！", stu_name);
@@ -61,12 +61,16 @@ impl Session {
         session.store_json();
         Ok(session)
     }
-    /// 先尝试 [`Session::load_json`], 如果发生错误且错误为登录过期，则 [`Session::relogin`]。
-    pub fn login(uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
+    /// 先尝试 [`Session::load_json`], 如果发生错误且错误为登录过期或 Cookies 不存在，则 [`Session::relogin`]。
+    pub fn load_json_or_relogin(uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
         match Session::load_json(uname) {
             Ok(s) => Ok(s),
             Err(e) => match e {
                 cxsign_error::Error::LoginExpired(_) => Session::relogin(uname, enc_passwd),
+                cxsign_error::Error::IoError(e) => match e.kind() {
+                    std::io::ErrorKind::NotFound => Session::relogin(uname, enc_passwd),
+                    _ => Err(cxsign_error::Error::IoError(e)),
+                },
                 _ => Err(e),
             },
         }
@@ -109,9 +113,7 @@ impl Session {
             .index(0..html_content.find('<').unwrap())
             .trim();
         if name.is_empty() {
-            return Err(cxsign_error::Error::LoginExpired(
-                "姓名为空！".to_string(),
-            ));
+            return Err(cxsign_error::Error::LoginExpired("姓名为空！".to_string()));
         }
         Ok(name.to_owned())
     }
