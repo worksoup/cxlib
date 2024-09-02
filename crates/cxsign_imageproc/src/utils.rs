@@ -103,7 +103,7 @@ pub fn download_image(
         .into_reader()
         .read_to_end(&mut v)
         .unwrap();
-    let img = image::io::Reader::new(std::io::Cursor::new(v))
+    let img = image::ImageReader::new(std::io::Cursor::new(v))
         .with_guessed_format()
         .unwrap()
         .decode()
