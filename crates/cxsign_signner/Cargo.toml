@@ -13,7 +13,7 @@ cxsign_types = { path = "../cxsign_types" }
 cxsign_user = { path = "../cxsign_user" }
 cxsign_utils = { path = "../cxsign_utils" }
 log.workspace = true
-rxing = "0.5"
+rxing = "0.6"
 image.workspace = true
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
-xcap = { version = "0.0.9" }
+xcap = { version = "0.0.13" }
