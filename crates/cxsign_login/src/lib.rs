@@ -5,7 +5,7 @@ use ureq::{Agent, AgentBuilder};
 
 pub mod protocol;
 pub mod utils;
-static UA: &str = 				"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile/ChaoXingStudy_3_6.1.0_android_phone_906_100";
+static UA: &str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_5.3.1_android_phone_5000_83";
 pub trait LoginTrait: Sized {
     fn login_enc(account: &str, enc_passwd: &str) -> Result<Self, Error>;
 
