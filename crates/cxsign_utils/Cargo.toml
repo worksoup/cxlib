@@ -9,4 +9,4 @@ chrono.workspace = true
 inquire = "0.7"
 flate2 = "1.0"
 log.workspace = true
-unicode-width = "0.1"
+unicode-width = "0.2"

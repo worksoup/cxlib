@@ -5,11 +5,10 @@ use cxsign_activity::RawSign;
 use cxsign_types::{Course, Dioption, LocationWithRange};
 use cxsign_user::Session;
 use serde::Deserialize;
+use cxsign_captcha::CaptchaId;
 
 pub mod protocol;
 pub mod utils;
-
-pub type CaptchaId = String;
 
 /// # [`SignTrait`]
 /// 所有的签到均实现了该 trait, 方便统一签到的流程。

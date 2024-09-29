@@ -1,4 +1,5 @@
 use crate::{protocol, PreSignResult};
+use cxsign_captcha::utils::find_captcha;
 use cxsign_types::{Dioption, LocationWithRange};
 use cxsign_user::Session;
 use log::{debug, trace};
@@ -23,10 +24,8 @@ pub fn analysis_after_presign(
     if let Some(location) = LocationWithRange::find_in_html(&html) {
         captcha_id_and_location.push_second(location);
     }
-    if let Some(start_of_captcha_id) = html.find("captchaId: '") {
-        let id = &html[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
-        debug!("captcha_id: {id}");
-        captcha_id_and_location.push_first(id.to_string());
+    if let Some(captcha_id) = find_captcha(session, &html) {
+        captcha_id_and_location.push_first(captcha_id);
     }
     let response_of_analysis = protocol::analysis(session, active_id)?;
     let data = response_of_analysis.into_string().unwrap();

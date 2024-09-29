@@ -1,4 +1,6 @@
 use std::fmt::Display;
+use log::debug;
+use ureq::{Agent, Response};
 
 pub static CAPTCHA_ID: &str = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
 // 获取滑块。
@@ -9,6 +11,8 @@ static CHECK_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/check/verific
 static GET_SERVER_TIME: &str = "https://captcha.chaoxing.com/captcha/get/conf";
 // Doesn't matter.
 pub(crate) static CALLBACK_NAME: &str = "jQuery_114514_1919810";
+static MY_SIGN_CAPTCHA_UTILS: &str =
+    "https://mobilelearn.chaoxing.com/front/mobile/sign/js/mySignCaptchaUtils.js";
 
 pub fn get_server_time(
     agent: &ureq::Agent,
@@ -63,4 +67,10 @@ pub fn check_captcha(
         .get(&url)
         .set("Referer", "https://mobilelearn.chaoxing.com");
     Ok(get.call()?)
+}
+
+pub fn my_sign_captcha_utils(client: &Agent) -> Result<Response, Box<ureq::Error>> {
+    let url = MY_SIGN_CAPTCHA_UTILS;
+    debug!("{url}");
+    Ok(client.get(url).call()?)
 }

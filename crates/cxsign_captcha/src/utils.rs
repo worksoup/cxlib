@@ -1,8 +1,8 @@
-use log::{debug, warn};
-use serde::Deserialize;
-
 use crate::hash::{encode, hash, uuid};
 use crate::protocol::{check_captcha, get_captcha, get_server_time};
+use crate::CaptchaId;
+use log::{debug, warn};
+use serde::Deserialize;
 
 pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, ureq::serde_json::Error>
 where
@@ -89,6 +89,24 @@ pub fn captcha_solver(
         }
     }
     Err(cxsign_error::Error::CaptchaEmptyError)
+}
+
+pub fn find_captcha(client: &ureq::Agent, presign_html: &str) -> Option<CaptchaId> {
+    if let Some(start_of_captcha_id) = presign_html.find("captchaId: '") {
+        let id = &presign_html[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
+        debug!("captcha_id: {id}");
+        Some(id.to_string())
+    } else if let Ok(js) =
+        crate::protocol::my_sign_captcha_utils(client).map(|r| r.into_string().unwrap())
+        && let Some(start_of_captcha_id) = js.find("captchaId: '")
+    {
+        debug!("start_of_captcha_id: {start_of_captcha_id}");
+        let id = &js[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
+        debug!("captcha_id: {id}");
+        Some(id.to_string())
+    } else {
+        None
+    }
 }
 
 #[derive(Deserialize, Debug)]
