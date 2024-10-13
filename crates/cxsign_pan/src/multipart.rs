@@ -16,7 +16,7 @@ pub struct PreparedFields<'d> {
     streams: Vec<PreparedField<'d>>,
     end_boundary: Cursor<String>,
 }
-impl<'d> Read for PreparedField<'d> {
+impl Read for PreparedField<'_> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         debug!("PreparedField::read()");
 
@@ -27,7 +27,7 @@ impl<'d> Read for PreparedField<'d> {
         }
     }
 }
-impl<'d> Read for PreparedFields<'d> {
+impl Read for PreparedFields<'_> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         if buf.is_empty() {
             debug!("PreparedFields::read() was passed a zero-sized buffer.");

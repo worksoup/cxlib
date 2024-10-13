@@ -38,7 +38,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
     }
 }
 
-impl<'l, T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'l, T> {
+impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'_, T> {
     type ExtData<'e> = ();
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(

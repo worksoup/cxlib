@@ -21,7 +21,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultLocationSignner<'a, T> {
         }
     }
 }
-impl<'a, T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationSignner<'a, T> {
+impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationSignner<'_, T> {
     type ExtData<'e> = ();
 
     fn sign<'b, Sessions: Iterator<Item = &'b Session> + Clone>(

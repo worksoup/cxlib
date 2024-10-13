@@ -187,6 +187,7 @@ impl SignResult {
         }
     }
 }
+//noinspection ALL
 /// 签到后状态。
 #[derive(num_enum::FromPrimitive, num_enum::IntoPrimitive)]
 #[repr(i64)]
