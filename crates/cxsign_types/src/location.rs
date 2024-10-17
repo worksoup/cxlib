@@ -1,10 +1,8 @@
-use std::f64::consts::PI;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{cell::SyncUnsafeCell, collections::HashMap};
+use std::{collections::HashMap, f64::consts::PI, ops::Deref, str::FromStr};
 
 use crate::Course;
 use cxsign_user::Session;
+use onceinit::{OnceInit, StaticDefault};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -17,41 +15,14 @@ impl LocationPreprocessorTrait for DefaultLocationPreprocessor {
         location
     }
 }
-static LOCATION_PREPROCESSOR: SyncUnsafeCell<&dyn LocationPreprocessorTrait> =
-    SyncUnsafeCell::new(&DefaultLocationPreprocessor);
-static STATE: AtomicUsize = AtomicUsize::new(0);
-const UNINITIALIZED: usize = 0;
-const INITIALIZING: usize = 1;
-const INITIALIZED: usize = 2;
-fn set_boxed_location_preprocessor_internal<F>(
-    make_preprocessor: F,
-) -> Result<(), cxsign_error::Error>
-where
-    F: FnOnce() -> &'static dyn LocationPreprocessorTrait,
-{
-    let old_state = match STATE.compare_exchange(
-        UNINITIALIZED,
-        INITIALIZING,
-        Ordering::SeqCst,
-        Ordering::SeqCst,
-    ) {
-        Ok(s) | Err(s) => s,
-    };
-    match old_state {
-        UNINITIALIZED => {
-            unsafe { *LOCATION_PREPROCESSOR.get() = make_preprocessor() }
-            STATE.store(INITIALIZED, Ordering::SeqCst);
-            Ok(())
-        }
-        INITIALIZING => {
-            while STATE.load(Ordering::SeqCst) == INITIALIZING {
-                std::hint::spin_loop()
-            }
-            Err(cxsign_error::Error::SetLocationPreprocessorError)
-        }
-        _ => Err(cxsign_error::Error::SetLocationPreprocessorError),
+impl StaticDefault for dyn LocationPreprocessorTrait {
+    fn static_default() -> &'static Self {
+        static NOP: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
+        &NOP
     }
 }
+
+static LOCATION_PREPROCESSOR: OnceInit<dyn LocationPreprocessorTrait> = OnceInit::new();
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct Location {
     addr: String,
@@ -61,12 +32,7 @@ pub struct Location {
 }
 impl Location {
     pub fn get_location_preprocessor() -> &'static dyn LocationPreprocessorTrait {
-        if STATE.load(Ordering::Acquire) != INITIALIZED {
-            static NOP: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
-            &NOP
-        } else {
-            unsafe { *LOCATION_PREPROCESSOR.get() }
-        }
+        LOCATION_PREPROCESSOR.deref()
     }
     pub fn to_preprocessed(self) -> Location {
         Self::get_location_preprocessor().do_preprocess(self)
@@ -75,12 +41,16 @@ impl Location {
     pub fn set_location_preprocessor(
         preprocessor: &'static dyn LocationPreprocessorTrait,
     ) -> Result<(), cxsign_error::Error> {
-        set_boxed_location_preprocessor_internal(|| preprocessor)
+        LOCATION_PREPROCESSOR
+            .set_data(preprocessor)
+            .map_err(|_| cxsign_error::Error::SetLocationPreprocessorError)
     }
     pub fn set_boxed_location_preprocessor(
         preprocessor: Box<dyn LocationPreprocessorTrait>,
     ) -> Result<(), cxsign_error::Error> {
-        set_boxed_location_preprocessor_internal(|| Box::leak(preprocessor))
+        LOCATION_PREPROCESSOR
+            .set_boxed_data(preprocessor)
+            .map_err(|_| cxsign_error::Error::SetLocationPreprocessorError)
     }
     pub fn to_owned_fields(self) -> [String; 4] {
         let Location {
