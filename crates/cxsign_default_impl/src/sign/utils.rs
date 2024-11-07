@@ -1,6 +1,6 @@
 use crate::sign::CaptchaId;
 use cxsign_activity::RawSign;
-use cxsign_captcha::protocol::CAPTCHA_ID;
+use cxsign_protocol::ProtocolEnum;
 use cxsign_sign::{SignResult, SignTrait};
 use cxsign_types::{Location, LocationWithRange};
 use cxsign_user::Session;
@@ -16,7 +16,7 @@ pub fn secondary_verification(
         captcha_id
     } else {
         warn!("未找到滑块 ID, 使用内建值。");
-        CAPTCHA_ID
+        &*ProtocolEnum::CaptchaId
     };
     let url_param = cxsign_captcha::utils::captcha_solver(agent, captcha_id)?;
     let r = {

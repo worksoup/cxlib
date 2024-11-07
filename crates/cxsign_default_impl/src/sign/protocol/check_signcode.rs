@@ -1,9 +1,7 @@
+use cxsign_protocol::ProtocolEnum;
 use ureq::{Agent, Response};
 
 // 签到码检查
-static CHECK_SIGNCODE: &str =
-    "https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/checkSignCode";
-
 pub fn check_signcode(
     client: &Agent,
     active_id: &str,
@@ -11,7 +9,8 @@ pub fn check_signcode(
 ) -> Result<Response, Box<ureq::Error>> {
     Ok(client
         .get(&format!(
-            "{CHECK_SIGNCODE}?activeId={active_id}&signCode={signcode}"
+            "{}?activeId={active_id}&signCode={signcode}",
+            ProtocolEnum::CheckSigncode
         ))
         .call()?)
 }

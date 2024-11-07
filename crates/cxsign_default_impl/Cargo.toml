@@ -11,6 +11,7 @@ cxsign_error = { path = "../cxsign_error" }
 cxsign_dir = { path = "../cxsign_dir" }
 cxsign_imageproc = { path = "../cxsign_imageproc" }
 cxsign_login = { path = "../cxsign_login" }
+cxsign_protocol = { path = "../cxsign_protocol" }
 cxsign_qrcode_utils = { path = "../cxsign_qrcode_utils" }
 cxsign_sign = { path = "../cxsign_sign" }
 cxsign_signner = { path = "../cxsign_signner" }
@@ -23,4 +24,5 @@ num_enum.workspace = true
 percent-encoding.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sqlite.workspace = true
+toml.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }

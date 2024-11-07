@@ -6,6 +6,7 @@ authors.workspace = true
 
 [dependencies]
 cxsign_imageproc = { path = "../cxsign_imageproc" }
+cxsign_protocol = { path = "../cxsign_protocol" }
 cxsign_utils = { path = "../cxsign_utils" }
 image.workspace = true
 log.workspace = true

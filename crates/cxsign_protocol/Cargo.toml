@@ -1,9 +1,8 @@
 [package]
-name = "cxsign_dir"
+name = "cxsign_protocol"
 edition = "2021"
 version.workspace = true
 authors.workspace = true
 
 [dependencies]
 onceinit.workspace = true
-directories = "5.0"

@@ -1,39 +1,35 @@
-use std::fmt::Display;
+use cxsign_protocol::ProtocolEnum;
 use log::debug;
+use std::fmt::Display;
 use ureq::{Agent, Response};
 
-pub static CAPTCHA_ID: &str = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
-// 获取滑块。
-static GET_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/get/verification/image";
-// 滑块验证。
-static CHECK_CAPTCHA: &str = "https://captcha.chaoxing.com/captcha/check/verification/result";
-// 获取服务器时间。
-static GET_SERVER_TIME: &str = "https://captcha.chaoxing.com/captcha/get/conf";
 // Doesn't matter.
 pub(crate) static CALLBACK_NAME: &str = "jQuery_114514_1919810";
-static MY_SIGN_CAPTCHA_UTILS: &str =
-    "https://mobilelearn.chaoxing.com/front/mobile/sign/js/mySignCaptchaUtils.js";
 
+// 获取服务器时间。
 pub fn get_server_time(
-    agent: &ureq::Agent,
+    agent: &Agent,
     captcha_id: &str,
     time_stamp_mills: impl Display + Copy,
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
-        "{GET_SERVER_TIME}?callback={CALLBACK_NAME}&captchaId={captcha_id}&_={time_stamp_mills}"
+        "{}?callback={CALLBACK_NAME}&captchaId={captcha_id}&_={time_stamp_mills}",
+        ProtocolEnum::GetServerTime,
     );
     Ok(agent.get(&url).call()?)
 }
 
+// 获取滑块。
 pub fn get_captcha(
-    agent: &ureq::Agent,
+    agent: &Agent,
     captcha_id: &str,
     captcha_key: &str,
     tmp_token: &str,
     time_stamp_mills: impl Display + Copy,
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
-        "{GET_CAPTCHA}?{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
+        "{}?{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
+        ProtocolEnum::GetCaptcha,
         format_args!("callback={}", CALLBACK_NAME),
         format_args!("captchaId={}", captcha_id),
         format_args!("captchaKey={}", captcha_key),
@@ -45,15 +41,17 @@ pub fn get_captcha(
     Ok(agent.get(&url).call()?)
 }
 
+// 滑块验证。
 pub fn check_captcha(
-    agent: &ureq::Agent,
+    agent: &Agent,
     captcha_id: &str,
     x: impl Display + Copy,
     token: &str,
     time_stamp_mills: impl Display + Copy,
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
-        "{CHECK_CAPTCHA}?{}&{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
+        "{}?{}&{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
+        ProtocolEnum::CheckCaptcha,
         format_args!("callback={CALLBACK_NAME}",),
         format_args!("captchaId={}", captcha_id),
         format_args!("token={}", token),
@@ -70,7 +68,7 @@ pub fn check_captcha(
 }
 
 pub fn my_sign_captcha_utils(client: &Agent) -> Result<Response, Box<ureq::Error>> {
-    let url = MY_SIGN_CAPTCHA_UTILS;
+    let url = ProtocolEnum::MySignCaptchaUtils;
     debug!("{url}");
-    Ok(client.get(url).call()?)
+    Ok(client.get(&url).call()?)
 }
