@@ -116,6 +116,14 @@ impl Dir {
             .base_dir
             .join(account.to_string() + ".json")
     }
+    pub fn get_config_file_path(file_name: &str) -> PathBuf {
+        if uninit() {
+            Self::set_default_config_dir()
+        }
+        unsafe { Self::get_dir_unchecked() }
+            .base_dir
+            .join(file_name)
+    }
 }
 impl From<PathBuf> for Dir {
     fn from(base_dir: PathBuf) -> Self {
