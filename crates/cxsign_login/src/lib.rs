@@ -15,7 +15,7 @@ impl LoginTrait for Agent {
     fn login_enc(account: &str, enc_passwd: &str) -> Result<Agent, Error> {
         let cookie_store = cookie_store::CookieStore::new(None);
         let client = AgentBuilder::new()
-            .user_agent(&ProtocolEnum::UserAgent)
+            .user_agent(&ProtocolEnum::UserAgent.to_string())
             .cookie_store(cookie_store)
             .build();
         let response = protocol::login_enc(&client, account, enc_passwd)?;
@@ -58,7 +58,7 @@ impl LoginTrait for Agent {
             cookie_store::CookieStore::load_json(file).unwrap()
         };
         Ok(AgentBuilder::new()
-            .user_agent(&ProtocolEnum::UserAgent)
+            .user_agent(&ProtocolEnum::UserAgent.to_string())
             .cookie_store(cookie_store)
             .build())
     }

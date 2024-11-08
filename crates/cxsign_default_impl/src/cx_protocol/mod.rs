@@ -1,12 +1,13 @@
 use cxsign_protocol::{CXProtocol, ProtocolEnum, ProtocolTrait};
-use log::{error, warn};
+use log::warn;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex, RwLock};
 use std::{
     fs::File,
     io::{ErrorKind, Read, Write},
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct ProtocolData {
     active_list: Option<String>,
     get_captcha: Option<String>,
@@ -144,67 +145,88 @@ impl Default for ProtocolData {
 }
 
 pub struct DefaultCXProtocol {
-    data: ProtocolData,
-    file: File,
+    data: Arc<RwLock<ProtocolData>>,
+    file: Option<Arc<Mutex<File>>>,
 }
 impl DefaultCXProtocol {
+    /// # init
+    /// 读取配置文件 `protocol.toml` 并构造 `ProtocolData`.
+    /// 若文件不存在，则尝试新建并使用默认值。
+    ///
+    /// 接着将协议设置为 `DefaultCXProtocol`.
+    ///
+    /// # Errors
+    ///
+    /// 在设置协议出错时返回 [`SetProtocolError`](cxsign_error::Error::ParseError).
     pub fn init() -> Result<(), cxsign_error::Error> {
         let protocol_config_path = cxsign_dir::Dir::get_config_file_path("protocol.toml");
         let mut file = match File::open(&protocol_config_path) {
-            Ok(file) => file,
+            Ok(file) => Some(file),
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => {
                     warn!("配置文件 `protocol.toml` 不存在，将新建。");
-                    File::create(&protocol_config_path)?
+                    if let Ok(file) = File::create(&protocol_config_path) {
+                        Some(file)
+                    } else {
+                        warn!("新建文件失败！");
+                        None
+                    }
                 }
                 _ => {
-                    error!("无法打开配置文件 `protocol.toml`: {}.", e.to_string());
-                    return Err(e.into());
+                    warn!("无法打开配置文件 `protocol.toml`: {}.", e.to_string());
+                    None
                 }
             },
         };
-        let mut s = String::new();
-        let _ = file.read_to_string(&mut s)?;
-        let data: ProtocolData =
-            toml::from_str(&s).map_err(|e| cxsign_error::Error::ParseError(e.to_string()))?;
+        let mut config = String::new();
+        let read = file
+            .as_mut()
+            .is_some_and(|f| f.read_to_string(&mut config).is_ok());
+        let data = if read {
+            toml::from_str(&config).unwrap_or_else(|_| ProtocolData::default())
+        } else {
+            warn!("无法读取配置文件，将视为只读状态，并禁用保存功能。");
+            ProtocolData::default()
+        };
+        let data = Arc::new(RwLock::new(data));
+        let file = file.map(|f| Arc::new(Mutex::new(f)));
         let protocol = DefaultCXProtocol { data, file };
         cxsign_protocol::set_boxed_protocol(Box::new(protocol))
             .map_err(|_| cxsign_error::Error::SetProtocolError)
     }
-    pub fn map_by_enum<'a, T: 'a>(
-        &'a self,
-        t: &ProtocolEnum,
-        do_something: impl Fn(&'a Option<String>) -> T,
-    ) -> T {
-        self.data.map_by_enum(t, do_something)
-    }
-    pub fn map_by_enum_mut<'a, T: 'a>(
-        &'a mut self,
-        t: &ProtocolEnum,
-        do_something: impl Fn(&'a mut Option<String>) -> T,
-    ) -> T {
-        self.data.map_by_enum_mut(t, do_something)
-    }
-    pub fn set(&mut self, t: &ProtocolEnum, value: &str) {
-        self.data.set(t, value)
-    }
-    pub fn store(&mut self) -> Result<(), cxsign_error::Error> {
-        let toml = toml::to_string_pretty(&self.data)
-            .map_err(|e| cxsign_error::Error::ParseError(e.to_string()))?;
-        Ok(self.file.write_all(toml.as_bytes())?)
-    }
-    /// 更新字段，相当于 [`set`](Self::set) + [`store`](Self::store), 具体逻辑为：若传入值与原有值不同，则更新字段并保存至文件。保存成功返回 `true`, 其余情况返回 `false`.
-    pub fn update(&mut self, t: &ProtocolEnum, value: &str) -> bool {
-        self.data.update(t, value) && self.store().is_ok()
-    }
 }
 impl ProtocolTrait for DefaultCXProtocol {
-    fn get(&self, t: &ProtocolEnum) -> &str {
-        if let Some(r) = self.data.map_by_enum(t, |a| a.as_ref().map(|a| a.as_str())) {
-            r
+    fn get(&self, t: &ProtocolEnum) -> String {
+        if let Some(r) = self
+            .data
+            .read()
+            .unwrap()
+            .map_by_enum(t, |a| a.as_ref().map(|a| a.as_str()))
+        {
+            r.to_owned()
         } else {
             CXProtocol.get(t)
         }
+    }
+    fn set(&self, t: &ProtocolEnum, value: &str) {
+        self.data.write().unwrap().set(t, value)
+    }
+    fn store(&self) -> Result<(), cxsign_error::Error> {
+        let toml =
+            toml::to_string_pretty(&*self.data.read().unwrap()).expect("若看到此消息说明有 bug.");
+        self.file
+            .as_ref()
+            .map(|f| f.lock().unwrap().write_all(toml.as_bytes()))
+            .transpose()?
+            .ok_or_else(|| {
+                cxsign_error::Error::FunctionIsDisabled(
+                    "文件为只读状态，保存功能已禁用。".to_string(),
+                )
+            })
+    }
+    /// 更新字段，相当于 [`set`](Self::set) + [`store`](Self::store), 具体逻辑为：若传入值与原有值不同，则更新字段并保存至文件。保存成功返回 `true`, 其余情况返回 `false`.
+    fn update(&self, t: &ProtocolEnum, value: &str) -> bool {
+        self.data.write().unwrap().update(t, value) && self.store().is_ok()
     }
 }
 #[cfg(test)]
@@ -215,5 +237,9 @@ mod tests {
     fn test_default() {
         let content = toml::to_string_pretty(&ProtocolData::default()).unwrap();
         println!("{content}");
+        let null: ProtocolData = toml::from_str("").unwrap();
+        println!("{null:?}");
+        let content = toml::to_string_pretty(&null).unwrap();
+        println!("{content:?}");
     }
 }

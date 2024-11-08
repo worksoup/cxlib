@@ -28,20 +28,17 @@ pub enum ProtocolEnum {
     UserAgent,
     QrcodePat,
 }
-impl Deref for ProtocolEnum {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        get(self)
-    }
-}
 impl Display for ProtocolEnum {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.deref().fmt(f)
+        get(self).fmt(f)
     }
 }
 pub trait ProtocolTrait: Sync {
-    fn get(&self, t: &ProtocolEnum) -> &str;
+    fn get(&self, t: &ProtocolEnum) -> String;
+
+    fn set(&self, t: &ProtocolEnum, value: &str);
+    fn store(&self) -> Result<(), cxsign_error::Error>;
+    fn update(&self, t: &ProtocolEnum, value: &str) -> bool;
 }
 
 pub struct CXProtocol;
@@ -96,7 +93,7 @@ static ACCOUNT_MANAGE: &str = "https://passport2.chaoxing.com/mooc/accountManage
 static USER_AGENT: &str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_5.3.1_android_phone_5000_83";
 
 impl ProtocolTrait for CXProtocol {
-    fn get(&self, t: &ProtocolEnum) -> &str {
+    fn get(&self, t: &ProtocolEnum) -> String {
         match t {
             ProtocolEnum::ActiveList => ACTIVE_LIST,
             ProtocolEnum::GetCaptcha => GET_CAPTCHA,
@@ -123,6 +120,19 @@ impl ProtocolTrait for CXProtocol {
             ProtocolEnum::UserAgent => USER_AGENT,
             ProtocolEnum::QrcodePat => QRCODE_PAT,
         }
+        .to_owned()
+    }
+
+    fn set(&self, _: &ProtocolEnum, _: &str) {}
+
+    fn store(&self) -> Result<(), cxsign_error::Error> {
+        Err(cxsign_error::Error::FunctionIsDisabled(
+            "默认实现不支持此操作。".to_string(),
+        ))
+    }
+
+    fn update(&self, _: &ProtocolEnum, _: &str) -> bool {
+        false
     }
 }
 
@@ -145,6 +155,18 @@ pub fn set_boxed_protocol(
     PROTOCOL.set_boxed_data(protocol)
 }
 
-pub fn get(t: &ProtocolEnum) -> &'static str {
+pub fn get(t: &ProtocolEnum) -> String {
     PROTOCOL.get(t)
+}
+
+pub fn set(t: &ProtocolEnum, value: &str) {
+    PROTOCOL.set(t, value)
+}
+
+pub fn store() -> Result<(), cxsign_error::Error> {
+    PROTOCOL.store()
+}
+
+pub fn update(t: &ProtocolEnum, value: &str) -> bool {
+    PROTOCOL.update(t, value)
 }

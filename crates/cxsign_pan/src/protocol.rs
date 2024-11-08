@@ -6,7 +6,7 @@ use ureq::{Agent, Response};
 
 // 超星网盘页
 pub fn pan_chaoxing(client: &Agent) -> Result<Response, Box<ureq::Error>> {
-    Ok(client.get(&ProtocolEnum::PanChaoxing).call()?)
+    Ok(client.get(&ProtocolEnum::PanChaoxing.to_string()).call()?)
 }
 
 // 网盘列表
@@ -21,7 +21,7 @@ pub fn pan_list(client: &Agent, parent_id: &str, enc: &str) -> Result<Response, 
 
 // 获取超星云盘的 token
 pub fn pan_token(client: &Agent) -> Result<Response, Box<ureq::Error>> {
-    Ok(client.get(&ProtocolEnum::PanToken).call()?)
+    Ok(client.get(&ProtocolEnum::PanToken.to_string()).call()?)
 }
 
 // 网盘上传接口

@@ -5,4 +5,5 @@ version.workspace = true
 authors.workspace = true
 
 [dependencies]
+cxsign_error = { path = "../cxsign_error" }
 onceinit.workspace = true

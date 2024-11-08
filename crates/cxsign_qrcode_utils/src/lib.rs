@@ -6,7 +6,7 @@ use rxing::Point;
 use std::collections::HashMap;
 
 pub fn is_enc_qrcode_url(url: &str) -> bool {
-    url.contains(&*ProtocolEnum::QrcodePat) && url.contains("&enc=")
+    url.contains(&*ProtocolEnum::QrcodePat.to_string()) && url.contains("&enc=")
 }
 pub fn scan_qrcode(
     image: image::DynamicImage,

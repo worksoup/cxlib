@@ -16,7 +16,7 @@ pub fn secondary_verification(
         captcha_id
     } else {
         warn!("未找到滑块 ID, 使用内建值。");
-        &*ProtocolEnum::CaptchaId
+        &ProtocolEnum::CaptchaId.to_string()
     };
     let url_param = cxsign_captcha::utils::captcha_solver(agent, captcha_id)?;
     let r = {

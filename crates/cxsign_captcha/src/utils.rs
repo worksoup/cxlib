@@ -144,13 +144,13 @@ mod tests {
             .as_millis();
         println!("{time}");
         let agent = ureq::Agent::new();
-        let r = get_server_time(&agent, &ProtocolEnum::CaptchaId, time).unwrap();
+        let r = get_server_time(&agent, &ProtocolEnum::CaptchaId.to_string(), time).unwrap();
         #[derive(Deserialize)]
         struct Tmp {
             t: u128,
         }
         let Tmp { t } = trim_response_to_json(r.into_string().unwrap().as_str()).unwrap();
-        let r = auto_solve_captcha(&agent, &ProtocolEnum::CaptchaId, t).unwrap();
+        let r = auto_solve_captcha(&agent, &ProtocolEnum::CaptchaId.to_string(), t).unwrap();
         println!("{:?}", r.get_validate_info());
     }
 }

@@ -70,5 +70,5 @@ pub fn check_captcha(
 pub fn my_sign_captcha_utils(client: &Agent) -> Result<Response, Box<ureq::Error>> {
     let url = ProtocolEnum::MySignCaptchaUtils;
     debug!("{url}");
-    Ok(client.get(&url).call()?)
+    Ok(client.get(&url.to_string()).call()?)
 }
