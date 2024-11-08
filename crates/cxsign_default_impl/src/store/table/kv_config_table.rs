@@ -133,7 +133,6 @@ impl KVConfigTable {
             query.bind((1, key)).unwrap();
             query.next().unwrap();
         }
-        std::fs::remove_file(cxsign_dir::Dir::get_json_file_path(key)).unwrap();
     }
 
     pub fn insert_or<O: Fn(&DataBase, &str, &str)>(db: &DataBase, key: &str, value: &str, or: O) {
