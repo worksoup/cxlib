@@ -190,17 +190,24 @@ impl DefaultCXProtocol {
                 }
             },
         };
-        let mut config = String::new();
-        read = read
-            && file
-                .as_mut()
-                .is_some_and(|f| f.read_to_string(&mut config).is_ok());
-        let data = if read {
-            toml::from_str(&config).unwrap_or_else(|_| ProtocolData::default())
-        } else {
-            warn!("无法读取配置文件，将视为只读状态，并禁用保存功能。");
-            ProtocolData::default()
-        };
+        let data = file
+            .as_mut()
+            .map(|f| {
+                if read {
+                    let data = ProtocolData::default();
+                    let config = toml::to_string_pretty(&data).unwrap();
+                    let _ = f.write_all(config.as_bytes());
+                    data
+                } else {
+                    let mut config = String::new();
+                    f.read_to_string(&mut config)
+                        .ok()
+                        .map(|_| toml::from_str(&config).ok())
+                        .flatten()
+                        .unwrap_or_else(ProtocolData::default)
+                }
+            })
+            .unwrap_or_else(|| ProtocolData::default());
         let data = Arc::new(RwLock::new(data));
         let file = file.map(|f| Arc::new(Mutex::new(f)));
         let protocol = DefaultCXProtocol { data, file };
