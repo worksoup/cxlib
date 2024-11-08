@@ -1,6 +1,7 @@
 use cxsign_protocol::{CXProtocol, Protocol, ProtocolTrait};
 use log::warn;
 use serde::{Deserialize, Serialize};
+use std::fs::OpenOptions;
 use std::sync::{Arc, Mutex, RwLock};
 use std::{
     fs::File,
@@ -160,7 +161,12 @@ impl DefaultCXProtocol {
     /// 在设置协议出错时返回 [`SetProtocolError`](cxsign_error::Error::ParseError).
     pub fn init() -> Result<(), cxsign_error::Error> {
         let protocol_config_path = cxsign_dir::Dir::get_config_file_path("protocol.toml");
-        let mut file = match File::open(&protocol_config_path) {
+        let mut file = match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(false)
+            .open(protocol_config_path.as_path())
+        {
             Ok(file) => Some(file),
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => {
