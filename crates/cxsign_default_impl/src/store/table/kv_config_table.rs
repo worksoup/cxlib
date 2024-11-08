@@ -26,13 +26,13 @@ impl FromStr for KVPair {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s
-            .split(',')
+            .split('=')
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>();
         if s.len() < 2 {
             Err(cxsign_error::Error::ParseError(
-                "键值表解析出错！格式为 `key, config`.".to_string(),
+                "键值表解析出错！格式为 `key = value`.".to_string(),
             ))
         } else {
             let key = s[0].to_string();
