@@ -1,4 +1,4 @@
-use cxsign_protocol::{CXProtocol, ProtocolEnum, ProtocolTrait};
+use cxsign_protocol::{CXProtocol, Protocol, ProtocolTrait};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, RwLock};
@@ -37,72 +37,72 @@ struct ProtocolData {
 impl ProtocolData {
     fn map_by_enum<'a, T>(
         &'a self,
-        t: &ProtocolEnum,
+        t: &Protocol,
         do_something: impl Fn(&'a Option<String>) -> T,
     ) -> T {
         match t {
-            ProtocolEnum::ActiveList => do_something(&self.active_list),
-            ProtocolEnum::GetCaptcha => do_something(&self.get_captcha),
-            ProtocolEnum::CheckCaptcha => do_something(&self.check_captcha),
-            ProtocolEnum::GetServerTime => do_something(&self.get_server_time),
-            ProtocolEnum::MySignCaptchaUtils => do_something(&self.my_sign_captcha_utils),
-            ProtocolEnum::CheckSigncode => do_something(&self.check_signcode),
-            ProtocolEnum::SignDetail => do_something(&self.sign_detail),
-            ProtocolEnum::LoginPage => do_something(&self.login_page),
-            ProtocolEnum::LoginEnc => do_something(&self.login_enc),
-            ProtocolEnum::PanChaoxing => do_something(&self.pan_chaoxing),
-            ProtocolEnum::PanList => do_something(&self.pan_list),
-            ProtocolEnum::PanToken => do_something(&self.pan_token),
-            ProtocolEnum::PanUpload => do_something(&self.pan_upload),
-            ProtocolEnum::Analysis => do_something(&self.analysis),
-            ProtocolEnum::Analysis2 => do_something(&self.analysis2),
-            ProtocolEnum::GetAttendInfo => do_something(&self.get_attend_info),
-            ProtocolEnum::PptSign => do_something(&self.ppt_sign),
-            ProtocolEnum::PreSign => do_something(&self.pre_sign),
-            ProtocolEnum::BackClazzData => do_something(&self.back_clazz_data),
-            ProtocolEnum::GetLocationLog => do_something(&self.get_location_log),
-            ProtocolEnum::AccountManage => do_something(&self.account_manage),
-            ProtocolEnum::CaptchaId => do_something(&self.captcha_id),
-            ProtocolEnum::UserAgent => do_something(&self.user_agent),
-            ProtocolEnum::QrcodePat => do_something(&self.qrcode_pat),
+            Protocol::ActiveList => do_something(&self.active_list),
+            Protocol::GetCaptcha => do_something(&self.get_captcha),
+            Protocol::CheckCaptcha => do_something(&self.check_captcha),
+            Protocol::GetServerTime => do_something(&self.get_server_time),
+            Protocol::MySignCaptchaUtils => do_something(&self.my_sign_captcha_utils),
+            Protocol::CheckSigncode => do_something(&self.check_signcode),
+            Protocol::SignDetail => do_something(&self.sign_detail),
+            Protocol::LoginPage => do_something(&self.login_page),
+            Protocol::LoginEnc => do_something(&self.login_enc),
+            Protocol::PanChaoxing => do_something(&self.pan_chaoxing),
+            Protocol::PanList => do_something(&self.pan_list),
+            Protocol::PanToken => do_something(&self.pan_token),
+            Protocol::PanUpload => do_something(&self.pan_upload),
+            Protocol::Analysis => do_something(&self.analysis),
+            Protocol::Analysis2 => do_something(&self.analysis2),
+            Protocol::GetAttendInfo => do_something(&self.get_attend_info),
+            Protocol::PptSign => do_something(&self.ppt_sign),
+            Protocol::PreSign => do_something(&self.pre_sign),
+            Protocol::BackClazzData => do_something(&self.back_clazz_data),
+            Protocol::GetLocationLog => do_something(&self.get_location_log),
+            Protocol::AccountManage => do_something(&self.account_manage),
+            Protocol::CaptchaId => do_something(&self.captcha_id),
+            Protocol::UserAgent => do_something(&self.user_agent),
+            Protocol::QrcodePat => do_something(&self.qrcode_pat),
         }
     }
     fn map_by_enum_mut<'a, T>(
         &'a mut self,
-        t: &ProtocolEnum,
+        t: &Protocol,
         do_something: impl Fn(&'a mut Option<String>) -> T,
     ) -> T {
         match t {
-            ProtocolEnum::ActiveList => do_something(&mut self.active_list),
-            ProtocolEnum::GetCaptcha => do_something(&mut self.get_captcha),
-            ProtocolEnum::CheckCaptcha => do_something(&mut self.check_captcha),
-            ProtocolEnum::GetServerTime => do_something(&mut self.get_server_time),
-            ProtocolEnum::MySignCaptchaUtils => do_something(&mut self.my_sign_captcha_utils),
-            ProtocolEnum::CheckSigncode => do_something(&mut self.check_signcode),
-            ProtocolEnum::SignDetail => do_something(&mut self.sign_detail),
-            ProtocolEnum::LoginPage => do_something(&mut self.login_page),
-            ProtocolEnum::LoginEnc => do_something(&mut self.login_enc),
-            ProtocolEnum::PanChaoxing => do_something(&mut self.pan_chaoxing),
-            ProtocolEnum::PanList => do_something(&mut self.pan_list),
-            ProtocolEnum::PanToken => do_something(&mut self.pan_token),
-            ProtocolEnum::PanUpload => do_something(&mut self.pan_upload),
-            ProtocolEnum::Analysis => do_something(&mut self.analysis),
-            ProtocolEnum::Analysis2 => do_something(&mut self.analysis2),
-            ProtocolEnum::GetAttendInfo => do_something(&mut self.get_attend_info),
-            ProtocolEnum::PptSign => do_something(&mut self.ppt_sign),
-            ProtocolEnum::PreSign => do_something(&mut self.pre_sign),
-            ProtocolEnum::BackClazzData => do_something(&mut self.back_clazz_data),
-            ProtocolEnum::GetLocationLog => do_something(&mut self.get_location_log),
-            ProtocolEnum::AccountManage => do_something(&mut self.account_manage),
-            ProtocolEnum::CaptchaId => do_something(&mut self.captcha_id),
-            ProtocolEnum::UserAgent => do_something(&mut self.user_agent),
-            ProtocolEnum::QrcodePat => do_something(&mut self.qrcode_pat),
+            Protocol::ActiveList => do_something(&mut self.active_list),
+            Protocol::GetCaptcha => do_something(&mut self.get_captcha),
+            Protocol::CheckCaptcha => do_something(&mut self.check_captcha),
+            Protocol::GetServerTime => do_something(&mut self.get_server_time),
+            Protocol::MySignCaptchaUtils => do_something(&mut self.my_sign_captcha_utils),
+            Protocol::CheckSigncode => do_something(&mut self.check_signcode),
+            Protocol::SignDetail => do_something(&mut self.sign_detail),
+            Protocol::LoginPage => do_something(&mut self.login_page),
+            Protocol::LoginEnc => do_something(&mut self.login_enc),
+            Protocol::PanChaoxing => do_something(&mut self.pan_chaoxing),
+            Protocol::PanList => do_something(&mut self.pan_list),
+            Protocol::PanToken => do_something(&mut self.pan_token),
+            Protocol::PanUpload => do_something(&mut self.pan_upload),
+            Protocol::Analysis => do_something(&mut self.analysis),
+            Protocol::Analysis2 => do_something(&mut self.analysis2),
+            Protocol::GetAttendInfo => do_something(&mut self.get_attend_info),
+            Protocol::PptSign => do_something(&mut self.ppt_sign),
+            Protocol::PreSign => do_something(&mut self.pre_sign),
+            Protocol::BackClazzData => do_something(&mut self.back_clazz_data),
+            Protocol::GetLocationLog => do_something(&mut self.get_location_log),
+            Protocol::AccountManage => do_something(&mut self.account_manage),
+            Protocol::CaptchaId => do_something(&mut self.captcha_id),
+            Protocol::UserAgent => do_something(&mut self.user_agent),
+            Protocol::QrcodePat => do_something(&mut self.qrcode_pat),
         }
     }
-    fn set(&mut self, t: &ProtocolEnum, value: &str) {
+    fn set(&mut self, t: &Protocol, value: &str) {
         self.map_by_enum_mut(t, |t| t.replace(value.to_owned()));
     }
-    fn update(&mut self, t: &ProtocolEnum, value: &str) -> bool {
+    fn update(&mut self, t: &Protocol, value: &str) -> bool {
         self.map_by_enum_mut(t, |t| {
             let not_to_update = t.as_ref().is_some_and(|v| v == value);
             t.replace(value.to_owned());
@@ -112,34 +112,34 @@ impl ProtocolData {
 }
 impl Default for ProtocolData {
     fn default() -> Self {
-        fn get(t: ProtocolEnum) -> Option<String> {
+        fn get(t: Protocol) -> Option<String> {
             Some(CXProtocol.get(&t).to_owned())
         }
         Self {
-            active_list: get(ProtocolEnum::ActiveList),
-            get_captcha: get(ProtocolEnum::GetCaptcha),
-            check_captcha: get(ProtocolEnum::CheckCaptcha),
-            get_server_time: get(ProtocolEnum::GetServerTime),
-            my_sign_captcha_utils: get(ProtocolEnum::MySignCaptchaUtils),
-            check_signcode: get(ProtocolEnum::CheckSigncode),
-            sign_detail: get(ProtocolEnum::SignDetail),
-            login_page: get(ProtocolEnum::LoginPage),
-            login_enc: get(ProtocolEnum::LoginEnc),
-            pan_chaoxing: get(ProtocolEnum::PanChaoxing),
-            pan_list: get(ProtocolEnum::PanList),
-            pan_token: get(ProtocolEnum::PanToken),
-            pan_upload: get(ProtocolEnum::PanUpload),
-            analysis: get(ProtocolEnum::Analysis),
-            analysis2: get(ProtocolEnum::Analysis2),
-            get_attend_info: get(ProtocolEnum::GetAttendInfo),
-            ppt_sign: get(ProtocolEnum::PptSign),
-            pre_sign: get(ProtocolEnum::PreSign),
-            back_clazz_data: get(ProtocolEnum::BackClazzData),
-            get_location_log: get(ProtocolEnum::GetLocationLog),
-            account_manage: get(ProtocolEnum::AccountManage),
-            captcha_id: get(ProtocolEnum::CaptchaId),
-            user_agent: get(ProtocolEnum::UserAgent),
-            qrcode_pat: get(ProtocolEnum::QrcodePat),
+            active_list: get(Protocol::ActiveList),
+            get_captcha: get(Protocol::GetCaptcha),
+            check_captcha: get(Protocol::CheckCaptcha),
+            get_server_time: get(Protocol::GetServerTime),
+            my_sign_captcha_utils: get(Protocol::MySignCaptchaUtils),
+            check_signcode: get(Protocol::CheckSigncode),
+            sign_detail: get(Protocol::SignDetail),
+            login_page: get(Protocol::LoginPage),
+            login_enc: get(Protocol::LoginEnc),
+            pan_chaoxing: get(Protocol::PanChaoxing),
+            pan_list: get(Protocol::PanList),
+            pan_token: get(Protocol::PanToken),
+            pan_upload: get(Protocol::PanUpload),
+            analysis: get(Protocol::Analysis),
+            analysis2: get(Protocol::Analysis2),
+            get_attend_info: get(Protocol::GetAttendInfo),
+            ppt_sign: get(Protocol::PptSign),
+            pre_sign: get(Protocol::PreSign),
+            back_clazz_data: get(Protocol::BackClazzData),
+            get_location_log: get(Protocol::GetLocationLog),
+            account_manage: get(Protocol::AccountManage),
+            captcha_id: get(Protocol::CaptchaId),
+            user_agent: get(Protocol::UserAgent),
+            qrcode_pat: get(Protocol::QrcodePat),
         }
     }
 }
@@ -196,7 +196,7 @@ impl DefaultCXProtocol {
     }
 }
 impl ProtocolTrait for DefaultCXProtocol {
-    fn get(&self, t: &ProtocolEnum) -> String {
+    fn get(&self, t: &Protocol) -> String {
         if let Some(r) = self
             .data
             .read()
@@ -208,7 +208,7 @@ impl ProtocolTrait for DefaultCXProtocol {
             CXProtocol.get(t)
         }
     }
-    fn set(&self, t: &ProtocolEnum, value: &str) {
+    fn set(&self, t: &Protocol, value: &str) {
         self.data.write().unwrap().set(t, value)
     }
     fn store(&self) -> Result<(), cxsign_error::Error> {
@@ -225,7 +225,7 @@ impl ProtocolTrait for DefaultCXProtocol {
             })
     }
     /// 更新字段，相当于 [`set`](Self::set) + [`store`](Self::store), 具体逻辑为：若传入值与原有值不同，则更新字段并保存至文件。保存成功返回 `true`, 其余情况返回 `false`.
-    fn update(&self, t: &ProtocolEnum, value: &str) -> bool {
+    fn update(&self, t: &Protocol, value: &str) -> bool {
         self.data.write().unwrap().update(t, value) && self.store().is_ok()
     }
 }

@@ -1,4 +1,4 @@
-use cxsign_protocol::ProtocolEnum;
+use cxsign_protocol::Protocol;
 use log::debug;
 use std::fmt::Display;
 use ureq::{Agent, Response};
@@ -14,7 +14,7 @@ pub fn get_server_time(
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
         "{}?callback={CALLBACK_NAME}&captchaId={captcha_id}&_={time_stamp_mills}",
-        ProtocolEnum::GetServerTime,
+        Protocol::GetServerTime,
     );
     Ok(agent.get(&url).call()?)
 }
@@ -29,7 +29,7 @@ pub fn get_captcha(
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
         "{}?{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
-        ProtocolEnum::GetCaptcha,
+        Protocol::GetCaptcha,
         format_args!("callback={}", CALLBACK_NAME),
         format_args!("captchaId={}", captcha_id),
         format_args!("captchaKey={}", captcha_key),
@@ -51,7 +51,7 @@ pub fn check_captcha(
 ) -> Result<ureq::Response, Box<ureq::Error>> {
     let url = format!(
         "{}?{}&{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
-        ProtocolEnum::CheckCaptcha,
+        Protocol::CheckCaptcha,
         format_args!("callback={CALLBACK_NAME}",),
         format_args!("captchaId={}", captcha_id),
         format_args!("token={}", token),
@@ -68,7 +68,7 @@ pub fn check_captcha(
 }
 
 pub fn my_sign_captcha_utils(client: &Agent) -> Result<Response, Box<ureq::Error>> {
-    let url = ProtocolEnum::MySignCaptchaUtils;
+    let url = Protocol::MySignCaptchaUtils;
     debug!("{url}");
     Ok(client.get(&url.to_string()).call()?)
 }

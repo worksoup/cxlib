@@ -1,4 +1,4 @@
-use cxsign_protocol::ProtocolEnum;
+use cxsign_protocol::Protocol;
 use log::debug;
 use ureq::{Agent, Response};
 
@@ -6,7 +6,7 @@ use ureq::{Agent, Response};
 pub fn sign_detail(client: &Agent, active_id: &str) -> Result<Response, Box<ureq::Error>> {
     let url = format!(
         "{}?activePrimaryId={active_id}&type=1",
-        ProtocolEnum::SignDetail
+        Protocol::SignDetail
     );
     debug!("{url}");
     Ok(client.get(&url).call()?)

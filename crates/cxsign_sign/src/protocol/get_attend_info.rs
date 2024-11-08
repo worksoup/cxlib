@@ -1,4 +1,4 @@
-use cxsign_protocol::ProtocolEnum;
+use cxsign_protocol::Protocol;
 use ureq::{Agent, Response};
 
 // 获取签到之后的信息，例如签到时的 ip, UA, 时间等
@@ -7,7 +7,7 @@ pub fn get_attend_info(client: &Agent, active_id: &str) -> Result<Response, Box<
     Ok(client
         .get(&format!(
             "{}?activeId={active_id}&type=1",
-            ProtocolEnum::GetAttendInfo
+            Protocol::GetAttendInfo
         ))
         .call()?)
 }

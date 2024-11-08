@@ -1,7 +1,7 @@
 use onceinit::{OnceInit, OnceInitError, StaticDefault};
 use std::fmt::{Display, Formatter};
 
-pub enum ProtocolEnum {
+pub enum Protocol {
     ActiveList,
     GetCaptcha,
     CheckCaptcha,
@@ -27,17 +27,31 @@ pub enum ProtocolEnum {
     UserAgent,
     QrcodePat,
 }
-impl Display for ProtocolEnum {
+impl Protocol {
+    pub fn get(&self) -> String {
+        PROTOCOL.get(self)
+    }
+    pub fn set(&self, value: &str) {
+        PROTOCOL.set(self, value)
+    }
+    pub fn store() -> Result<(), cxsign_error::Error> {
+        PROTOCOL.store()
+    }
+    pub fn update(&self, value: &str) -> bool {
+        PROTOCOL.update(self, value)
+    }
+}
+impl Display for Protocol {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        get(self).fmt(f)
+        self.get().fmt(f)
     }
 }
 pub trait ProtocolTrait: Sync {
-    fn get(&self, t: &ProtocolEnum) -> String;
+    fn get(&self, t: &Protocol) -> String;
 
-    fn set(&self, t: &ProtocolEnum, value: &str);
+    fn set(&self, t: &Protocol, value: &str);
     fn store(&self) -> Result<(), cxsign_error::Error>;
-    fn update(&self, t: &ProtocolEnum, value: &str) -> bool;
+    fn update(&self, t: &Protocol, value: &str) -> bool;
 }
 
 pub struct CXProtocol;
@@ -92,37 +106,37 @@ static ACCOUNT_MANAGE: &str = "https://passport2.chaoxing.com/mooc/accountManage
 static USER_AGENT: &str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_5.3.1_android_phone_5000_83";
 
 impl ProtocolTrait for CXProtocol {
-    fn get(&self, t: &ProtocolEnum) -> String {
+    fn get(&self, t: &Protocol) -> String {
         match t {
-            ProtocolEnum::ActiveList => ACTIVE_LIST,
-            ProtocolEnum::GetCaptcha => GET_CAPTCHA,
-            ProtocolEnum::CheckCaptcha => CHECK_CAPTCHA,
-            ProtocolEnum::GetServerTime => GET_SERVER_TIME,
-            ProtocolEnum::MySignCaptchaUtils => MY_SIGN_CAPTCHA_UTILS,
-            ProtocolEnum::CheckSigncode => CHECK_SIGNCODE,
-            ProtocolEnum::SignDetail => SIGN_DETAIL,
-            ProtocolEnum::LoginPage => LOGIN_PAGE,
-            ProtocolEnum::LoginEnc => LOGIN_ENC,
-            ProtocolEnum::PanChaoxing => PAN_CHAOXING,
-            ProtocolEnum::PanList => PAN_LIST,
-            ProtocolEnum::PanToken => PAN_TOKEN,
-            ProtocolEnum::PanUpload => PAN_UPLOAD,
-            ProtocolEnum::Analysis => ANALYSIS,
-            ProtocolEnum::Analysis2 => ANALYSIS2,
-            ProtocolEnum::GetAttendInfo => GET_ATTEND_INFO,
-            ProtocolEnum::PptSign => PPT_SIGN,
-            ProtocolEnum::PreSign => PRE_SIGN,
-            ProtocolEnum::BackClazzData => BACK_CLAZZ_DATA,
-            ProtocolEnum::GetLocationLog => GET_LOCATION_LOG,
-            ProtocolEnum::AccountManage => ACCOUNT_MANAGE,
-            ProtocolEnum::CaptchaId => CAPTCHA_ID,
-            ProtocolEnum::UserAgent => USER_AGENT,
-            ProtocolEnum::QrcodePat => QRCODE_PAT,
+            Protocol::ActiveList => ACTIVE_LIST,
+            Protocol::GetCaptcha => GET_CAPTCHA,
+            Protocol::CheckCaptcha => CHECK_CAPTCHA,
+            Protocol::GetServerTime => GET_SERVER_TIME,
+            Protocol::MySignCaptchaUtils => MY_SIGN_CAPTCHA_UTILS,
+            Protocol::CheckSigncode => CHECK_SIGNCODE,
+            Protocol::SignDetail => SIGN_DETAIL,
+            Protocol::LoginPage => LOGIN_PAGE,
+            Protocol::LoginEnc => LOGIN_ENC,
+            Protocol::PanChaoxing => PAN_CHAOXING,
+            Protocol::PanList => PAN_LIST,
+            Protocol::PanToken => PAN_TOKEN,
+            Protocol::PanUpload => PAN_UPLOAD,
+            Protocol::Analysis => ANALYSIS,
+            Protocol::Analysis2 => ANALYSIS2,
+            Protocol::GetAttendInfo => GET_ATTEND_INFO,
+            Protocol::PptSign => PPT_SIGN,
+            Protocol::PreSign => PRE_SIGN,
+            Protocol::BackClazzData => BACK_CLAZZ_DATA,
+            Protocol::GetLocationLog => GET_LOCATION_LOG,
+            Protocol::AccountManage => ACCOUNT_MANAGE,
+            Protocol::CaptchaId => CAPTCHA_ID,
+            Protocol::UserAgent => USER_AGENT,
+            Protocol::QrcodePat => QRCODE_PAT,
         }
         .to_owned()
     }
 
-    fn set(&self, _: &ProtocolEnum, _: &str) {}
+    fn set(&self, _: &Protocol, _: &str) {}
 
     fn store(&self) -> Result<(), cxsign_error::Error> {
         Err(cxsign_error::Error::FunctionIsDisabled(
@@ -130,7 +144,7 @@ impl ProtocolTrait for CXProtocol {
         ))
     }
 
-    fn update(&self, _: &ProtocolEnum, _: &str) -> bool {
+    fn update(&self, _: &Protocol, _: &str) -> bool {
         false
     }
 }
@@ -152,20 +166,4 @@ pub fn set_boxed_protocol(
     protocol: Box<impl ProtocolTrait + 'static>,
 ) -> Result<(), OnceInitError> {
     PROTOCOL.set_boxed_data(protocol)
-}
-
-pub fn get(t: &ProtocolEnum) -> String {
-    PROTOCOL.get(t)
-}
-
-pub fn set(t: &ProtocolEnum, value: &str) {
-    PROTOCOL.set(t, value)
-}
-
-pub fn store() -> Result<(), cxsign_error::Error> {
-    PROTOCOL.store()
-}
-
-pub fn update(t: &ProtocolEnum, value: &str) -> bool {
-    PROTOCOL.update(t, value)
 }
