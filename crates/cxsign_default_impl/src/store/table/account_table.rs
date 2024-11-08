@@ -240,10 +240,19 @@ impl DataBaseTableTrait for AccountTable {
         let data = crate::utils::parse::<cxsign_error::Error, UnameAndEncPwdPair>(data);
         for UnameAndEncPwdPair { uname, enc_pwd } in data {
             match Session::relogin(uname.as_str(), &enc_pwd) {
-                Ok(session) => info!(
-                    "账号 [{uname}]（用户名：{}）导入成功！",
-                    session.get_stu_name()
-                ),
+                Ok(session) => {
+                    info!(
+                        "账号 [{uname}]（用户名：{}）导入成功！",
+                        session.get_stu_name()
+                    );
+                    Self::add_account_or(
+                        db,
+                        uname.as_str(),
+                        &enc_pwd,
+                        uname.as_str(),
+                        AccountTable::update_account,
+                    );
+                }
                 Err(e) => warn!("账号 [{uname}] 导入失败！错误信息：{e}."),
             }
         }
