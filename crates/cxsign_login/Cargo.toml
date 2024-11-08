@@ -10,7 +10,7 @@ edition = "2021"
 cookie_store.workspace = true
 cxsign_error = { path = "../cxsign_error" }
 cxsign_protocol = { path = "../cxsign_protocol" }
-des = "0.8"
+des.workspace = true
 log = { workspace = true, features = ["release_max_level_info"] }
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }

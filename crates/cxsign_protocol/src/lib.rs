@@ -1,6 +1,5 @@
 use onceinit::{OnceInit, OnceInitError, StaticDefault};
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
 
 pub enum ProtocolEnum {
     ActiveList,

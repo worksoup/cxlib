@@ -6,7 +6,7 @@ authors.workspace = true
 
 [dependencies]
 cxsign_protocol = { path = "../cxsign_protocol" }
-mime_guess = "2.0"
+mime_guess.workspace = true
 log.workspace = true
 rand.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }

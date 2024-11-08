@@ -6,4 +6,4 @@ authors.workspace = true
 
 [dependencies]
 onceinit.workspace = true
-directories = "5.0"
+directories.workspace = true
