@@ -162,7 +162,7 @@ impl DefaultCXProtocol {
     pub fn init() -> Result<(), cxsign_error::Error> {
         let protocol_config_path = cxsign_dir::Dir::get_config_file_path("protocol.toml");
         let metadata = protocol_config_path.metadata();
-        let mut read = true;
+        let mut read = false;
         let mut file = match metadata {
             Ok(metadata) => {
                 if metadata.is_file() {
@@ -181,7 +181,7 @@ impl DefaultCXProtocol {
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => {
                     warn!("配置文件 `protocol.toml` 不存在，将新建。");
-                    read = false;
+                    read = true;
                     File::create(&protocol_config_path).ok()
                 }
                 _ => {
