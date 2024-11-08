@@ -18,6 +18,8 @@ pub enum Error {
     CaptchaEmptyError,
     #[error("设置位置预处理错误！")]
     SetLocationPreprocessorError,
+    #[error("设置 CX 协议错误！")]
+    SetProtocolError,
     #[error("数据解析失败！")]
     ParseError(String),
 }

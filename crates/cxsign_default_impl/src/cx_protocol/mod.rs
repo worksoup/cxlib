@@ -1,8 +1,13 @@
 use cxsign_protocol::{CXProtocol, ProtocolEnum, ProtocolTrait};
+use log::{error, warn};
 use serde::{Deserialize, Serialize};
+use std::{
+    fs::File,
+    io::{ErrorKind, Read, Write},
+};
 
 #[derive(Serialize, Deserialize)]
-pub struct ProtocolData {
+struct ProtocolData {
     active_list: Option<String>,
     get_captcha: Option<String>,
     check_captcha: Option<String>,
@@ -29,7 +34,7 @@ pub struct ProtocolData {
     qrcode_pat: Option<String>,
 }
 impl ProtocolData {
-    pub fn map_by_enum<'a, T>(
+    fn map_by_enum<'a, T>(
         &'a self,
         t: &ProtocolEnum,
         do_something: impl Fn(&'a Option<String>) -> T,
@@ -61,7 +66,7 @@ impl ProtocolData {
             ProtocolEnum::QrcodePat => do_something(&self.qrcode_pat),
         }
     }
-    pub fn map_by_enum_mut<'a, T>(
+    fn map_by_enum_mut<'a, T>(
         &'a mut self,
         t: &ProtocolEnum,
         do_something: impl Fn(&'a mut Option<String>) -> T,
@@ -93,10 +98,10 @@ impl ProtocolData {
             ProtocolEnum::QrcodePat => do_something(&mut self.qrcode_pat),
         }
     }
-    pub fn set(&mut self, t: &ProtocolEnum, value: &str) {
+    fn set(&mut self, t: &ProtocolEnum, value: &str) {
         self.map_by_enum_mut(t, |t| t.replace(value.to_owned()));
     }
-    pub fn update(&mut self, t: &ProtocolEnum, value: &str) -> bool {
+    fn update(&mut self, t: &ProtocolEnum, value: &str) -> bool {
         self.map_by_enum_mut(t, |t| {
             let not_to_update = t.as_ref().is_some_and(|v| v == value);
             t.replace(value.to_owned());
@@ -139,53 +144,67 @@ impl Default for ProtocolData {
 }
 
 pub struct DefaultCXProtocol {
-    data: Option<ProtocolData>,
+    data: ProtocolData,
+    file: File,
 }
 impl DefaultCXProtocol {
+    pub fn init() -> Result<(), cxsign_error::Error> {
+        let protocol_config_path = cxsign_dir::Dir::get_config_file_path("protocol.toml");
+        let mut file = match File::open(&protocol_config_path) {
+            Ok(file) => file,
+            Err(e) => match e.kind() {
+                ErrorKind::NotFound => {
+                    warn!("配置文件 `protocol.toml` 不存在，将新建。");
+                    File::create(&protocol_config_path)?
+                }
+                _ => {
+                    error!("无法打开配置文件 `protocol.toml`: {}.", e.to_string());
+                    return Err(e.into());
+                }
+            },
+        };
+        let mut s = String::new();
+        let _ = file.read_to_string(&mut s)?;
+        let data: ProtocolData =
+            toml::from_str(&s).map_err(|e| cxsign_error::Error::ParseError(e.to_string()))?;
+        let protocol = DefaultCXProtocol { data, file };
+        cxsign_protocol::set_boxed_protocol(Box::new(protocol))
+            .map_err(|_| cxsign_error::Error::SetProtocolError)
+    }
     pub fn map_by_enum<'a, T: 'a>(
         &'a self,
         t: &ProtocolEnum,
         do_something: impl Fn(&'a Option<String>) -> T,
-    ) -> Option<T> {
-        self.data.as_ref().map(|d| d.map_by_enum(t, do_something))
+    ) -> T {
+        self.data.map_by_enum(t, do_something)
     }
     pub fn map_by_enum_mut<'a, T: 'a>(
         &'a mut self,
         t: &ProtocolEnum,
         do_something: impl Fn(&'a mut Option<String>) -> T,
-    ) -> Option<T> {
-        self.data
-            .as_mut()
-            .map(|d| d.map_by_enum_mut(t, do_something))
+    ) -> T {
+        self.data.map_by_enum_mut(t, do_something)
     }
     pub fn set(&mut self, t: &ProtocolEnum, value: &str) {
-        if let Some(data) = self.data.as_mut() {
-            data.set(t, value);
-        } else {
-            let mut new = ProtocolData::default();
-            new.set(t, value);
-            self.data.replace(new);
-        }
+        self.data.set(t, value)
     }
+    pub fn store(&mut self) -> Result<(), cxsign_error::Error> {
+        let toml = toml::to_string_pretty(&self.data)
+            .map_err(|e| cxsign_error::Error::ParseError(e.to_string()))?;
+        Ok(self.file.write_all(toml.as_bytes())?)
+    }
+    /// 更新字段，相当于 [`set`](Self::set) + [`store`](Self::store), 具体逻辑为：若传入值与原有值不同，则更新字段并保存至文件。保存成功返回 `true`, 其余情况返回 `false`.
     pub fn update(&mut self, t: &ProtocolEnum, value: &str) -> bool {
-        if let Some(data) = self.data.as_mut() {
-            data.update(t, value)
-        } else {
-            let mut new = ProtocolData::default();
-            let r = new.update(t, value);
-            self.data.replace(new);
-            r
-        }
+        self.data.update(t, value) && self.store().is_ok()
     }
 }
 impl ProtocolTrait for DefaultCXProtocol {
     fn get(&self, t: &ProtocolEnum) -> &str {
-        if let Some(data) = self.data.as_ref() {
-            if let Some(r) = data.map_by_enum(t, |a| a.as_ref().map(|a| a.as_str())) {
-                return r;
-            }
-        };
-        CXProtocol.get(t)
+        if let Some(r) = self.data.map_by_enum(t, |a| a.as_ref().map(|a| a.as_str())) {
+            r
+        } else {
+            CXProtocol.get(t)
+        }
     }
 }
 #[cfg(test)]
