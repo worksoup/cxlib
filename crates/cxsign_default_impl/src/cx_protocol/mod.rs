@@ -161,13 +161,22 @@ impl DefaultCXProtocol {
     /// 在设置协议出错时返回 [`SetProtocolError`](cxsign_error::Error::ParseError).
     pub fn init() -> Result<(), cxsign_error::Error> {
         let protocol_config_path = cxsign_dir::Dir::get_config_file_path("protocol.toml");
-        let mut file = match OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(false)
-            .open(protocol_config_path.as_path())
-        {
-            Ok(file) => Some(file),
+        let metadata = protocol_config_path.metadata();
+        let mut file = match metadata {
+            Ok(metadata) => {
+                if metadata.is_file() {
+                    OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create(false)
+                        .truncate(true)
+                        .open(protocol_config_path.as_path())
+                        .ok()
+                } else {
+                    warn!("文件位置被目录占用。");
+                    None
+                }
+            }
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => {
                     warn!("配置文件 `protocol.toml` 不存在，将新建。");
