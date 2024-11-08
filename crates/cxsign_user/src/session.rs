@@ -62,7 +62,10 @@ impl Session {
         Ok(session)
     }
     /// 先尝试 [`Session::load_json`], 如果发生错误且错误为登录过期或 Cookies 不存在，则 [`Session::relogin`]。
-    pub fn load_json_or_relogin(uname: &str, enc_passwd: &str) -> Result<Session, cxsign_error::Error> {
+    pub fn load_json_or_relogin(
+        uname: &str,
+        enc_passwd: &str,
+    ) -> Result<Session, cxsign_error::Error> {
         match Session::load_json(uname) {
             Ok(s) => Ok(s),
             Err(e) => match e {
