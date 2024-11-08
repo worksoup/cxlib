@@ -1,11 +1,11 @@
 use cxsign_error::Error;
+use cxsign_protocol::Protocol;
 use log::warn;
 use std::path::Path;
 use ureq::{Agent, AgentBuilder};
 
 pub mod protocol;
 pub mod utils;
-static UA: &str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_5.3.1_android_phone_5000_83";
 pub trait LoginTrait: Sized {
     fn login_enc(account: &str, enc_passwd: &str) -> Result<Self, Error>;
 
@@ -15,7 +15,7 @@ impl LoginTrait for Agent {
     fn login_enc(account: &str, enc_passwd: &str) -> Result<Agent, Error> {
         let cookie_store = cookie_store::CookieStore::new(None);
         let client = AgentBuilder::new()
-            .user_agent(UA)
+            .user_agent(&Protocol::UserAgent.to_string())
             .cookie_store(cookie_store)
             .build();
         let response = protocol::login_enc(&client, account, enc_passwd)?;
@@ -58,7 +58,7 @@ impl LoginTrait for Agent {
             cookie_store::CookieStore::load_json(file).unwrap()
         };
         Ok(AgentBuilder::new()
-            .user_agent(UA)
+            .user_agent(&Protocol::UserAgent.to_string())
             .cookie_store(cookie_store)
             .build())
     }

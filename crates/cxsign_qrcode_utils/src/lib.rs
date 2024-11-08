@@ -1,12 +1,12 @@
-mod protocol;
-
+use cxsign_protocol::Protocol;
 use cxsign_utils::inquire_confirm;
 use log::{debug, error, info, warn};
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 use rxing::Point;
 use std::collections::HashMap;
+
 pub fn is_enc_qrcode_url(url: &str) -> bool {
-    url.contains(protocol::QRCODE_PAT) && url.contains("&enc=")
+    url.contains(&*Protocol::QrcodePat.to_string()) && url.contains("&enc=")
 }
 pub fn scan_qrcode(
     image: image::DynamicImage,
@@ -83,12 +83,12 @@ pub fn capture_screen_for_enc(is_refresh: bool, precise: bool) -> Option<String>
             info!("存在签到二维码。");
             return if precise && is_refresh && inquire_confirm("二维码图片是否就绪？", "本程序已在屏幕上找到签到二维码。请不要改变该二维码的位置，待二维码刷新后按下回车进行签到。") {
                 // 如果是定时刷新的二维码，等待二维码刷新。
-                let 二维码在屏幕上的位置 = get_rect_contains_vertex(r.getPoints());
-                debug!("二维码位置：{:?}", 二维码在屏幕上的位置);
+                let qrcode_pos_on_screen = get_rect_contains_vertex(r.getPoints());
+                debug!("二维码位置：{:?}", qrcode_pos_on_screen);
                 let pic = screen
                     .capture_image()
                     .unwrap_or_else(|e| panic!("{e:?}"));
-                let cut_pic = cxsign_imageproc::cut_picture(&image::DynamicImage::from(pic), 二维码在屏幕上的位置.0, 二维码在屏幕上的位置.1);
+                let cut_pic = cxsign_imageproc::cut_picture(&image::DynamicImage::from(pic), qrcode_pos_on_screen.0, qrcode_pos_on_screen.1);
                 let r = scan_qrcode(cut_pic, &mut HashMap::new()).unwrap_or_else(|e| panic!("{e:?}"));
                 cxsign_utils::find_qrcode_sign_enc_in_url(r[0].getText())
             } else {

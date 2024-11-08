@@ -1,88 +1,40 @@
 #![feature(sync_unsafe_cell)]
 
+use onceinit::{OnceInit, OnceInitState, StaticDefault};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
-const UNINITIALIZED: usize = 0;
-const INITIALIZING: usize = 1;
-const INITIALIZED: usize = 2;
-mod config_dir_info_state {
-    use crate::{INITIALIZED, INITIALIZING, UNINITIALIZED};
-    use std::cell::SyncUnsafeCell;
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    pub static CONFIG_DIR_INFO: SyncUnsafeCell<(&str, &str, &str, &str)> =
-        SyncUnsafeCell::new(("TEST_CXSIGN", "up.workso", "Worksoup", "cxsign"));
-    static STATE: AtomicUsize = AtomicUsize::new(0);
-    pub fn set_config_dir_info(
-        env_arg: &'static str,
-        qualifier: &'static str,
-        organization: &'static str,
-        application: &'static str,
-    ) {
-        let old_state = match STATE.compare_exchange(
-            UNINITIALIZED,
-            INITIALIZING,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
-            Ok(s) | Err(s) => s,
-        };
-        match old_state {
-            UNINITIALIZED => {
-                unsafe { *CONFIG_DIR_INFO.get() = (env_arg, qualifier, organization, application) }
-                STATE.store(INITIALIZED, Ordering::SeqCst);
-            }
-            INITIALIZING => {
-                while STATE.load(Ordering::SeqCst) == crate::INITIALIZING {
-                    std::hint::spin_loop()
-                }
-            }
-            _ => (),
-        }
+struct ConfigDirInfo {
+    env_arg: &'static str,
+    qualifier: &'static str,
+    organization: &'static str,
+    application: &'static str,
+}
+static DEFAULT_CONFIG_DIR_INFO: ConfigDirInfo = ConfigDirInfo {
+    env_arg: "TEST_CXSIGN",
+    qualifier: "up.workso",
+    organization: "Worksoup",
+    application: "cxsign",
+};
+impl StaticDefault for ConfigDirInfo {
+    fn static_default() -> &'static Self {
+        &DEFAULT_CONFIG_DIR_INFO
     }
 }
-mod config_dir_state {
-    use crate::{Dir, INITIALIZED, INITIALIZING, UNINITIALIZED};
-    use std::cell::SyncUnsafeCell;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+static CONFIG_DIR_INFO: OnceInit<ConfigDirInfo> = OnceInit::new();
 
-    pub static CONFIG_DIR: SyncUnsafeCell<Option<&Dir>> = SyncUnsafeCell::new(None);
-    static STATE: AtomicUsize = AtomicUsize::new(0);
+static CONFIG_DIR: OnceInit<Dir> = OnceInit::new();
 
-    pub fn uninit() -> bool {
-        let state = STATE.load(Ordering::SeqCst);
-        match state {
-            UNINITIALIZED => true,
-            INITIALIZING => {
-                while STATE.load(Ordering::SeqCst) == INITIALIZING {
-                    println!("adasd");
-                    std::hint::spin_loop()
-                }
-                false
+fn uninit() -> bool {
+    match CONFIG_DIR.get_state() {
+        OnceInitState::INITIALIZED => false,
+        OnceInitState::INITIALIZING => {
+            while let OnceInitState::INITIALIZING = CONFIG_DIR.get_state() {
+                std::hint::spin_loop()
             }
-            _ => false,
+            false
         }
-    }
-    pub fn set_config_dir(dir: Box<Dir>) {
-        let old_state = match STATE.compare_exchange(
-            UNINITIALIZED,
-            INITIALIZING,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
-            Ok(s) | Err(s) => s,
-        };
-        match old_state {
-            UNINITIALIZED => {
-                unsafe { *CONFIG_DIR.get() = Some(Box::leak(dir)) }
-                STATE.store(INITIALIZED, Ordering::SeqCst);
-            }
-            INITIALIZING => {
-                while STATE.load(Ordering::SeqCst) == crate::INITIALIZING {
-                    std::hint::spin_loop()
-                }
-            }
-            _ => (),
-        }
+        _ => true,
     }
 }
 
@@ -92,17 +44,35 @@ pub struct Dir {
     database_dir: PathBuf,
 }
 impl Dir {
+    pub fn new(base_dir: &Path) -> Self {
+        let base_dir = base_dir.to_path_buf();
+        let database_dir = base_dir.join("cx.db");
+        Self {
+            base_dir,
+            database_dir,
+        }
+    }
     pub fn set_config_dir_info(
         env_arg: &'static str,
         qualifier: &'static str,
         organization: &'static str,
         application: &'static str,
     ) {
-        config_dir_info_state::set_config_dir_info(env_arg, qualifier, organization, application);
+        let data = Box::new(ConfigDirInfo {
+            env_arg,
+            qualifier,
+            organization,
+            application,
+        });
+        let _ = CONFIG_DIR_INFO.set_boxed_data(data);
     }
     fn set_default_config_dir() {
-        let (env_arg, qualifier, organization, application) =
-            unsafe { *config_dir_info_state::CONFIG_DIR_INFO.get() };
+        let ConfigDirInfo {
+            env_arg,
+            qualifier,
+            organization,
+            application,
+        } = { CONFIG_DIR_INFO.deref().to_owned() };
         let is_testing = std::env::var(env_arg).is_ok();
         let binding = directories::ProjectDirs::from(qualifier, organization, application).unwrap();
         let base_dir = if is_testing {
@@ -119,27 +89,19 @@ impl Dir {
         Self::set_config_dir(dir);
     }
     pub fn set_config_dir(dir: Box<Self>) {
-        config_dir_state::set_config_dir(dir);
-    }
-    pub fn new(base_dir: &Path) -> Self {
-        let base_dir = base_dir.to_path_buf();
-        let database_dir = base_dir.join("cx.db");
-        Self {
-            base_dir,
-            database_dir,
-        }
+        let _ = CONFIG_DIR.set_boxed_data(dir);
     }
     unsafe fn get_dir_unchecked() -> &'static Dir {
-        unsafe { (*config_dir_state::CONFIG_DIR.get()).unwrap_unchecked() }
+        CONFIG_DIR.get_data_unchecked()
     }
     pub fn get_config_dir() -> PathBuf {
-        if config_dir_state::uninit() {
+        if uninit() {
             Self::set_default_config_dir()
         }
         unsafe { Self::get_dir_unchecked() }.base_dir.to_path_buf()
     }
     pub fn get_database_dir() -> PathBuf {
-        if config_dir_state::uninit() {
+        if uninit() {
             Self::set_default_config_dir()
         }
         unsafe { Self::get_dir_unchecked() }
@@ -147,12 +109,20 @@ impl Dir {
             .to_path_buf()
     }
     pub fn get_json_file_path(account: &str) -> PathBuf {
-        if config_dir_state::uninit() {
+        if uninit() {
             Self::set_default_config_dir()
         }
         unsafe { Self::get_dir_unchecked() }
             .base_dir
             .join(account.to_string() + ".json")
+    }
+    pub fn get_config_file_path(file_name: &str) -> PathBuf {
+        if uninit() {
+            Self::set_default_config_dir()
+        }
+        unsafe { Self::get_dir_unchecked() }
+            .base_dir
+            .join(file_name)
     }
 }
 impl From<PathBuf> for Dir {

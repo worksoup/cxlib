@@ -9,6 +9,7 @@ chrono.workspace = true
 cxsign_activity = { path = "../cxsign_activity" }
 cxsign_captcha = { path = "../cxsign_captcha" }
 cxsign_error = { path = "../cxsign_error" }
+cxsign_protocol = { path = "../cxsign_protocol" }
 #cxsign_store = { path = "../cxsign_store" }
 cxsign_user = { path = "../cxsign_user" }
 cxsign_utils = { path = "../cxsign_utils" }

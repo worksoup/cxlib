@@ -7,14 +7,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-onceinit = { git = "https://github.com/worksoup/onceinit.git" }
 cxsign_dir = { path = "../cxsign_dir" }
 cxsign_error = { path = "../cxsign_error" }
 cxsign_pan = { path = "../cxsign_pan" }
-cxsign_store = { path = "../cxsign_store" }
+cxsign_protocol = { path = "../cxsign_protocol" }
 cxsign_user = { path = "../cxsign_user" }
 log.workspace = true
+onceinit.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"] }
-sqlite.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }
