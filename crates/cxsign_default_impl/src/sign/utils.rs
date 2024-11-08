@@ -13,6 +13,7 @@ pub fn secondary_verification(
     captcha_id: &Option<CaptchaId>,
 ) -> Result<SignResult, cxsign_error::Error> {
     let captcha_id = if let Some(captcha_id) = captcha_id {
+        Protocol::CaptchaId.update(&captcha_id);
         captcha_id
     } else {
         warn!("未找到滑块 ID, 使用内建值。");
