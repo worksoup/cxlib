@@ -96,6 +96,10 @@ impl ProtocolItem {
 impl ProtocolItemTrait for ProtocolItem {
     type ProtocolData = ProtocolData;
 
+    fn config_file_name() -> &'static str {
+        "protocol.toml"
+    }
+
     fn get_protocol_() -> &'static OnceInit<dyn ProtocolTrait<Self>> {
         &PROTOCOL
     }
@@ -165,7 +169,7 @@ pub struct ProtocolData {
     qrcode_pat: Option<String>,
 }
 impl ProtocolDataTrait for ProtocolData {
-    type ProtocolList = ProtocolItem;
+    type ProtocolItem = ProtocolItem;
 
     fn map_by_enum<'a, T>(
         &'a self,
@@ -275,7 +279,7 @@ where
         + Send
         + Sync
         + 'static
-        + ProtocolDataTrait<ProtocolList = Protocol>,
+        + ProtocolDataTrait<ProtocolItem = Protocol>,
 {
     /// # init
     /// 读取配置文件 `protocol.toml` 并构造 `ProtocolData`.
@@ -347,7 +351,7 @@ where
         + Send
         + Sync
         + 'static
-        + ProtocolDataTrait<ProtocolList = ProtocolItem>,
+        + ProtocolDataTrait<ProtocolItem = ProtocolItem>,
 {
     /// # init
     /// 读取配置文件 `protocol.toml` 并构造 `ProtocolData`.
@@ -359,22 +363,23 @@ where
     ///
     /// 在设置协议出错时返回 [`SetProtocolError`](cxsign_error::Error::SetProtocolError).
     pub fn init() -> Result<(), cxsign_error::Error> {
-        let protocol_config_path = cxsign_dir::Dir::get_config_file_path("protocol.toml");
+        let protocol_config_path = cxsign_dir::Dir::get_config_file_path(ProtocolItem::config_file_name());
         let protocol = CXProtocol::<ProtocolData>::load(&protocol_config_path)?;
         ProtocolItem::set_boxed_protocol(Box::new(protocol))
             .map_err(|_| cxsign_error::Error::SetProtocolError)
     }
 }
-impl<ProtocolList, ProtocolData> ProtocolTrait<ProtocolList> for CXProtocol<ProtocolData>
+impl<ProtocolItem, ProtocolData> ProtocolTrait<ProtocolItem> for CXProtocol<ProtocolData>
 where
+    ProtocolItem: ProtocolItemTrait,
     ProtocolData: Default
         + for<'de> serde::Deserialize<'de>
         + serde::Serialize
         + Send
         + Sync
-        + ProtocolDataTrait<ProtocolList = ProtocolList>,
+        + ProtocolDataTrait<ProtocolItem = ProtocolItem>,
 {
-    fn get(&self, t: &ProtocolList) -> String {
+    fn get(&self, t: &ProtocolItem) -> String {
         if let Some(r) = self
             .data
             .read()
@@ -383,10 +388,10 @@ where
         {
             r.to_owned()
         } else {
-            todo!()
+            ProtocolItem::get_default(t)
         }
     }
-    fn set(&self, t: &ProtocolList, value: &str) {
+    fn set(&self, t: &ProtocolItem, value: &str) {
         self.data.write().unwrap().set(t, value)
     }
     fn store(&self) -> Result<(), cxsign_error::Error> {
@@ -403,7 +408,7 @@ where
             })
     }
     /// 更新字段，相当于 [`set`](Self::set) + [`store`](Self::store), 具体逻辑为：若传入值与原有值不同，则更新字段并保存至文件。保存成功返回 `true`, 其余情况返回 `false`.
-    fn update(&self, t: &ProtocolList, value: &str) -> bool {
+    fn update(&self, t: &ProtocolItem, value: &str) -> bool {
         self.data.write().unwrap().update(t, value) && self.store().is_ok()
     }
 }

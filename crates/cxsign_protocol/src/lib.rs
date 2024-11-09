@@ -6,6 +6,7 @@ use onceinit::{OnceInit, OnceInitError, OnceInitState, StaticDefault};
 
 pub trait ProtocolItemTrait: Sized + 'static {
     type ProtocolData;
+    fn config_file_name() -> &'static str;
     fn get_protocol_() -> &'static OnceInit<dyn ProtocolTrait<Self>>;
     fn get_protocol() -> &'static dyn ProtocolTrait<Self>;
     fn set_protocol(protocol: &'static impl ProtocolTrait<Self>) -> Result<(), OnceInitError> {
@@ -31,21 +32,21 @@ pub trait ProtocolItemTrait: Sized + 'static {
     }
 }
 pub trait ProtocolDataTrait {
-    type ProtocolList;
+    type ProtocolItem;
     fn map_by_enum<'a, T>(
         &'a self,
-        t: &Self::ProtocolList,
+        t: &Self::ProtocolItem,
         do_something: impl Fn(&'a Option<String>) -> T,
     ) -> T;
     fn map_by_enum_mut<'a, T>(
         &'a mut self,
-        t: &Self::ProtocolList,
+        t: &Self::ProtocolItem,
         do_something: impl Fn(&'a mut Option<String>) -> T,
     ) -> T;
-    fn set(&mut self, t: &Self::ProtocolList, value: &str) {
+    fn set(&mut self, t: &Self::ProtocolItem, value: &str) {
         self.map_by_enum_mut(t, |t| t.replace(value.to_owned()));
     }
-    fn update(&mut self, t: &Self::ProtocolList, value: &str) -> bool {
+    fn update(&mut self, t: &Self::ProtocolItem, value: &str) -> bool {
         self.map_by_enum_mut(t, |t| {
             let not_to_update = t.as_ref().is_some_and(|v| v == value);
             t.replace(value.to_owned());
@@ -72,7 +73,7 @@ where
         + Send
         + Sync
         + 'static
-        + ProtocolDataTrait<ProtocolList = ProtocolItem>,
+        + ProtocolDataTrait<ProtocolItem = ProtocolItem>,
 {
     fn static_default() -> &'static Self {
         if let OnceInitState::UNINITIALIZED = PROTOCOL.get_state() {
