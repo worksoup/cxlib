@@ -1,4 +1,4 @@
-use cxsign_protocol::Protocol;
+use cxsign_protocol::ProtocolItem;
 use cxsign_types::Location;
 use cxsign_user::Session;
 use ureq::Response;
@@ -8,7 +8,7 @@ pub fn general_sign(session: &Session, active_id: &str) -> Result<Response, Box<
     let uid = session.get_uid();
     let fid = session.get_fid();
     let stu_name = session.get_stu_name();
-    session.get(&format!("{}?activeId={active_id}&uid={uid}&clientip=&latitude=-1&longitude=-1&appType=15&fid={fid}&name={stu_name}", Protocol::PptSign)).call().map_err(|e| e.into())
+    session.get(&format!("{}?activeId={active_id}&uid={uid}&clientip=&latitude=-1&longitude=-1&appType=15&fid={fid}&name={stu_name}", ProtocolItem::PptSign)).call().map_err(|e| e.into())
 }
 
 pub fn photo_sign(
@@ -20,7 +20,7 @@ pub fn photo_sign(
     let fid = session.get_fid();
     let stu_name = session.get_stu_name();
     // NOTE 存疑。
-    session.get(&format!("{}?activeId={active_id}&uid={uid}&clientip=&useragent=&latitude=-1&longitude=-1&appType=15&fid={fid}&objectId={object_id}&name={}", Protocol::PptSign, percent_encoding::utf8_percent_encode(stu_name, percent_encoding::NON_ALPHANUMERIC))).call().map_err(|e| e.into())
+    session.get(&format!("{}?activeId={active_id}&uid={uid}&clientip=&useragent=&latitude=-1&longitude=-1&appType=15&fid={fid}&objectId={object_id}&name={}", ProtocolItem::PptSign, percent_encoding::utf8_percent_encode(stu_name, percent_encoding::NON_ALPHANUMERIC))).call().map_err(|e| e.into())
 }
 
 pub fn qrcode_sign_url(
@@ -50,12 +50,12 @@ pub fn qrcode_sign_url(
         .to_string();
         format!(
             r#"{}?enc={enc}&name={stu_name}&activeId={active_id}&uid={uid}&clientip=&location={location_str}&latitude=-1&longitude=-1&fid={fid}&appType=15"#,
-            Protocol::PptSign
+            ProtocolItem::PptSign
         )
     } else {
         format!(
             r#"{}?enc={enc}&name={stu_name}&activeId={active_id}&uid={uid}&clientip=&location=&latitude=-1&longitude=-1&fid={fid}&appType=15"#,
-            Protocol::PptSign
+            ProtocolItem::PptSign
         )
     }
 }
@@ -82,7 +82,7 @@ pub fn location_sign_url(
     let lat = location.get_lat();
     let lon = location.get_lon();
     let if_tijiao = if is_auto_location { 1 } else { 0 };
-    format!("{}?name={stu_name}&address={address}&activeId={active_id}&uid={uid}&clientip=&latitude={lat}&longitude={lon}&fid={fid}&appType=15&ifTiJiao={if_tijiao}", Protocol::PptSign)
+    format!("{}?name={stu_name}&address={address}&activeId={active_id}&uid={uid}&clientip=&latitude={lat}&longitude={lon}&fid={fid}&appType=15&ifTiJiao={if_tijiao}", ProtocolItem::PptSign)
 }
 pub fn location_sign(
     session: &Session,
@@ -108,6 +108,6 @@ pub fn signcode_sign(
     let uid = session.get_uid();
     let fid = session.get_fid();
     let stu_name = session.get_stu_name();
-    let url = format!("{}?activeId={active_id}&uid={uid}&clientip=&latitude=-1&longitude=-1&appType=15&fid={fid}&name={stu_name}&signCode={signcode}", Protocol::PptSign);
+    let url = format!("{}?activeId={active_id}&uid={uid}&clientip=&latitude=-1&longitude=-1&appType=15&fid={fid}&name={stu_name}&signCode={signcode}", ProtocolItem::PptSign);
     Ok(session.get(&url).call()?)
 }

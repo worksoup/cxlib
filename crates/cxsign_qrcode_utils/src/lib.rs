@@ -1,4 +1,4 @@
-use cxsign_protocol::Protocol;
+use cxsign_protocol::ProtocolItem;
 use cxsign_utils::inquire_confirm;
 use log::{debug, error, info, warn};
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
@@ -6,7 +6,7 @@ use rxing::Point;
 use std::collections::HashMap;
 
 pub fn is_enc_qrcode_url(url: &str) -> bool {
-    url.contains(&*Protocol::QrcodePat.to_string()) && url.contains("&enc=")
+    url.contains(&*ProtocolItem::QrcodePat.to_string()) && url.contains("&enc=")
 }
 pub fn scan_qrcode(
     image: image::DynamicImage,

@@ -5,5 +5,9 @@ version.workspace = true
 authors.workspace = true
 
 [dependencies]
+cxsign_dir = { path = "../cxsign_dir" }
 cxsign_error = { path = "../cxsign_error" }
 onceinit.workspace = true
+log.workspace = true
+serde = { workspace = true, features = ["derive"] }
+toml.workspace = true

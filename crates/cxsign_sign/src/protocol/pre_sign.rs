@@ -1,4 +1,4 @@
-use cxsign_protocol::Protocol;
+use cxsign_protocol::ProtocolItem;
 use cxsign_types::Course;
 use ureq::{Agent, Response};
 
@@ -11,7 +11,7 @@ pub fn pre_sign(
 ) -> Result<Response, Box<ureq::Error>> {
     let course_id = course.get_id();
     let class_id = course.get_class_id();
-    let url = Protocol::PreSign;
+    let url = ProtocolItem::PreSign;
     let url =
         format!("{url}?courseId={course_id}&classId={class_id}&activePrimaryId={active_id}&general=1&sys=1&ls=1&appType=15&&tid=&uid={uid}&ut=s&isTeacherViewOpen=0");
     Ok(client.get(&url).call()?)
@@ -27,7 +27,7 @@ pub fn pre_sign_for_qrcode_sign(
     let course_id = course.get_id();
     let class_id = course.get_class_id();
     let url =
-        format!("{}?courseId={course_id}&classId={class_id}&activePrimaryId={active_id}&general=1&sys=1&ls=1&appType=15&&tid=&uid={uid}&ut=s&isTeacherViewOpen=0&rcode={}", Protocol::PreSign, format_args!(
+        format!("{}?courseId={course_id}&classId={class_id}&activePrimaryId={active_id}&general=1&sys=1&ls=1&appType=15&&tid=&uid={uid}&ut=s&isTeacherViewOpen=0&rcode={}", ProtocolItem::PreSign, format_args!(
             "&rcode={}",percent_encoding::utf8_percent_encode(&format!("SIGNIN:aid={active_id}&source=15&Code={c}&enc={enc}"), percent_encoding::NON_ALPHANUMERIC)
         ));
     Ok(client.get(&url).call()?)

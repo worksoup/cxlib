@@ -1,12 +1,12 @@
 use crate::multipart::{Field, PreparedFields};
-use cxsign_protocol::Protocol;
+use cxsign_protocol::ProtocolItem;
 use std::fs::File;
 use std::path::Path;
 use ureq::{Agent, Response};
 
 // 超星网盘页
 pub fn pan_chaoxing(client: &Agent) -> Result<Response, Box<ureq::Error>> {
-    Ok(client.get(&Protocol::PanChaoxing.to_string()).call()?)
+    Ok(client.get(&ProtocolItem::PanChaoxing.to_string()).call()?)
 }
 
 // 网盘列表
@@ -14,14 +14,14 @@ pub fn pan_list(client: &Agent, parent_id: &str, enc: &str) -> Result<Response, 
     Ok(client
         .post(&format!(
             "{}?puid=0&shareid=0&parentId={parent_id}&page=1&size=50&enc={enc}",
-            Protocol::PanList
+            ProtocolItem::PanList
         ))
         .call()?)
 }
 
 // 获取超星云盘的 token
 pub fn pan_token(client: &Agent) -> Result<Response, Box<ureq::Error>> {
-    Ok(client.get(&Protocol::PanToken.to_string()).call()?)
+    Ok(client.get(&ProtocolItem::PanToken.to_string()).call()?)
 }
 
 // 网盘上传接口
@@ -42,7 +42,7 @@ pub fn pan_upload(
     Ok(client
         .post(&format!(
             "{}?_from=mobilelearn&_token={token}",
-            Protocol::PanUpload,
+            ProtocolItem::PanUpload,
         ))
         .set(
             "Content-Type",

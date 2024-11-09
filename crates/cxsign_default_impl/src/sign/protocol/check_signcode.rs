@@ -1,4 +1,4 @@
-use cxsign_protocol::Protocol;
+use cxsign_protocol::ProtocolItem;
 use ureq::{Agent, Response};
 
 // 签到码检查
@@ -10,7 +10,7 @@ pub fn check_signcode(
     Ok(client
         .get(&format!(
             "{}?activeId={active_id}&signCode={signcode}",
-            Protocol::CheckSigncode
+            ProtocolItem::CheckSigncode
         ))
         .call()?)
 }

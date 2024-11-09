@@ -1,4 +1,4 @@
-use cxsign_protocol::Protocol;
+use cxsign_protocol::ProtocolItem;
 use cxsign_types::Course;
 use log::debug;
 use ureq::{Agent, Response};
@@ -12,7 +12,7 @@ pub fn active_list(client: &Agent, course: Course) -> Result<Response, Box<ureq:
         .to_string();
     let url = format!(
         "{}?fid=0&courseId={}&classId={}&showNotStartedActive=0&_={time}",
-        Protocol::ActiveList,
+        ProtocolItem::ActiveList,
         course.get_id(),
         course.get_class_id(),
     );
