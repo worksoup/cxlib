@@ -202,12 +202,11 @@ impl DefaultCXProtocol {
                     let mut config = String::new();
                     f.read_to_string(&mut config)
                         .ok()
-                        .map(|_| toml::from_str(&config).ok())
-                        .flatten()
-                        .unwrap_or_else(ProtocolData::default)
+                        .and_then(|_| toml::from_str(&config).ok())
+                        .unwrap_or_default()
                 }
             })
-            .unwrap_or_else(|| ProtocolData::default());
+            .unwrap_or_default();
         let data = Arc::new(RwLock::new(data));
         let file = file.map(|f| Arc::new(Mutex::new(f)));
         let protocol = DefaultCXProtocol { data, file };
