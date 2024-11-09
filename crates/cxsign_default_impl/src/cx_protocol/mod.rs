@@ -215,7 +215,7 @@ impl DefaultCXProtocol {
             .map_err(|_| cxsign_error::Error::SetProtocolError)
     }
 }
-impl ProtocolTrait for DefaultCXProtocol {
+impl ProtocolTrait<Protocol> for DefaultCXProtocol {
     fn get(&self, t: &Protocol) -> String {
         if let Some(r) = self
             .data

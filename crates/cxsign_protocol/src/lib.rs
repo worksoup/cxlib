@@ -46,7 +46,7 @@ impl Display for Protocol {
         self.get().fmt(f)
     }
 }
-pub trait ProtocolTrait: Sync {
+pub trait ProtocolTrait<Protocol>: Sync {
     fn get(&self, t: &Protocol) -> String;
 
     fn set(&self, t: &Protocol, value: &str);
@@ -105,7 +105,7 @@ static GET_LOCATION_LOG: &str = "https://mobilelearn.chaoxing.com/v2/apis/sign/g
 static ACCOUNT_MANAGE: &str = "https://passport2.chaoxing.com/mooc/accountManage";
 static USER_AGENT: &str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_5.3.1_android_phone_5000_83";
 
-impl ProtocolTrait for CXProtocol {
+impl ProtocolTrait<Protocol> for CXProtocol {
     fn get(&self, t: &Protocol) -> String {
         match t {
             Protocol::ActiveList => ACTIVE_LIST,
@@ -149,21 +149,21 @@ impl ProtocolTrait for CXProtocol {
     }
 }
 
-impl StaticDefault for dyn ProtocolTrait {
+impl StaticDefault for dyn ProtocolTrait<Protocol> {
     fn static_default() -> &'static Self {
         static DEFAULT: CXProtocol = CXProtocol;
         &DEFAULT
     }
 }
 
-static PROTOCOL: OnceInit<dyn ProtocolTrait> = OnceInit::new();
+static PROTOCOL: OnceInit<dyn ProtocolTrait<Protocol>> = OnceInit::new();
 
-pub fn set_protocol(protocol: &'static impl ProtocolTrait) -> Result<(), OnceInitError> {
+pub fn set_protocol(protocol: &'static impl ProtocolTrait<Protocol>) -> Result<(), OnceInitError> {
     PROTOCOL.set_data(protocol)
 }
 
 pub fn set_boxed_protocol(
-    protocol: Box<impl ProtocolTrait + 'static>,
+    protocol: Box<impl ProtocolTrait<Protocol> + 'static>,
 ) -> Result<(), OnceInitError> {
     PROTOCOL.set_boxed_data(protocol)
 }
