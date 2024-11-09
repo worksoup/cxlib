@@ -193,7 +193,10 @@ impl AccountTable {
         pwd: Option<String>,
     ) -> Result<Session, cxsign_error::Error> {
         let pwd = pwd.ok_or(cxsign_error::Error::LoginError("没有密码！".to_string()))?;
-        let enc_pwd = cxsign_login::utils::des_enc(&pwd);
+        let pwd = pwd.as_bytes();
+        assert!(pwd.len() > 7);
+        assert!(pwd.len() < 17);
+        let enc_pwd = cxsign_login::utils::des_enc(pwd);
         let session = Session::relogin(&uname, &enc_pwd)?;
         let name = session.get_stu_name();
         Self::add_account_or(db, &uname, &enc_pwd, name, AccountTable::update_account);
