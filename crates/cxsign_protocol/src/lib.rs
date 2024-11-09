@@ -3,34 +3,81 @@ mod default_impl;
 pub use default_impl::*;
 
 use onceinit::{OnceInit, OnceInitError, OnceInitState, StaticDefault};
-use std::ops::Deref;
-pub trait ProtocolTrait<Protocol>: Sync {
-    fn get(&self, t: &Protocol) -> String;
 
-    fn set(&self, t: &Protocol, value: &str);
+pub trait ProtocolItemTrait: Sized + 'static {
+    type ProtocolData;
+    fn get_protocol_() -> &'static OnceInit<dyn ProtocolTrait<Self>>;
+    fn get_protocol() -> &'static dyn ProtocolTrait<Self>;
+    fn set_protocol(protocol: &'static impl ProtocolTrait<Self>) -> Result<(), OnceInitError> {
+        Self::get_protocol_().set_data(protocol)
+    }
+    fn set_boxed_protocol(
+        protocol: Box<impl ProtocolTrait<Self> + 'static>,
+    ) -> Result<(), OnceInitError> {
+        Self::get_protocol_().set_boxed_data(protocol)
+    }
+    fn get(&self) -> String {
+        Self::get_protocol().get(self)
+    }
+    fn get_default(&self) -> String;
+    fn set(&self, value: &str) {
+        Self::get_protocol().set(self, value)
+    }
+    fn store() -> Result<(), cxsign_error::Error> {
+        Self::get_protocol().store()
+    }
+    fn update(&self, value: &str) -> bool {
+        Self::get_protocol().update(self, value)
+    }
+}
+pub trait ProtocolDataTrait {
+    type ProtocolList;
+    fn map_by_enum<'a, T>(
+        &'a self,
+        t: &Self::ProtocolList,
+        do_something: impl Fn(&'a Option<String>) -> T,
+    ) -> T;
+    fn map_by_enum_mut<'a, T>(
+        &'a mut self,
+        t: &Self::ProtocolList,
+        do_something: impl Fn(&'a mut Option<String>) -> T,
+    ) -> T;
+    fn set(&mut self, t: &Self::ProtocolList, value: &str) {
+        self.map_by_enum_mut(t, |t| t.replace(value.to_owned()));
+    }
+    fn update(&mut self, t: &Self::ProtocolList, value: &str) -> bool {
+        self.map_by_enum_mut(t, |t| {
+            let not_to_update = t.as_ref().is_some_and(|v| v == value);
+            t.replace(value.to_owned());
+            !not_to_update
+        })
+    }
+}
+pub trait ProtocolTrait<ProtocolItem>: Sync {
+    fn get(&self, t: &ProtocolItem) -> String;
+
+    fn set(&self, t: &ProtocolItem, value: &str);
     fn store(&self) -> Result<(), cxsign_error::Error>;
-    fn update(&self, t: &Protocol, value: &str) -> bool;
+    fn update(&self, t: &ProtocolItem, value: &str) -> bool;
 }
 
 static PROTOCOL: OnceInit<dyn ProtocolTrait<ProtocolItem>> = OnceInit::new();
 
-impl StaticDefault for dyn ProtocolTrait<ProtocolItem> {
+impl<ProtocolItem, ProtocolData> StaticDefault for dyn ProtocolTrait<ProtocolItem>
+where
+    ProtocolItem: ProtocolItemTrait<ProtocolData = ProtocolData>,
+    ProtocolData: Default
+        + for<'de> serde::Deserialize<'de>
+        + serde::Serialize
+        + Send
+        + Sync
+        + 'static
+        + ProtocolDataTrait<ProtocolList = ProtocolItem>,
+{
     fn static_default() -> &'static Self {
         if let OnceInitState::UNINITIALIZED = PROTOCOL.get_state() {
             let _ = CXProtocol::<ProtocolData>::init();
         }
-        PROTOCOL.deref()
+        ProtocolItem::get_protocol()
     }
-}
-
-pub fn set_protocol(
-    protocol: &'static impl ProtocolTrait<ProtocolItem>,
-) -> Result<(), OnceInitError> {
-    PROTOCOL.set_data(protocol)
-}
-
-pub fn set_boxed_protocol(
-    protocol: Box<impl ProtocolTrait<ProtocolItem> + 'static>,
-) -> Result<(), OnceInitError> {
-    PROTOCOL.set_boxed_data(protocol)
 }

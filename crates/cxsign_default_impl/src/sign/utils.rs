@@ -1,6 +1,6 @@
 use crate::sign::CaptchaId;
 use cxsign_activity::RawSign;
-use cxsign_protocol::ProtocolItem;
+use cxsign_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxsign_sign::{SignResult, SignTrait};
 use cxsign_types::{Location, LocationWithRange};
 use cxsign_user::Session;

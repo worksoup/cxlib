@@ -1,10 +1,12 @@
-use crate::{ProtocolTrait, PROTOCOL};
+use crate::{ProtocolDataTrait, ProtocolItemTrait, ProtocolTrait, PROTOCOL};
 use log::warn;
+use onceinit::OnceInit;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
     fs::{File, OpenOptions},
     io::{ErrorKind, Read, Write},
+    ops::Deref,
     path::PathBuf,
     sync::{Arc, Mutex, RwLock},
 };
@@ -36,75 +38,6 @@ pub enum ProtocolItem {
     QrcodePat,
 }
 impl ProtocolItem {
-    pub fn get(&self) -> String {
-        PROTOCOL.get(self)
-    }
-    pub fn set(&self, value: &str) {
-        PROTOCOL.set(self, value)
-    }
-    pub fn store() -> Result<(), cxsign_error::Error> {
-        PROTOCOL.store()
-    }
-    pub fn update(&self, value: &str) -> bool {
-        PROTOCOL.update(self, value)
-    }
-}
-impl Display for ProtocolItem {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.get().fmt(f)
-    }
-}
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ProtocolData {
-    active_list: Option<String>,
-    get_captcha: Option<String>,
-    check_captcha: Option<String>,
-    get_server_time: Option<String>,
-    my_sign_captcha_utils: Option<String>,
-    check_signcode: Option<String>,
-    sign_detail: Option<String>,
-    login_page: Option<String>,
-    login_enc: Option<String>,
-    pan_chaoxing: Option<String>,
-    pan_list: Option<String>,
-    pan_token: Option<String>,
-    pan_upload: Option<String>,
-    analysis: Option<String>,
-    analysis2: Option<String>,
-    get_attend_info: Option<String>,
-    ppt_sign: Option<String>,
-    pre_sign: Option<String>,
-    back_clazz_data: Option<String>,
-    get_location_log: Option<String>,
-    account_manage: Option<String>,
-    captcha_id: Option<String>,
-    user_agent: Option<String>,
-    qrcode_pat: Option<String>,
-}
-pub trait ProtocolDataTrait {
-    type ProtocolList;
-    fn map_by_enum<'a, T>(
-        &'a self,
-        t: &Self::ProtocolList,
-        do_something: impl Fn(&'a Option<String>) -> T,
-    ) -> T;
-    fn map_by_enum_mut<'a, T>(
-        &'a mut self,
-        t: &Self::ProtocolList,
-        do_something: impl Fn(&'a mut Option<String>) -> T,
-    ) -> T;
-    fn set(&mut self, t: &Self::ProtocolList, value: &str) {
-        self.map_by_enum_mut(t, |t| t.replace(value.to_owned()));
-    }
-    fn update(&mut self, t: &Self::ProtocolList, value: &str) -> bool {
-        self.map_by_enum_mut(t, |t| {
-            let not_to_update = t.as_ref().is_some_and(|v| v == value);
-            t.replace(value.to_owned());
-            !not_to_update
-        })
-    }
-}
-impl ProtocolData {
     // 查询活动
     pub const ACTIVE_LIST: &'static str =
         "https://mobilelearn.chaoxing.com/v2/apis/active/student/activelist";
@@ -159,6 +92,77 @@ impl ProtocolData {
     // 账号设置页
     pub const ACCOUNT_MANAGE: &'static str = "https://passport2.chaoxing.com/mooc/accountManage";
     pub const USER_AGENT: &'static str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_5.3.1_android_phone_5000_83";
+}
+impl ProtocolItemTrait for ProtocolItem {
+    type ProtocolData = ProtocolData;
+
+    fn get_protocol_() -> &'static OnceInit<dyn ProtocolTrait<Self>> {
+        &PROTOCOL
+    }
+    fn get_protocol() -> &'static (dyn ProtocolTrait<ProtocolItem> + 'static) {
+        PROTOCOL.deref()
+    }
+
+    fn get_default(&self) -> String {
+        match self {
+            Self::ActiveList => Self::ACTIVE_LIST.to_string(),
+            Self::GetCaptcha => Self::GET_CAPTCHA.to_string(),
+            Self::CheckCaptcha => Self::CHECK_CAPTCHA.to_string(),
+            Self::GetServerTime => Self::GET_SERVER_TIME.to_string(),
+            Self::MySignCaptchaUtils => Self::MY_SIGN_CAPTCHA_UTILS.to_string(),
+            Self::CheckSigncode => Self::CHECK_SIGNCODE.to_string(),
+            Self::SignDetail => Self::SIGN_DETAIL.to_string(),
+            Self::LoginPage => Self::LOGIN_PAGE.to_string(),
+            Self::LoginEnc => Self::LOGIN_ENC.to_string(),
+            Self::PanChaoxing => Self::PAN_CHAOXING.to_string(),
+            Self::PanList => Self::PAN_LIST.to_string(),
+            Self::PanToken => Self::PAN_TOKEN.to_string(),
+            Self::PanUpload => Self::PAN_UPLOAD.to_string(),
+            Self::Analysis => Self::ANALYSIS.to_string(),
+            Self::Analysis2 => Self::ANALYSIS2.to_string(),
+            Self::GetAttendInfo => Self::GET_ATTEND_INFO.to_string(),
+            Self::PptSign => Self::PPT_SIGN.to_string(),
+            Self::PreSign => Self::PRE_SIGN.to_string(),
+            Self::BackClazzData => Self::BACK_CLAZZ_DATA.to_string(),
+            Self::GetLocationLog => Self::GET_LOCATION_LOG.to_string(),
+            Self::AccountManage => Self::ACCOUNT_MANAGE.to_string(),
+            Self::CaptchaId => Self::CAPTCHA_ID.to_string(),
+            Self::UserAgent => Self::USER_AGENT.to_string(),
+            Self::QrcodePat => Self::QRCODE_PAT.to_string(),
+        }
+    }
+}
+impl Display for ProtocolItem {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.get().fmt(f)
+    }
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProtocolData {
+    active_list: Option<String>,
+    get_captcha: Option<String>,
+    check_captcha: Option<String>,
+    get_server_time: Option<String>,
+    my_sign_captcha_utils: Option<String>,
+    check_signcode: Option<String>,
+    sign_detail: Option<String>,
+    login_page: Option<String>,
+    login_enc: Option<String>,
+    pan_chaoxing: Option<String>,
+    pan_list: Option<String>,
+    pan_token: Option<String>,
+    pan_upload: Option<String>,
+    analysis: Option<String>,
+    analysis2: Option<String>,
+    get_attend_info: Option<String>,
+    ppt_sign: Option<String>,
+    pre_sign: Option<String>,
+    back_clazz_data: Option<String>,
+    get_location_log: Option<String>,
+    account_manage: Option<String>,
+    captcha_id: Option<String>,
+    user_agent: Option<String>,
+    qrcode_pat: Option<String>,
 }
 impl ProtocolDataTrait for ProtocolData {
     type ProtocolList = ProtocolItem;
@@ -231,30 +235,30 @@ impl ProtocolDataTrait for ProtocolData {
 impl Default for ProtocolData {
     fn default() -> Self {
         Self {
-            active_list: Some(ProtocolData::ACTIVE_LIST.to_string()),
-            get_captcha: Some(ProtocolData::GET_CAPTCHA.to_string()),
-            check_captcha: Some(ProtocolData::CHECK_CAPTCHA.to_string()),
-            get_server_time: Some(ProtocolData::GET_SERVER_TIME.to_string()),
-            my_sign_captcha_utils: Some(ProtocolData::MY_SIGN_CAPTCHA_UTILS.to_string()),
-            check_signcode: Some(ProtocolData::CHECK_SIGNCODE.to_string()),
-            sign_detail: Some(ProtocolData::SIGN_DETAIL.to_string()),
-            login_page: Some(ProtocolData::LOGIN_PAGE.to_string()),
-            login_enc: Some(ProtocolData::LOGIN_ENC.to_string()),
-            pan_chaoxing: Some(ProtocolData::PAN_CHAOXING.to_string()),
-            pan_list: Some(ProtocolData::PAN_LIST.to_string()),
-            pan_token: Some(ProtocolData::PAN_TOKEN.to_string()),
-            pan_upload: Some(ProtocolData::PAN_UPLOAD.to_string()),
-            analysis: Some(ProtocolData::ANALYSIS.to_string()),
-            analysis2: Some(ProtocolData::ANALYSIS2.to_string()),
-            get_attend_info: Some(ProtocolData::GET_ATTEND_INFO.to_string()),
-            ppt_sign: Some(ProtocolData::PPT_SIGN.to_string()),
-            pre_sign: Some(ProtocolData::PRE_SIGN.to_string()),
-            back_clazz_data: Some(ProtocolData::BACK_CLAZZ_DATA.to_string()),
-            get_location_log: Some(ProtocolData::GET_LOCATION_LOG.to_string()),
-            account_manage: Some(ProtocolData::ACCOUNT_MANAGE.to_string()),
-            captcha_id: Some(ProtocolData::CAPTCHA_ID.to_string()),
-            user_agent: Some(ProtocolData::USER_AGENT.to_string()),
-            qrcode_pat: Some(ProtocolData::QRCODE_PAT.to_string()),
+            active_list: Some(ProtocolItem::ACTIVE_LIST.to_string()),
+            get_captcha: Some(ProtocolItem::GET_CAPTCHA.to_string()),
+            check_captcha: Some(ProtocolItem::CHECK_CAPTCHA.to_string()),
+            get_server_time: Some(ProtocolItem::GET_SERVER_TIME.to_string()),
+            my_sign_captcha_utils: Some(ProtocolItem::MY_SIGN_CAPTCHA_UTILS.to_string()),
+            check_signcode: Some(ProtocolItem::CHECK_SIGNCODE.to_string()),
+            sign_detail: Some(ProtocolItem::SIGN_DETAIL.to_string()),
+            login_page: Some(ProtocolItem::LOGIN_PAGE.to_string()),
+            login_enc: Some(ProtocolItem::LOGIN_ENC.to_string()),
+            pan_chaoxing: Some(ProtocolItem::PAN_CHAOXING.to_string()),
+            pan_list: Some(ProtocolItem::PAN_LIST.to_string()),
+            pan_token: Some(ProtocolItem::PAN_TOKEN.to_string()),
+            pan_upload: Some(ProtocolItem::PAN_UPLOAD.to_string()),
+            analysis: Some(ProtocolItem::ANALYSIS.to_string()),
+            analysis2: Some(ProtocolItem::ANALYSIS2.to_string()),
+            get_attend_info: Some(ProtocolItem::GET_ATTEND_INFO.to_string()),
+            ppt_sign: Some(ProtocolItem::PPT_SIGN.to_string()),
+            pre_sign: Some(ProtocolItem::PRE_SIGN.to_string()),
+            back_clazz_data: Some(ProtocolItem::BACK_CLAZZ_DATA.to_string()),
+            get_location_log: Some(ProtocolItem::GET_LOCATION_LOG.to_string()),
+            account_manage: Some(ProtocolItem::ACCOUNT_MANAGE.to_string()),
+            captcha_id: Some(ProtocolItem::CAPTCHA_ID.to_string()),
+            user_agent: Some(ProtocolItem::USER_AGENT.to_string()),
+            qrcode_pat: Some(ProtocolItem::QRCODE_PAT.to_string()),
         }
     }
 }
@@ -334,15 +338,16 @@ where
         Ok(CXProtocol { data, file })
     }
 }
-impl<ProtocolData> CXProtocol<ProtocolData>
+impl<ProtocolItem, ProtocolData> CXProtocol<ProtocolData>
 where
+    ProtocolItem: ProtocolItemTrait,
     ProtocolData: Default
         + for<'de> serde::Deserialize<'de>
         + serde::Serialize
         + Send
         + Sync
         + 'static
-        + ProtocolDataTrait<ProtocolList =ProtocolItem>,
+        + ProtocolDataTrait<ProtocolList = ProtocolItem>,
 {
     /// # init
     /// 读取配置文件 `protocol.toml` 并构造 `ProtocolData`.
@@ -352,11 +357,11 @@ where
     ///
     /// # Errors
     ///
-    /// 在设置协议出错时返回 [`SetProtocolError`](cxsign_error::Error::ParseError).
+    /// 在设置协议出错时返回 [`SetProtocolError`](cxsign_error::Error::SetProtocolError).
     pub fn init() -> Result<(), cxsign_error::Error> {
         let protocol_config_path = cxsign_dir::Dir::get_config_file_path("protocol.toml");
         let protocol = CXProtocol::<ProtocolData>::load(&protocol_config_path)?;
-        crate::set_boxed_protocol(Box::new(protocol))
+        ProtocolItem::set_boxed_protocol(Box::new(protocol))
             .map_err(|_| cxsign_error::Error::SetProtocolError)
     }
 }
