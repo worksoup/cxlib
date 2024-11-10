@@ -13,6 +13,7 @@ cxsign_protocol = { path = "../cxsign_protocol" }
 des.workspace = true
 log = { workspace = true, features = ["release_max_level_info"] }
 hex.workspace = true
+onceinit.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }

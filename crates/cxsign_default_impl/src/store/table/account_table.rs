@@ -1,29 +1,61 @@
 use crate::store::{DataBase, DataBaseTableTrait};
-use cxsign_login::DefaultLoginSolver;
+use cxsign_dir::Dir;
+use cxsign_error::Error;
+use cxsign_login::{DefaultLoginSolver, LoginSolverWrapper};
 use cxsign_store::StorageTableCommandTrait;
 use cxsign_user::Session;
 use log::{info, warn};
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::str::FromStr;
-
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    str::FromStr,
+};
 pub struct AccountTable;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UnameAndEncPwdPair {
-    pub uname: String,
-    pub enc_pwd: String,
+pub struct AccountData {
+    uid: String,
+    uname: String,
+    enc_pwd: String,
+    login_type: String,
 }
-impl From<(String, String)> for UnameAndEncPwdPair {
-    fn from((uname, enc_pwd): (String, String)) -> Self {
-        UnameAndEncPwdPair { uname, enc_pwd }
+impl AccountData {
+    pub fn new(uid: String, uname: String, enc_pwd: String, login_type: String) -> AccountData {
+        Self {
+            uid,
+            uname,
+            enc_pwd,
+            login_type,
+        }
+    }
+    pub fn uid(&self) -> &str {
+        &self.uid
+    }
+    pub fn uname(&self) -> &str {
+        &self.uname
+    }
+    pub fn enc_pwd(&self) -> &str {
+        &self.enc_pwd
+    }
+    pub fn login_type(&self) -> &str {
+        &self.login_type
     }
 }
-impl Display for UnameAndEncPwdPair {
+impl From<(String, String, String)> for AccountData {
+    fn from((uid, uname, enc_pwd): (String, String, String)) -> Self {
+        AccountData::new(uid, uname, enc_pwd, "".to_owned())
+    }
+}
+impl From<(String, String, String, String)> for AccountData {
+    fn from((uid, uname, enc_pwd, login_type): (String, String, String, String)) -> Self {
+        AccountData::new(uid, uname, enc_pwd, login_type)
+    }
+}
+impl Display for AccountData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{},{}", self.uname, self.enc_pwd)
+        write!(f, "{},{},{}", self.uname, self.enc_pwd, self.login_type)
     }
 }
-impl FromStr for UnameAndEncPwdPair {
+impl FromStr for AccountData {
     type Err = cxsign_error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -33,13 +65,26 @@ impl FromStr for UnameAndEncPwdPair {
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>();
         if s.len() < 2 {
-            Err(cxsign_error::Error::ParseError(
-                "登录所需信息解析出错！格式为 `uname,enc_pwd`.".to_string(),
+            Err(Error::ParseError(
+                "登录所需信息解析出错！格式为 `uname,enc_pwd[, login_typ]`.".to_string(),
             ))
         } else {
             let uname = s[0].to_string();
             let enc_pwd = s[1].to_string();
-            Ok(Self { uname, enc_pwd })
+            let login_type = if s.len() == 3 {
+                s[2].to_string()
+            } else {
+                String::new()
+            };
+            let (agent, cookies) =
+                Session::relogin_raw(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;
+            Session::store_cookies(&agent, cookies.get_uid())?;
+            Ok(Self {
+                uid: cookies.get_uid().to_owned(),
+                uname,
+                enc_pwd,
+                login_type,
+            })
         }
     }
 }
@@ -54,27 +99,30 @@ impl AccountTable {
         }
         s
     }
-    pub fn get_session(db: &DataBase, account: &str) -> Option<Session> {
-        if Self::has_account(db, account) {
-            Some(Session::load_cookies(account, &DefaultLoginSolver).unwrap())
+    pub fn get_session(db: &DataBase, uid: &str) -> Option<Session> {
+        if Self::has_account(db, uid) {
+            let account = Self::get_account(db, uid)?;
+            Session::load_cookies(uid, account.uname()).ok()
         } else {
-            warn!("没有该账号：[`{account}`]，请检查输入或登录。");
+            warn!("没有该账号：[`{uid}`]，请检查输入或登录。");
             None
         }
     }
     pub fn get_sessions(db: &DataBase) -> HashMap<String, Session> {
-        let binding = Self::get_accounts(db);
-        let str_list = binding.keys().collect::<Vec<_>>();
+        let accounts = Self::get_accounts(db).into_iter().collect::<Vec<_>>();
         let mut s = HashMap::new();
-        for account in str_list {
+        for account in accounts {
             if Self::has_account(db, &account.uname) {
-                let session = Session::load_cookies_or_relogin(
-                    &account.uname,
-                    &account.enc_pwd,
-                    &DefaultLoginSolver,
-                )
-                .unwrap();
-                s.insert(account.uname.clone(), session);
+                if let Ok(session) = Session::load_cookies_or_relogin(
+                    account.uname(),
+                    account.uid(),
+                    account.enc_pwd(),
+                    &LoginSolverWrapper::new(account.login_type()),
+                ) {
+                    s.insert(account.uname.clone(), session);
+                } else {
+                    warn!("账号加载失败：[`{}`]，跳过。", account.uname);
+                }
             } else {
                 warn!(
                     "没有该账号：[`{}`]，跳过。请检查输入或登录。",
@@ -84,87 +132,93 @@ impl AccountTable {
         }
         s
     }
-    pub fn has_account(db: &DataBase, uname: &str) -> bool {
+    pub fn has_account(db: &DataBase, uid: &str) -> bool {
         let mut query = db
             .prepare(format!(
-                "SELECT count(*) FROM {} WHERE uname=?;",
+                "SELECT count(*) FROM {} WHERE uid=?;",
                 Self::TABLE_NAME
             ))
             .unwrap();
-        query.bind((1, uname)).unwrap();
+        query.bind((1, uid)).unwrap();
         query.next().unwrap();
         query.read::<i64, _>(0).unwrap() > 0
     }
 
-    pub fn delete_account(db: &DataBase, uname: &str) {
-        if Self::has_account(db, uname) {
+    pub fn delete_account(db: &DataBase, uid: &str) {
+        if Self::has_account(db, uid) {
             let mut query = db
-                .prepare(format!("DELETE FROM {} WHERE uname=?;", Self::TABLE_NAME))
+                .prepare(format!("DELETE FROM {} WHERE uid=?;", Self::TABLE_NAME))
                 .unwrap();
-            query.bind((1, uname)).unwrap();
+            query.bind((1, uid)).unwrap();
             query.next().unwrap();
         }
-        std::fs::remove_file(cxsign_dir::Dir::get_json_file_path(uname)).unwrap();
+        std::fs::remove_file(Dir::get_json_file_path(uid)).unwrap();
     }
 
-    pub fn add_account_or<O: Fn(&DataBase, &str, &str, &str)>(
+    pub fn add_account_or<O: Fn(&DataBase, &AccountData)>(
         db: &DataBase,
-        uname: &str,
-        pwd: &str,
-        name: &str,
+        account: &AccountData,
         or: O,
     ) {
         let mut query = db
             .prepare(format!(
-                "INSERT INTO {}(uname,pwd,name) values(:uname,:pwd,:name);",
+                "INSERT INTO {}(uid,uname,enc_pwd,login_type) values(:uid,:uname,:enc_pwd,:login_type);",
                 Self::TABLE_NAME
             ))
             .unwrap();
         query
             .bind::<&[(_, sqlite::Value)]>(
                 &[
-                    (":pwd", pwd.into()),
-                    (":uname", uname.into()),
-                    (":name", name.into()),
+                    (":uid", account.uid().into()),
+                    (":uname", account.uname().into()),
+                    (":enc_pwd", account.enc_pwd().into()),
+                    (":login_type", account.login_type().into()),
                 ][..],
             )
             .unwrap();
         match query.next() {
             Ok(_) => (),
-            Err(_) => or(db, uname, pwd, name),
+            Err(_) => or(db, account),
         };
     }
 
-    pub fn update_account(db: &DataBase, uname: &str, pwd: &str, name: &str) {
+    pub fn update_account(db: &DataBase, account: &AccountData) {
         let mut query = db
             .prepare(format!(
-                "UPDATE {} SET pwd=:pwd,name=:name WHERE uname=:uname;",
+                "UPDATE {} SET uname=:uname,enc_pwd=:enc_pwd,login_type=:login_type WHERE uid=:uid;",
                 Self::TABLE_NAME
             ))
             .unwrap();
         query
             .bind::<&[(_, sqlite::Value)]>(
                 &[
-                    (":uname", uname.into()),
-                    (":pwd", pwd.into()),
-                    (":name", name.into()),
+                    (":uid", account.uid().into()),
+                    (":uname", account.uname().into()),
+                    (":pwd", account.enc_pwd().into()),
+                    (":login_type", account.login_type().into()),
                 ][..],
             )
             .unwrap();
         query.next().unwrap();
     }
 
-    pub fn get_accounts(db: &DataBase) -> HashMap<UnameAndEncPwdPair, String> {
+    pub fn get_accounts(db: &DataBase) -> HashSet<AccountData> {
         let mut query = db
             .prepare(format!("SELECT * FROM {};", Self::TABLE_NAME))
             .unwrap();
-        let mut accounts = HashMap::new();
+        let mut accounts = HashSet::new();
         for c in query.iter() {
             if let Ok(row) = c {
+                let uid: &str = row.read("uid");
                 let uname: &str = row.read("uname");
-                let pwd: &str = row.read("pwd");
-                let name: &str = row.read("name");
-                accounts.insert((uname.into(), pwd.into()).into(), name.into());
+                let enc_pwd: &str = row.read("enc_pwd");
+                let login_type: &str = row.read("login_type");
+                accounts.insert(AccountData::new(
+                    uid.into(),
+                    uname.into(),
+                    enc_pwd.into(),
+                    login_type.into(),
+                ));
             } else {
                 warn!("账号解析行出错：{c:?}.");
             }
@@ -174,17 +228,23 @@ impl AccountTable {
         }
         accounts
     }
-    pub fn get_account(db: &DataBase, account: &str) -> Option<(UnameAndEncPwdPair, String)> {
+    pub fn get_account(db: &DataBase, uid: &str) -> Option<AccountData> {
         let mut query = db
-            .prepare(format!("SELECT * FROM {} WHERE uname=?;", Self::TABLE_NAME))
+            .prepare(format!("SELECT * FROM {} WHERE uid=?;", Self::TABLE_NAME))
             .unwrap();
-        query.bind((1, account)).unwrap();
+        query.bind((1, uid)).unwrap();
         for c in query.iter() {
             if let Ok(row) = c {
+                let uid: &str = row.read("uid");
                 let uname: &str = row.read("uname");
-                let pwd: &str = row.read("pwd");
-                let name: &str = row.read("name");
-                return Some(((uname.into(), pwd.into()).into(), name.into()));
+                let enc_pwd: &str = row.read("enc_pwd");
+                let login_type: &str = row.read("login_type");
+                return Some(AccountData::new(
+                    uid.into(),
+                    uname.into(),
+                    enc_pwd.into(),
+                    login_type.into(),
+                ));
             } else {
                 warn!("账号解析行出错：{c:?}.");
             }
@@ -196,23 +256,32 @@ impl AccountTable {
         db: &DataBase,
         uname: String,
         pwd: Option<String>,
+        login_type: String,
     ) -> Result<Session, cxsign_error::Error> {
-        let pwd = pwd.ok_or(cxsign_error::Error::LoginError("没有密码！".to_string()))?;
+        let pwd = pwd.ok_or(Error::LoginError("没有密码！".to_string()))?;
         let pwd = pwd.as_bytes();
         assert!(pwd.len() > 7);
         assert!(pwd.len() < 17);
         let enc_pwd = cxsign_login::utils::des_enc(pwd, b"u2oh6Vu^".to_owned());
-        let session = Session::relogin(&uname, &enc_pwd, &DefaultLoginSolver)?;
-        let name = session.get_stu_name();
-        Self::add_account_or(db, &uname, &enc_pwd, name, AccountTable::update_account);
+        let session = Session::relogin(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;
+        Self::add_account_or(
+            db,
+            &AccountData::new(session.get_uid().to_owned(), uname, enc_pwd, login_type),
+            AccountTable::update_account,
+        );
         Ok(session)
     }
-    pub fn relogin(db: &DataBase, uname: String) -> Result<Session, cxsign_error::Error> {
-        if let Some((UnameAndEncPwdPair { uname, enc_pwd }, _)) =
-            AccountTable::get_account(db, &uname)
+    pub fn relogin(db: &DataBase, uid: String) -> Result<Session, cxsign_error::Error> {
+        if let Some(AccountData {
+            uid,
+            uname,
+            enc_pwd,
+            login_type,
+        }) = AccountTable::get_account(db, &uid)
         {
-            let session = Session::relogin(&uname, &enc_pwd, &DefaultLoginSolver)?;
-            session.store_cookies();
+            let session =
+                Session::relogin(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;
+            Session::store_cookies(&session, &uid)?;
             Ok(session)
         } else {
             warn!("数据库中没有该用户！可能是实现错误。");
@@ -240,33 +309,28 @@ impl StorageTableCommandTrait<DataBase> for AccountTable {
 }
 impl DataBaseTableTrait for AccountTable {
     const TABLE_ARGS: &'static str =
-        "uname CHAR (50) UNIQUE NOT NULL,pwd TEXT NOT NULL,name TEXT NOT NULL";
+        "uid CHAR (50) UNIQUE NOT NULL,uname TEXT NOT NULL,enc_pwd TEXT NOT NULL,login_type TEXT NOT NULL";
     const TABLE_NAME: &'static str = "account";
 
     fn import(db: &DataBase, data: &str) {
         db.add_table::<Self>();
-        let data = crate::utils::parse::<cxsign_error::Error, UnameAndEncPwdPair>(data);
-        for UnameAndEncPwdPair { uname, enc_pwd } in data {
-            match Session::relogin(uname.as_str(), &enc_pwd, &DefaultLoginSolver) {
+        let data = crate::utils::parse::<cxsign_error::Error, AccountData>(data);
+        for account in data {
+            match Session::relogin(account.uname(), account.enc_pwd(), &DefaultLoginSolver) {
                 Ok(session) => {
                     info!(
-                        "账号 [{uname}]（用户名：{}）导入成功！",
+                        "账号 [{}]（用户名：{}）导入成功！",
+                        account.uname(),
                         session.get_stu_name()
                     );
-                    Self::add_account_or(
-                        db,
-                        uname.as_str(),
-                        &enc_pwd,
-                        uname.as_str(),
-                        AccountTable::update_account,
-                    );
+                    Self::add_account_or(db, &account, AccountTable::update_account);
                 }
-                Err(e) => warn!("账号 [{uname}] 导入失败！错误信息：{e}."),
+                Err(e) => warn!("账号 [{}] 导入失败！错误信息：{e}.", account.uname(),),
             }
         }
     }
 
     fn export(db: &DataBase) -> String {
-        crate::utils::to_string(Self::get_accounts(db).keys())
+        crate::utils::to_string(Self::get_accounts(db).iter())
     }
 }

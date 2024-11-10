@@ -1,12 +1,14 @@
 use crate::{cookies::UserCookies, protocol};
 use cxsign_dir::Dir;
-use cxsign_login::{DefaultLoginSolver, LoginSolverTrait};
+use cxsign_login::LoginSolverTrait;
+use cxsign_protocol::ProtocolItem;
 use log::{info, trace};
+use std::path::Path;
 use std::{
     hash::Hash,
     ops::{Deref, Index},
 };
-use ureq::Agent;
+use ureq::{Agent, AgentBuilder};
 
 #[derive(Debug, Clone)]
 pub struct Session {
@@ -33,48 +35,68 @@ impl Hash for Session {
 }
 
 impl Session {
-    /// 加载本地 Cookies 并返回 [`Session`].
-    pub fn load_cookies<LoginSolver: LoginSolverTrait>(
-        uname: &str,
-        login_solver: &LoginSolver,
+    pub fn from_raw(
+        uname: String,
+        agent: Agent,
+        cookies: UserCookies,
     ) -> Result<Session, cxsign_error::Error> {
-        let client = login_solver.load_cookies(Dir::get_json_file_path(uname))?;
-        let cookies = UserCookies::new(&client);
-        let stu_name = Self::find_stu_name_in_html(&client)?;
-        info!("用户[{}]加载 Cookies 成功！", stu_name);
-        Ok(Session {
-            agent: client,
-            uname: uname.to_string(),
-            stu_name,
-            cookies,
-        })
-    }
-    /// 类似于 [`Session::load_cookies`], 不过须传入加密后的密码以重新登录。重新登录后将 [`Session::store_cookies`] 以持久化 Cookies.
-    pub fn relogin<LoginSolver: LoginSolverTrait>(
-        uname: &str,
-        enc_passwd: &str,
-        login_solver: &LoginSolver,
-    ) -> Result<Session, cxsign_error::Error> {
-        let client = login_solver.login_enc(uname, enc_passwd)?;
-        let cookies = UserCookies::new(&client);
-        let stu_name = Self::find_stu_name_in_html(&client)?;
-        info!("用户[{}]登录成功！", stu_name);
+        let stu_name = Self::find_stu_name_in_html(&agent)?;
         let session = Session {
-            agent: client,
+            agent,
             uname: uname.to_string(),
             stu_name,
             cookies,
         };
-        session.store_cookies();
+        Ok(session)
+    }
+    pub fn load_cookies_raw<P: AsRef<Path>>(cookies_file: P) -> Result<Agent, std::io::Error> {
+        let cookie_store = {
+            let file = std::fs::File::open(cookies_file).map(std::io::BufReader::new)?;
+            cookie_store::CookieStore::load_json(file).unwrap()
+        };
+        Ok(AgentBuilder::new()
+            .user_agent(&ProtocolItem::UserAgent.to_string())
+            .cookie_store(cookie_store)
+            .build())
+    }
+    /// 加载本地 Cookies 并返回 [`Session`].
+    pub fn load_cookies(uid: &str, uname: &str) -> Result<Session, cxsign_error::Error> {
+        let agent = Self::load_cookies_raw(Dir::get_json_file_path(uid))?;
+        let cookies = UserCookies::new(&agent);
+        let session = Self::from_raw(uname.to_string(), agent, cookies)?;
+        info!("用户[{}]加载 Cookies 成功！", session.get_stu_name());
+        Ok(session)
+    }
+    /// 类似于 [`Session::load_cookies`], 不过须传入加密后的密码以重新登录。重新登录后将 [`Session::store_cookies`] 以持久化 Cookies.
+    pub fn relogin_raw<LoginSolver: LoginSolverTrait>(
+        uname: &str,
+        enc_pwd: &str,
+        login_solver: &LoginSolver,
+    ) -> Result<(Agent, UserCookies), cxsign_error::Error> {
+        let agent = login_solver.login_enc(uname, enc_pwd)?;
+        let cookies = UserCookies::new(&agent);
+        Ok((agent, cookies))
+    }
+    /// 相当于 [`Session::relogin_raw`] 后 [`Session::from_raw`].
+    pub fn relogin<LoginSolver: LoginSolverTrait>(
+        uname: &str,
+        enc_pwd: &str,
+        login_solver: &LoginSolver,
+    ) -> Result<Session, cxsign_error::Error> {
+        let (agent, cookies) = Session::relogin_raw(uname, enc_pwd, login_solver)?;
+        Self::store_cookies(&agent, cookies.get_uid())?;
+        let session = Self::from_raw(uname.to_string(), agent, cookies)?;
+        info!("用户[{}]登录成功！", session.get_stu_name());
         Ok(session)
     }
     /// 先尝试 [`Session::load_cookies`], 如果发生错误且错误为登录过期或 Cookies 不存在，则 [`Session::relogin`]。
     pub fn load_cookies_or_relogin<LoginSolver: LoginSolverTrait>(
         uname: &str,
+        uid: &str,
         enc_passwd: &str,
         login_solver: &LoginSolver,
     ) -> Result<Session, cxsign_error::Error> {
-        match Session::load_cookies(uname, login_solver) {
+        match Session::load_cookies(uid, uname) {
             Ok(s) => Ok(s),
             Err(e) => match e {
                 cxsign_error::Error::LoginExpired(_) => {
@@ -91,12 +113,16 @@ impl Session {
         }
     }
     /// 将 Cookies 保存在某位置。具体请查看代码：[`Session::store_cookies`].
-    pub fn store_cookies(&self) {
-        let store_path = Dir::get_json_file_path(self.get_uname());
-        let mut writer = std::fs::File::create(store_path)
-            .map(std::io::BufWriter::new)
-            .unwrap();
-        self.cookie_store().save_json(&mut writer).unwrap();
+    pub fn store_cookies(
+        agent: &Agent,
+        file_name_without_ext: &str,
+    ) -> Result<(), cxsign_error::Error> {
+        let store_path = Dir::get_json_file_path(file_name_without_ext);
+        let mut writer = std::fs::File::create(store_path).map(std::io::BufWriter::new)?;
+        agent
+            .cookie_store()
+            .save_json(&mut writer)
+            .map_err(|e| cxsign_error::Error::LoginError(format!("Cookies 持久化失败：{e}")))
     }
     pub fn get_uid(&self) -> &str {
         self.cookies.get_uid()
@@ -113,9 +139,9 @@ impl Session {
     pub fn get_avatar_url(&self, size: usize) -> String {
         format!("https://photo.chaoxing.com/p/{}_{}", self.get_uid(), size)
     }
-    fn find_stu_name_in_html(client: &Agent) -> Result<String, cxsign_error::Error> {
+    fn find_stu_name_in_html(agent: &Agent) -> Result<String, cxsign_error::Error> {
         let login_expired_err = || cxsign_error::Error::LoginExpired("无法获取姓名！".to_string());
-        let r = protocol::account_manage(client)?;
+        let r = protocol::account_manage(agent)?;
         let html_content = r.into_string().unwrap();
         trace!("{html_content}");
         let e = html_content
