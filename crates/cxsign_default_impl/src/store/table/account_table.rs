@@ -1,4 +1,5 @@
 use crate::store::{DataBase, DataBaseTableTrait};
+use cxsign_login::DefaultLoginSolver;
 use cxsign_store::StorageTableCommandTrait;
 use cxsign_user::Session;
 use log::{info, warn};
@@ -55,7 +56,7 @@ impl AccountTable {
     }
     pub fn get_session(db: &DataBase, account: &str) -> Option<Session> {
         if Self::has_account(db, account) {
-            Some(Session::load_json(account).unwrap())
+            Some(Session::load_cookies(account, &DefaultLoginSolver).unwrap())
         } else {
             warn!("没有该账号：[`{account}`]，请检查输入或登录。");
             None
@@ -67,8 +68,12 @@ impl AccountTable {
         let mut s = HashMap::new();
         for account in str_list {
             if Self::has_account(db, &account.uname) {
-                let session =
-                    Session::load_json_or_relogin(&account.uname, &account.enc_pwd).unwrap();
+                let session = Session::load_cookies_or_relogin(
+                    &account.uname,
+                    &account.enc_pwd,
+                    &DefaultLoginSolver,
+                )
+                .unwrap();
                 s.insert(account.uname.clone(), session);
             } else {
                 warn!(
@@ -197,7 +202,7 @@ impl AccountTable {
         assert!(pwd.len() > 7);
         assert!(pwd.len() < 17);
         let enc_pwd = cxsign_login::utils::des_enc(pwd, b"u2oh6Vu^".to_owned());
-        let session = Session::relogin(&uname, &enc_pwd)?;
+        let session = Session::relogin(&uname, &enc_pwd, &DefaultLoginSolver)?;
         let name = session.get_stu_name();
         Self::add_account_or(db, &uname, &enc_pwd, name, AccountTable::update_account);
         Ok(session)
@@ -206,8 +211,8 @@ impl AccountTable {
         if let Some((UnameAndEncPwdPair { uname, enc_pwd }, _)) =
             AccountTable::get_account(db, &uname)
         {
-            let session = Session::relogin(&uname, &enc_pwd)?;
-            session.store_json();
+            let session = Session::relogin(&uname, &enc_pwd, &DefaultLoginSolver)?;
+            session.store_cookies();
             Ok(session)
         } else {
             warn!("数据库中没有该用户！可能是实现错误。");
@@ -242,7 +247,7 @@ impl DataBaseTableTrait for AccountTable {
         db.add_table::<Self>();
         let data = crate::utils::parse::<cxsign_error::Error, UnameAndEncPwdPair>(data);
         for UnameAndEncPwdPair { uname, enc_pwd } in data {
-            match Session::relogin(uname.as_str(), &enc_pwd) {
+            match Session::relogin(uname.as_str(), &enc_pwd, &DefaultLoginSolver) {
                 Ok(session) => {
                     info!(
                         "账号 [{uname}]（用户名：{}）导入成功！",

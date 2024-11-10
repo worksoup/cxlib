@@ -6,13 +6,14 @@ use ureq::{Agent, AgentBuilder};
 
 pub mod protocol;
 pub mod utils;
-pub trait LoginTrait: Sized {
-    fn login_enc(account: &str, enc_passwd: &str) -> Result<Self, Error>;
+pub trait LoginSolverTrait {
+    fn login_enc(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error>;
 
-    fn load_json<P: AsRef<Path>>(cookies_file: P) -> Result<Self, std::io::Error>;
+    fn load_cookies<P: AsRef<Path>>(&self, cookies_file: P) -> Result<Agent, std::io::Error>;
 }
-impl LoginTrait for Agent {
-    fn login_enc(account: &str, enc_passwd: &str) -> Result<Agent, Error> {
+pub struct DefaultLoginSolver;
+impl LoginSolverTrait for DefaultLoginSolver {
+    fn login_enc(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error> {
         let cookie_store = cookie_store::CookieStore::new(None);
         let client = AgentBuilder::new()
             .user_agent(&ProtocolItem::UserAgent.to_string())
@@ -52,7 +53,7 @@ impl LoginTrait for Agent {
         Ok(client)
     }
 
-    fn load_json<P: AsRef<Path>>(cookies_file: P) -> Result<Agent, std::io::Error> {
+    fn load_cookies<P: AsRef<Path>>(&self, cookies_file: P) -> Result<Agent, std::io::Error> {
         let cookie_store = {
             let file = std::fs::File::open(cookies_file).map(std::io::BufReader::new)?;
             cookie_store::CookieStore::load_json(file).unwrap()
