@@ -92,6 +92,14 @@ where
     map_colors(image, |p| Luma([p[1]]))
 }
 
+pub fn image_from_bytes(bytes: Vec<u8>) -> DynamicImage {
+    image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .unwrap()
+        .decode()
+        .unwrap()
+}
+
 pub fn download_image(
     agent: &ureq::Agent,
     image_url: &str,
@@ -103,11 +111,7 @@ pub fn download_image(
         .into_reader()
         .read_to_end(&mut v)
         .unwrap();
-    let img = image::ImageReader::new(std::io::Cursor::new(v))
-        .with_guessed_format()
-        .unwrap()
-        .decode()
-        .unwrap();
+    let img = image_from_bytes(v);
     Ok(img)
 }
 
