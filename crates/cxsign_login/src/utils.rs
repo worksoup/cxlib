@@ -20,11 +20,11 @@ pub fn pkcs7_pad<const BLOCK_SIZE: usize>(data: &[u8]) -> Vec<[u8; BLOCK_SIZE]> 
     }
     r
 }
-pub fn des_enc(text: &[u8]) -> String {
-    let key = GenericArray::from(b"u2oh6Vu^".to_owned());
+pub fn des_enc(data: &[u8], key: [u8; 8]) -> String {
+    let key = GenericArray::from(key);
     let des = Des::new(&key);
     let mut data_block_enc = Vec::new();
-    for block in pkcs7_pad(text) {
+    for block in pkcs7_pad(data) {
         let mut block = GenericArray::from(block);
         des.encrypt_block(&mut block);
         let mut block = block.to_vec();

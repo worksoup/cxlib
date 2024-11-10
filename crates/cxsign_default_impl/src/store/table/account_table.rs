@@ -196,7 +196,7 @@ impl AccountTable {
         let pwd = pwd.as_bytes();
         assert!(pwd.len() > 7);
         assert!(pwd.len() < 17);
-        let enc_pwd = cxsign_login::utils::des_enc(pwd);
+        let enc_pwd = cxsign_login::utils::des_enc(pwd, b"u2oh6Vu^".to_owned());
         let session = Session::relogin(&uname, &enc_pwd)?;
         let name = session.get_stu_name();
         Self::add_account_or(db, &uname, &enc_pwd, name, AccountTable::update_account);
