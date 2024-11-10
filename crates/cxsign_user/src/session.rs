@@ -1,13 +1,9 @@
-use crate::{cookies::UserCookies, protocol};
+use crate::cookies::UserCookies;
 use cxsign_dir::Dir;
-use cxsign_login::LoginSolverTrait;
+use cxsign_login::{DefaultLoginSolver, LoginSolverTrait};
 use cxsign_protocol::ProtocolItem;
-use log::{info, trace};
-use std::path::Path;
-use std::{
-    hash::Hash,
-    ops::{Deref, Index},
-};
+use log::info;
+use std::{hash::Hash, ops::Deref, path::Path};
 use ureq::{Agent, AgentBuilder};
 
 #[derive(Debug, Clone)]
@@ -40,7 +36,7 @@ impl Session {
         agent: Agent,
         cookies: UserCookies,
     ) -> Result<Session, cxsign_error::Error> {
-        let stu_name = Self::find_stu_name_in_html(&agent)?;
+        let stu_name = DefaultLoginSolver::find_stu_name_in_html(&agent)?;
         let session = Session {
             agent,
             uname: uname.to_string(),
@@ -138,25 +134,6 @@ impl Session {
     }
     pub fn get_avatar_url(&self, size: usize) -> String {
         format!("https://photo.chaoxing.com/p/{}_{}", self.get_uid(), size)
-    }
-    fn find_stu_name_in_html(agent: &Agent) -> Result<String, cxsign_error::Error> {
-        let login_expired_err = || cxsign_error::Error::LoginExpired("无法获取姓名！".to_string());
-        let r = protocol::account_manage(agent)?;
-        let html_content = r.into_string().unwrap();
-        trace!("{html_content}");
-        let e = html_content
-            .find("colorBlue")
-            .ok_or_else(login_expired_err)?;
-        let html_content = html_content.index(e..html_content.len()).to_owned();
-        let e = html_content.find('>').unwrap() + 1;
-        let html_content = html_content.index(e..html_content.len()).to_owned();
-        let name = html_content
-            .index(0..html_content.find('<').unwrap())
-            .trim();
-        if name.is_empty() {
-            return Err(cxsign_error::Error::LoginExpired("姓名为空！".to_string()));
-        }
-        Ok(name.to_owned())
     }
 }
 

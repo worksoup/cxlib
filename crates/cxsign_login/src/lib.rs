@@ -1,9 +1,9 @@
 use cxsign_error::Error;
 use cxsign_protocol::ProtocolItem;
-use log::warn;
+use log::{trace, warn};
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 use std::sync::{Arc, RwLock};
 use ureq::{Agent, AgentBuilder};
 
@@ -11,13 +11,40 @@ pub mod protocol;
 pub mod utils;
 pub trait LoginSolverTrait: Send + Sync {
     fn login_type(&self) -> &str;
+    fn is_logged_in(&self, agent: &Agent) -> bool;
     fn login_enc(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error>;
 }
 pub struct DefaultLoginSolver;
+impl DefaultLoginSolver {
+    pub fn find_stu_name_in_html(agent: &Agent) -> Result<String, cxsign_error::Error> {
+        let login_expired_err = || cxsign_error::Error::LoginExpired("无法获取姓名！".to_string());
+        let r = protocol::account_manage(agent)?;
+        let html_content = r.into_string().unwrap();
+        trace!("{html_content}");
+        let e = html_content
+            .find("colorBlue")
+            .ok_or_else(login_expired_err)?;
+        let html_content = html_content.index(e..html_content.len()).to_owned();
+        let e = html_content.find('>').unwrap() + 1;
+        let html_content = html_content.index(e..html_content.len()).to_owned();
+        let name = html_content
+            .index(0..html_content.find('<').unwrap())
+            .trim();
+        if name.is_empty() {
+            return Err(cxsign_error::Error::LoginExpired("姓名为空！".to_string()));
+        }
+        Ok(name.to_owned())
+    }
+}
 impl LoginSolverTrait for DefaultLoginSolver {
     fn login_type(&self) -> &str {
         "DefaultLoginSolver"
     }
+
+    fn is_logged_in(&self, agent: &Agent) -> bool {
+        Self::find_stu_name_in_html(agent).is_ok()
+    }
+
     fn login_enc(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error> {
         let cookie_store = cookie_store::CookieStore::new(None);
         let client = AgentBuilder::new()
@@ -101,6 +128,16 @@ pub struct LoginSolverWrapper<'s>(&'s str);
 impl LoginSolverTrait for LoginSolverWrapper<'_> {
     fn login_type(&self) -> &str {
         self.0
+    }
+
+    fn is_logged_in(&self, agent: &Agent) -> bool {
+        LOGIN_SOLVERS
+            .0
+            .read()
+            .unwrap()
+            .get(self.0)
+            .unwrap()
+            .is_logged_in(agent)
     }
 
     fn login_enc(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error> {
