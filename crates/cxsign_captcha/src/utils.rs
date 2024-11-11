@@ -1,6 +1,7 @@
 use crate::hash::{encode, hash, uuid};
 use crate::protocol::{check_captcha, get_captcha, get_server_time};
 use crate::CaptchaId;
+use cxsign_imageproc::find_max_ncc;
 use log::{debug, warn};
 use serde::Deserialize;
 
@@ -58,7 +59,7 @@ pub fn auto_solve_captcha(
     let agent = ureq::Agent::new();
     let small_img = cxsign_imageproc::download_image(&agent, &cutout_image_url)?;
     let big_img = cxsign_imageproc::download_image(&agent, &shade_image_url)?;
-    let max_x = cxsign_imageproc::find_sub_image(&big_img, &small_img);
+    let max_x = cxsign_imageproc::find_sub_image(&big_img, &small_img, find_max_ncc);
     debug!("本地滑块结果：{max_x}");
     let r = check_captcha(&agent, captcha_id, max_x, &token, time + 2)?;
     let v: ValidateResult = trim_response_to_json(&r.into_string().unwrap()).unwrap();

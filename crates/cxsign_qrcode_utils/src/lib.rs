@@ -88,8 +88,8 @@ pub fn capture_screen_for_enc(is_refresh: bool, precise: bool) -> Option<String>
                 let pic = screen
                     .capture_image()
                     .unwrap_or_else(|e| panic!("{e:?}"));
-                let cut_pic = cxsign_imageproc::cut_picture(&image::DynamicImage::from(pic), qrcode_pos_on_screen.0, qrcode_pos_on_screen.1);
-                let r = scan_qrcode(cut_pic, &mut HashMap::new()).unwrap_or_else(|e| panic!("{e:?}"));
+                let cut_pic = cxsign_imageproc::cut_picture(&pic, qrcode_pos_on_screen.0, qrcode_pos_on_screen.1);
+                let r = scan_qrcode(cut_pic.to_image().into(), &mut HashMap::new()).unwrap_or_else(|e| panic!("{e:?}"));
                 cxsign_utils::find_qrcode_sign_enc_in_url(r[0].getText())
             } else {
                 // 如果不是精确截取的二维码，则不需要提示。
