@@ -76,7 +76,7 @@ where
         + ProtocolDataTrait<ProtocolItem = ProtocolItem>,
 {
     fn static_default() -> &'static Self {
-        if let OnceInitState::UNINITIALIZED = PROTOCOL.get_state() {
+        if let OnceInitState::UNINITIALIZED = ProtocolItem::get_protocol_().get_state() {
             let _ = CXProtocol::<ProtocolData>::init();
         }
         ProtocolItem::get_protocol()
