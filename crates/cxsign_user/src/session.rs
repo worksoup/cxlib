@@ -48,7 +48,7 @@ impl Session {
     pub fn load_cookies_raw<P: AsRef<Path>>(cookies_file: P) -> Result<Agent, std::io::Error> {
         let cookie_store = {
             let file = std::fs::File::open(cookies_file).map(std::io::BufReader::new)?;
-            cookie_store::CookieStore::load_json(file).unwrap()
+            cookie_store::serde::json::load(file).unwrap()
         };
         Ok(AgentBuilder::new()
             .user_agent(&ProtocolItem::UserAgent.to_string())
@@ -115,9 +115,7 @@ impl Session {
     ) -> Result<(), cxsign_error::Error> {
         let store_path = Dir::get_json_file_path(file_name_without_ext);
         let mut writer = std::fs::File::create(store_path).map(std::io::BufWriter::new)?;
-        agent
-            .cookie_store()
-            .save_json(&mut writer)
+        cookie_store::serde::json::save(&agent.cookie_store(), &mut writer)
             .map_err(|e| cxsign_error::Error::LoginError(format!("Cookies 持久化失败：{e}")))
     }
     pub fn get_uid(&self) -> &str {

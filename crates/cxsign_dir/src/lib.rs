@@ -26,16 +26,7 @@ static CONFIG_DIR_INFO: OnceInit<ConfigDirInfo> = OnceInit::new();
 static CONFIG_DIR: OnceInit<Dir> = OnceInit::new();
 
 fn uninit() -> bool {
-    match CONFIG_DIR.get_state() {
-        OnceInitState::INITIALIZED => false,
-        OnceInitState::INITIALIZING => {
-            while let OnceInitState::INITIALIZING = CONFIG_DIR.get_state() {
-                std::hint::spin_loop()
-            }
-            false
-        }
-        _ => true,
-    }
+    !matches!(CONFIG_DIR.get_state(), OnceInitState::INITIALIZED)
 }
 
 #[derive(Clone)]

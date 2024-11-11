@@ -29,7 +29,7 @@ log = { version = "0.4", features = ["release_max_level_info"] }
 mime_guess = "2.0"
 num_enum = "0.7"
 num-traits = "0.2"
-onceinit = "0.0.3"
+onceinit = "0.0.4"
 percent-encoding = "2.3"
 rand = "0.8"
 rxing = "0.6"
