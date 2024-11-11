@@ -136,8 +136,7 @@ impl LoginSolverTrait for LoginSolverWrapper<'_> {
             .read()
             .unwrap()
             .get(self.0)
-            .unwrap()
-            .is_logged_in(agent)
+            .is_some_and(|l| l.is_logged_in(agent))
     }
 
     fn login_enc(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error> {
@@ -146,7 +145,7 @@ impl LoginSolverTrait for LoginSolverWrapper<'_> {
             .read()
             .unwrap()
             .get(self.0)
-            .unwrap()
+            .ok_or_else(|| cxsign_error::Error::LoginError("不支持的登录协议！".to_string()))?
             .login_enc(account, enc_passwd)
     }
 }
