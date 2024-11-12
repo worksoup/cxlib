@@ -69,7 +69,7 @@ impl Session {
         enc_pwd: &str,
         login_solver: &LoginSolver,
     ) -> Result<(Agent, UserCookies), cxsign_error::Error> {
-        let agent = login_solver.login_enc(uname, enc_pwd)?;
+        let agent = login_solver.login_s(uname, enc_pwd)?;
         let cookies = UserCookies::new(&agent);
         Ok((agent, cookies))
     }

@@ -1,7 +1,7 @@
 use crate::store::{DataBase, DataBaseTableTrait};
 use cxsign_dir::Dir;
 use cxsign_error::Error;
-use cxsign_login::{DefaultLoginSolver, LoginSolverWrapper};
+use cxsign_login::{DefaultLoginSolver, LoginSolverTrait, LoginSolverWrapper};
 use cxsign_store::StorageTableCommandTrait;
 use cxsign_user::Session;
 use log::{info, warn};
@@ -259,10 +259,8 @@ impl AccountTable {
         login_type: String,
     ) -> Result<Session, cxsign_error::Error> {
         let pwd = pwd.ok_or(Error::LoginError("没有密码！".to_string()))?;
-        let pwd = pwd.as_bytes();
-        assert!(pwd.len() > 7);
-        assert!(pwd.len() < 17);
-        let enc_pwd = cxsign_login::utils::des_enc(pwd, b"u2oh6Vu^".to_owned());
+        let solver = LoginSolverWrapper::new(&login_type);
+        let enc_pwd = solver.pwd_enc(pwd)?;
         let session = Session::relogin(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;
         Self::add_account_or(
             db,
