@@ -1,5 +1,6 @@
 use crate::sign::utils::sign_unchecked_with_location;
 use crate::sign::{PreSignResult, RawSign, SignResult, SignTrait};
+use cxsign_sign::utils::PPTSignHelper;
 use cxsign_types::{Location, LocationWithRange};
 use cxsign_user::Session;
 use serde::{Deserialize, Serialize};
@@ -25,6 +26,17 @@ impl LocationSign {
     }
 }
 impl SignTrait for LocationSign {
+    type RuntimeData = Location;
+
+    fn sign_url(&self, session: &Session, data: &Location) -> PPTSignHelper {
+        cxsign_sign::protocol::location_sign_url(
+            session,
+            data,
+            self.raw_sign.active_id.as_str(),
+            self.preset_location.is_some(),
+        )
+    }
+
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }
@@ -35,23 +47,13 @@ impl SignTrait for LocationSign {
     ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
-            PreSignResult::Data(captcha_id) => {
-                let url_getter = |l: &Location| {
-                    cxsign_sign::protocol::location_sign_url(
-                        session,
-                        l,
-                        self.raw_sign.active_id.as_str(),
-                        self.preset_location.is_some(),
-                    )
-                };
-                sign_unchecked_with_location::<Self>(
-                    url_getter,
-                    &self.location,
-                    &self.preset_location,
-                    captcha_id.into_first(),
-                    session,
-                )
-            }
+            PreSignResult::Data(mut data) => sign_unchecked_with_location::<Self>(
+                self,
+                &self.location,
+                &self.preset_location,
+                data.remove_first(),
+                session,
+            ),
         }
     }
     fn pre_sign_and_sign(&self, session: &Session) -> Result<SignResult, cxsign_error::Error> {

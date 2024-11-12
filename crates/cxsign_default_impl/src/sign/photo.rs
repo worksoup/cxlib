@@ -1,4 +1,5 @@
 use crate::sign::{PreSignResult, RawSign, SignResult, SignTrait};
+use cxsign_sign::utils::{try_secondary_verification, PPTSignHelper};
 use cxsign_types::Photo;
 use cxsign_user::Session;
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,15 @@ impl PhotoSign {
     }
 }
 impl SignTrait for PhotoSign {
+    type RuntimeData = Photo;
+    fn sign_url(&self, session: &Session, runtime_data: &Photo) -> PPTSignHelper {
+        cxsign_sign::protocol::photo_sign_url(
+            session,
+            &self.as_inner().active_id,
+            runtime_data.get_object_id(),
+        )
+    }
+
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }
@@ -28,14 +38,10 @@ impl SignTrait for PhotoSign {
     ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
-            _ => {
+            PreSignResult::Data(mut data) => {
                 let photo = self.photo.as_ref().unwrap();
-                let r = cxsign_sign::protocol::photo_sign(
-                    session,
-                    self.raw_sign.active_id.as_str(),
-                    photo.get_object_id(),
-                )?;
-                Ok(Self::guess_sign_result_by_text(&r.into_string().unwrap()))
+                let url = self.sign_url(session, photo);
+                try_secondary_verification::<Self>(session, url, &data.remove_first())
             }
         }
     }

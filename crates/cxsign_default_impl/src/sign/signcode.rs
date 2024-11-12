@@ -1,4 +1,6 @@
 use crate::sign::{GestureOrSigncodeSignTrait, PreSignResult, RawSign, SignResult, SignTrait};
+use cxsign_sign::protocol::signcode_sign_url;
+use cxsign_sign::utils::PPTSignHelper;
 use cxsign_user::Session;
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +20,11 @@ impl SigncodeSign {
     }
 }
 impl SignTrait for SigncodeSign {
+    type RuntimeData = String;
+    fn sign_url(&self, session: &Session, runtime_data: &Self::RuntimeData) -> PPTSignHelper {
+        signcode_sign_url(session, &self.as_inner().active_id, runtime_data)
+    }
+
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }
@@ -32,9 +39,11 @@ impl SignTrait for SigncodeSign {
     ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
-            _ => Ok(self.sign_with_signcode(session, unsafe {
-                self.signcode.as_ref().unwrap_unchecked()
-            })?),
+            PreSignResult::Data(mut data) => Ok(self.sign_with_signcode(
+                session,
+                unsafe { self.signcode.as_ref().unwrap_unchecked() },
+                data.remove_first(),
+            )?),
         }
     }
 }

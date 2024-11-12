@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Dioption<T1, T2> {
     None,
     First(T1),
@@ -9,6 +10,38 @@ fn steal<T>(dest: &mut T) -> T {
     std::mem::replace(dest, zeroed)
 }
 impl<T1, T2> Dioption<T1, T2> {
+    pub fn remove_first(&mut self) -> Option<T1> {
+        match self {
+            Dioption::First(f) => {
+                let f = steal(f);
+                *self = Dioption::None;
+                Some(f)
+            }
+            Dioption::Both(f, s) => {
+                let f = steal(f);
+                let s = steal(s);
+                *self = Dioption::Second(s);
+                Some(f)
+            }
+            _ => None,
+        }
+    }
+    pub fn remove_second(&mut self) -> Option<T2> {
+        match self {
+            Dioption::Second(s) => {
+                let s = steal(s);
+                *self = Dioption::None;
+                Some(s)
+            }
+            Dioption::Both(f, s) => {
+                let f = steal(f);
+                let s = steal(s);
+                *self = Dioption::First(f);
+                Some(s)
+            }
+            _ => None,
+        }
+    }
     pub fn into_first(self) -> Option<T1> {
         match self {
             Dioption::First(f) => Some(f),
@@ -144,5 +177,16 @@ impl<T> Dioption<T, T> {
             }
             _ => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_dioption() {
+        let mut a = Dioption::Both(1, 2);
+        let b = a.remove_first();
+        println!("a: {a:?}, b: {b:?}");
     }
 }

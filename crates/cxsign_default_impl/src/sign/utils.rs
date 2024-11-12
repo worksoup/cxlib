@@ -1,15 +1,15 @@
 use crate::sign::CaptchaId;
 use cxsign_activity::RawSign;
 use cxsign_protocol::{ProtocolItem, ProtocolItemTrait};
+use cxsign_sign::utils::PPTSignHelper;
 use cxsign_sign::{SignResult, SignTrait};
 use cxsign_types::{Location, LocationWithRange};
 use cxsign_user::Session;
 use log::{debug, warn};
-use ureq::Response;
 
 pub fn secondary_verification(
     agent: &ureq::Agent,
-    url: String,
+    url: PPTSignHelper,
     captcha_id: &Option<CaptchaId>,
 ) -> Result<SignResult, cxsign_error::Error> {
     let captcha_id = if let Some(captcha_id) = captcha_id {
@@ -21,15 +21,15 @@ pub fn secondary_verification(
     };
     let url_param = cxsign_captcha::utils::captcha_solver(agent, captcha_id)?;
     let r = {
-        let url = url + "&validate=" + &url_param;
-        let r = ureq_get(agent, &url)?;
+        let url = url.with_validate(&url_param);
+        let r = url.get(agent)?;
         RawSign::guess_sign_result_by_text(&r.into_string().unwrap())
     };
     Ok(r)
 }
 
-pub fn sign_unchecked_with_location<T: SignTrait>(
-    url_getter: impl Fn(&Location) -> String,
+pub fn sign_unchecked_with_location<T: SignTrait<RuntimeData = Location>>(
+    sign: &T,
     location: &Location,
     preset_location: &Option<LocationWithRange>,
     captcha_id: Option<CaptchaId>,
@@ -51,8 +51,8 @@ pub fn sign_unchecked_with_location<T: SignTrait>(
         });
     }
     for location in locations {
-        let url = url_getter(&location);
-        let r = ureq_get(session, &url)?;
+        let url = sign.sign_url(session, &location);
+        let r = url.get(session)?;
         match T::guess_sign_result_by_text(&r.into_string().unwrap()) {
             SignResult::Susses => return Ok(SignResult::Susses),
             SignResult::Fail { msg } => {
@@ -61,7 +61,7 @@ pub fn sign_unchecked_with_location<T: SignTrait>(
                     let url = if msg.len() > 9 {
                         let enc2 = &msg[9..msg.len()];
                         debug!("enc2: {enc2:?}");
-                        url + "&enc2=" + enc2
+                        url.with_enc2(enc2)
                     } else {
                         url
                     };
@@ -79,7 +79,4 @@ pub fn sign_unchecked_with_location<T: SignTrait>(
     Ok(SignResult::Fail {
         msg: "所有位置均不可用。".to_string(),
     })
-}
-pub fn ureq_get(agent: &ureq::Agent, url: &str) -> Result<Response, Box<ureq::Error>> {
-    Ok(agent.get(url).call()?)
 }

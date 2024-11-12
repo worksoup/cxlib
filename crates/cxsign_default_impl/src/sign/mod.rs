@@ -14,13 +14,14 @@ pub use normal::*;
 pub use photo::*;
 pub use qrcode::*;
 pub use signcode::*;
-use std::collections::HashMap;
 
 use cxsign_activity::RawSign;
+use cxsign_sign::utils::{try_secondary_verification, PPTSignHelper};
 use cxsign_sign::{PreSignResult, SignDetail, SignResult, SignState, SignTrait};
-use cxsign_types::{Location, LocationWithRange};
+use cxsign_types::{Location, LocationWithRange, Photo, Triple};
 use cxsign_user::Session;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 pub type CaptchaId = String;
 
@@ -43,6 +44,20 @@ pub enum Sign {
     Unknown(RawSign),
 }
 impl SignTrait for Sign {
+    type RuntimeData = Triple<Photo, Location, String>;
+
+    fn sign_url(&self, session: &Session, data: &Self::RuntimeData) -> PPTSignHelper {
+        match self {
+            Sign::Photo(a) => a.sign_url(session, data.first().unwrap()),
+            Sign::Normal(a) => a.sign_url(session, &()),
+            Sign::QrCode(a) => a.sign_url(session, data.second().unwrap()),
+            Sign::Gesture(a) => a.sign_url(session, data.last().unwrap()),
+            Sign::Location(a) => a.sign_url(session, data.second().unwrap()),
+            Sign::Signcode(a) => a.sign_url(session, data.last().unwrap()),
+            Sign::Unknown(a) => a.sign_url(session, &()),
+        }
+    }
+
     fn as_inner(&self) -> &RawSign {
         match self {
             Sign::Photo(a) => a.as_inner(),
@@ -222,19 +237,16 @@ impl Sign {
 /// 为手势签到和签到码签到实现的一个特型，方便复用代码。
 ///
 /// 这两种签到除签到码格式以外没有任何不同之处。
-pub trait GestureOrSigncodeSignTrait: SignTrait {
+pub trait GestureOrSigncodeSignTrait: SignTrait<RuntimeData = String> + Sized {
     fn sign_with_signcode(
         &self,
         session: &Session,
-        signcode: &str,
+        signcode: &String,
+        captcha_id: Option<CaptchaId>,
     ) -> Result<SignResult, cxsign_error::Error> {
         if Self::check_signcode(session, &self.as_inner().active_id, signcode)? {
-            let r = cxsign_sign::protocol::signcode_sign(
-                session,
-                self.as_inner().active_id.as_str(),
-                signcode,
-            )?;
-            Ok(Self::guess_sign_result_by_text(&r.into_string().unwrap()))
+            let url = self.sign_url(session, signcode);
+            try_secondary_verification::<Self>(session, url, &captcha_id)
         } else {
             Ok(SignResult::Fail {
                 msg: "签到码或手势不正确".into(),
@@ -268,6 +280,6 @@ impl GestureOrSigncodeSignTrait for GestureSign {
 
 impl GestureOrSigncodeSignTrait for SigncodeSign {
     fn set_signcode(&mut self, signcode: String) {
-        SigncodeSign::set_signcode(self, signcode)
+        self.set_signcode(signcode)
     }
 }

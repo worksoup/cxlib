@@ -1,11 +1,13 @@
 use log::info;
 use std::ops::Add;
 
+use crate::protocol::general_sign_url;
+use crate::utils::{try_secondary_verification, PPTSignHelper};
 use cxsign_activity::RawSign;
+use cxsign_captcha::CaptchaId;
 use cxsign_types::{Course, Dioption, LocationWithRange};
 use cxsign_user::Session;
 use serde::Deserialize;
-use cxsign_captcha::CaptchaId;
 
 pub mod protocol;
 pub mod utils;
@@ -27,6 +29,8 @@ pub mod utils;
 ///
 /// 细节详见各签到的文档。
 pub trait SignTrait: Ord {
+    type RuntimeData;
+    fn sign_url(&self, session: &Session, runtime_data: &Self::RuntimeData) -> PPTSignHelper;
     /// 获取各签到类型内部对原始签到类型的引用。
     /// [`RawSign`] 的各字段均为 `pub`,
     /// 故可以通过本函数获取一些签到通用的信息。
@@ -117,6 +121,12 @@ pub trait SignTrait: Ord {
 }
 
 impl SignTrait for RawSign {
+    type RuntimeData = ();
+
+    fn sign_url(&self, session: &Session, _: &()) -> PPTSignHelper {
+        general_sign_url(session, &self.active_id)
+    }
+
     fn as_inner(&self) -> &RawSign {
         self
     }
@@ -135,9 +145,9 @@ impl SignTrait for RawSign {
     ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
-            _ => {
-                let r = protocol::general_sign(session, self.active_id.as_str())?;
-                Ok(Self::guess_sign_result_by_text(&r.into_string().unwrap()))
+            PreSignResult::Data(mut data) => {
+                let url = self.sign_url(session, &());
+                try_secondary_verification::<Self>(session, url, &data.remove_first())
             }
         }
     }

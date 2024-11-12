@@ -1,28 +1,11 @@
 use crate::sign::utils::sign_unchecked_with_location;
-use crate::sign::{CaptchaId, LocationSign, PreSignResult, RawSign, SignResult, SignTrait};
-use cxsign_types::{Location, LocationWithRange};
+use crate::sign::{LocationSign, PreSignResult, RawSign, SignResult, SignTrait};
+use cxsign_sign::utils::PPTSignHelper;
+use cxsign_types::Location;
 use cxsign_user::Session;
 use log::info;
 use serde::{Deserialize, Serialize};
 
-fn sign_unchecked<T: SignTrait>(
-    sign: &T,
-    enc: &str,
-    location: &Location,
-    preset_location: &Option<LocationWithRange>,
-    captcha_id: Option<CaptchaId>,
-    session: &Session,
-) -> Result<SignResult, cxsign_error::Error> {
-    let url_getter = |l: &Location| {
-        cxsign_sign::protocol::qrcode_sign_url(
-            session,
-            enc,
-            sign.as_inner().active_id.as_str(),
-            Some(l),
-        )
-    };
-    sign_unchecked_with_location::<T>(url_getter, location, preset_location, captcha_id, session)
-}
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct QrCodeSign {
     pub(crate) is_refresh: bool,
@@ -45,6 +28,18 @@ impl QrCodeSign {
     }
 }
 impl SignTrait for QrCodeSign {
+    type RuntimeData = Location;
+
+    fn sign_url(&self, session: &Session, runtime_data: &Location) -> PPTSignHelper {
+        let enc = unsafe { self.enc.as_ref().unwrap_unchecked() };
+        cxsign_sign::protocol::qrcode_sign_url(
+            session,
+            enc,
+            self.as_inner().active_id.as_str(),
+            Some(runtime_data),
+        )
+    }
+
     fn as_inner(&self) -> &RawSign {
         self.raw_sign.as_inner()
     }
@@ -74,17 +69,13 @@ impl SignTrait for QrCodeSign {
     ) -> Result<SignResult, cxsign_error::Error> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
-            PreSignResult::Data(captcha_id) => {
-                let enc = unsafe { self.enc.as_ref().unwrap_unchecked() };
-                sign_unchecked::<QrCodeSign>(
-                    self,
-                    enc,
-                    &self.raw_sign.location,
-                    &self.raw_sign.preset_location,
-                    captcha_id.into_first(),
-                    session,
-                )
-            }
+            PreSignResult::Data(mut data) => sign_unchecked_with_location::<QrCodeSign>(
+                self,
+                &self.raw_sign.location,
+                &self.raw_sign.preset_location,
+                data.remove_first(),
+                session,
+            ),
         }
     }
 }
