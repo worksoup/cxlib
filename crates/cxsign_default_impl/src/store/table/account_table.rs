@@ -194,7 +194,7 @@ impl AccountTable {
                 &[
                     (":uid", account.uid().into()),
                     (":uname", account.uname().into()),
-                    (":pwd", account.enc_pwd().into()),
+                    (":enc_pwd", account.enc_pwd().into()),
                     (":login_type", account.login_type().into()),
                 ][..],
             )
