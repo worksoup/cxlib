@@ -112,14 +112,14 @@ impl AccountTable {
         let accounts = Self::get_accounts(db).into_iter().collect::<Vec<_>>();
         let mut s = HashMap::new();
         for account in accounts {
-            if Self::has_account(db, &account.uname) {
+            if Self::has_account(db, &account.uid) {
                 if let Ok(session) = Session::load_cookies_or_relogin(
                     account.uname(),
                     account.uid(),
                     account.enc_pwd(),
                     &LoginSolverWrapper::new(account.login_type()),
                 ) {
-                    s.insert(account.uname.clone(), session);
+                    s.insert(account.uid.clone(), session);
                 } else {
                     warn!("账号加载失败：[`{}`]，跳过。", account.uname);
                 }
