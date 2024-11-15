@@ -15,22 +15,35 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+/// # Activity
+///
+/// 活动类型，是一个枚举，可能是一个[暂未被分类的课程签到](RawSign)，也可能是[其他活动](OtherActivity)，如通知、作业等。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Activity {
     RawSign(RawSign),
     Other(OtherActivity),
 }
+/// # CourseExcludeInfoTrait
+/// 课程排除列表特型。在获取[活动](Activity)列表时排除部分课程的活动，以此提高加载速度。
 pub trait CourseExcludeInfoTrait {
-    fn has_exclude(&self, id: i64) -> bool;
-
+    /// 课程是否被排除，参数为课程 ID.
+    fn is_excluded(&self, id: i64) -> bool;
+    /// 获取所有被排除的课程的 ID
     fn get_excludes(&self) -> Vec<i64>;
-
-    fn add_exclude(&self, id: i64);
-    fn delete_exclude(&self, id: i64);
-
+    /// 排除某课程，参数为课程 ID.
+    fn exclude(&self, id: i64);
+    /// 取消对某课程的排除，参数为课程 ID.
+    fn disable_exclude(&self, id: i64);
+    /// 更新排除列表，参数为课程 ID 的列表。
+    /// 在默认实现中，该函数会完全删除旧数据，并更新为新数据。
     fn update_excludes(&self, excludes: &[i64]);
 }
 impl Activity {
+    /// 获取指定的**单个**课程的活动，并决定是否将该课程加入到排除列表中。
+    ///
+    /// 具体逻辑为：若该课程在 160 天内无任何活动，则排除该课程，否则取消排除。
+    ///
+    /// 另见：[`CourseExcludeInfoTrait`].
     pub fn get_course_activities(
         table: &impl CourseExcludeInfoTrait,
         session: &Session,
@@ -46,14 +59,23 @@ impl Activity {
             }
         }
         let id = course.get_id();
-        let excluded = table.has_exclude(id);
+        let excluded = table.is_excluded(id);
         if dont_exclude && excluded {
-            table.delete_exclude(id);
+            table.disable_exclude(id);
         } else if !dont_exclude && !excluded {
-            table.add_exclude(id);
+            table.exclude(id);
         }
         Ok(activities)
     }
+    /// 获取指定课程集合的活动，并决定是否将这些课程加入到排除列表中。
+    ///
+    /// 当 `set_excludes` 为 `true` 时，该函数会获取所有这些课程的活动，并根据结果改变排除列表。
+    ///
+    /// 具体逻辑参见 [`Activity::get_course_activities`].
+    ///
+    /// 反之，则会根据排除列表排除部分课程，以此提高获取速度。
+    ///
+    /// 另见：[`CourseExcludeInfoTrait`].
     fn get_activities(
         table: &impl CourseExcludeInfoTrait,
         set_excludes: bool,
@@ -127,6 +149,15 @@ impl Activity {
         }
         Ok(valid_signs)
     }
+    /// 获取所有的活动。
+    ///
+    /// 当 `set_excludes` 为 `true` 时，该函数会获取所有活动，并根据结果改变排除列表。
+    ///
+    /// 具体逻辑参见 [`Activity::get_course_activities`].
+    ///
+    /// 反之，则会根据排除列表排除部分课程，以此提高获取速度。
+    ///
+    /// 另见：[`CourseExcludeInfoTrait`].
     pub fn get_all_activities<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         table: &impl CourseExcludeInfoTrait,
         sessions: Sessions,
@@ -197,6 +228,9 @@ impl Activity {
     }
 }
 
+/// # OtherActivity
+///
+/// 除课程签到外的其他活动，如通知、作业等。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct OtherActivity {
     pub id: String,
@@ -206,6 +240,11 @@ pub struct OtherActivity {
     pub start_time_mills: u64,
 }
 
+/// # ActivityRaw
+///
+/// 未分类的活动类型，仅用于内部反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
 #[derive(Deserialize, Serialize, Clone)]
 struct ActivityRaw {
     #[serde(rename = "nameOne")]
@@ -217,13 +256,17 @@ struct ActivityRaw {
     #[serde(rename = "startTime")]
     start_time_mills: u64,
 }
-
+/// 内部类型，用于反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
 #[derive(Deserialize, Serialize)]
 struct Data {
     #[serde(rename = "activeList")]
     active_list: Vec<ActivityRaw>,
 }
-
+/// 内部类型，用于反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
 #[derive(Deserialize, Serialize)]
 struct GetActivityR {
     data: Option<Data>,

@@ -3,6 +3,11 @@ use cxsign_utils::get_width_str_should_be;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
+/// # RawSign
+///
+/// 未分类的课程签到。
+///
+/// 对于该类型的分类、处理等，请参考 `cxsign_default_impl::sign` 中的相关部分。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct RawSign {
     pub start_time_mills: u64,

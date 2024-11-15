@@ -78,7 +78,7 @@ impl Default for DataBase {
     }
 }
 impl CourseExcludeInfoTrait for DataBase {
-    fn has_exclude(&self, id: i64) -> bool {
+    fn is_excluded(&self, id: i64) -> bool {
         ExcludeTable::has_exclude(self, id)
     }
 
@@ -86,11 +86,11 @@ impl CourseExcludeInfoTrait for DataBase {
         ExcludeTable::get_excludes(self)
     }
 
-    fn add_exclude(&self, id: i64) {
+    fn exclude(&self, id: i64) {
         ExcludeTable::add_exclude(self, id)
     }
 
-    fn delete_exclude(&self, id: i64) {
+    fn disable_exclude(&self, id: i64) {
         ExcludeTable::delete_exclude(self, id)
     }
 

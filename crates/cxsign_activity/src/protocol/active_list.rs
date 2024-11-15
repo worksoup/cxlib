@@ -3,7 +3,7 @@ use cxsign_types::Course;
 use log::debug;
 use ureq::{Agent, Response};
 
-// 查询活动
+/// 查询课程活动。
 pub fn active_list(client: &Agent, course: Course) -> Result<Response, Box<ureq::Error>> {
     let time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
