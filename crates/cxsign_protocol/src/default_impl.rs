@@ -299,8 +299,6 @@ where
                     OpenOptions::new()
                         .read(true)
                         .write(true)
-                        .create(false)
-                        .truncate(true)
                         .open(protocol_config_path.as_path())
                         .ok()
                 } else {
@@ -363,7 +361,8 @@ where
     ///
     /// 在设置协议出错时返回 [`SetProtocolError`](cxsign_error::Error::SetProtocolError).
     pub fn init() -> Result<(), cxsign_error::Error> {
-        let protocol_config_path = cxsign_dir::Dir::get_config_file_path(ProtocolItem::config_file_name());
+        let protocol_config_path =
+            cxsign_dir::Dir::get_config_file_path(ProtocolItem::config_file_name());
         let protocol = CXProtocol::<ProtocolData>::load(&protocol_config_path)?;
         ProtocolItem::set_boxed_protocol(Box::new(protocol))
             .map_err(|_| cxsign_error::Error::SetProtocolError)
