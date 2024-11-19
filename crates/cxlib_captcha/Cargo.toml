@@ -1,0 +1,16 @@
+[package]
+name = "cxlib_captcha"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+cxlib_error = { path = "../cxlib_error" }
+cxlib_imageproc = { path = "../cxlib_imageproc" }
+cxlib_obfuscate = { path = "../cxlib_obfuscate" }
+cxlib_protocol = { path = "../cxlib_protocol" }
+hex.workspace = true
+log.workspace = true
+rand.workspace = true
+ureq = { workspace = true, features = ["cookies", "json"] }
+serde = { workspace = true, features = ["derive"] }

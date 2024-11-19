@@ -1,0 +1,14 @@
+[package]
+name = "cxlib_obfuscate"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+#syn = "*"
+quote = "*"
+proc-macro2 = "*"
+cxlib_utils = { path = "../cxlib_utils" }

@@ -1,0 +1,19 @@
+[package]
+name = "cxlib_types"
+version.workspace = true
+authors.workspace = true
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cxlib_dir = { path = "../cxlib_dir" }
+cxlib_error = { path = "../cxlib_error" }
+cxlib_pan = { path = "../cxlib_pan" }
+cxlib_protocol = { path = "../cxlib_protocol" }
+cxlib_user = { path = "../cxlib_user" }
+log.workspace = true
+onceinit.workspace = true
+rand.workspace = true
+serde = { workspace = true, features = ["derive"] }
+ureq = { workspace = true, features = ["cookies", "json"] }

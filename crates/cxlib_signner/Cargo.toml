@@ -1,0 +1,12 @@
+[package]
+name = "cxlib_signner"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+cxlib_activity = { path = "../cxlib_activity" }
+cxlib_error = { path = "../cxlib_error" }
+cxlib_sign = { path = "../cxlib_sign" }
+cxlib_types = { path = "../cxlib_types" }
+cxlib_user = { path = "../cxlib_user" }

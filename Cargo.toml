@@ -1,5 +1,5 @@
 [package]
-name = "cxsign"
+name = "cxlib"
 edition = "2021"
 version.workspace = true
 authors.workspace = true
@@ -43,7 +43,7 @@ ureq = "2.10"
 xcap = { version = "0.0.14" }
 
 [dependencies]
-cxsign_internal = { path = "crates/cxsign_internal" }
+cxlib_internal = { path = "crates/cxlib_internal" }
 
 #chrono = "0.4"
 #clap = { version = "4.5", features = ["derive"] }

@@ -1,9 +1,0 @@
-[package]
-name = "cxsign_dir"
-edition = "2021"
-version.workspace = true
-authors.workspace = true
-
-[dependencies]
-onceinit.workspace = true
-directories.workspace = true

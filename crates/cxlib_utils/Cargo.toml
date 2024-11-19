@@ -1,0 +1,12 @@
+[package]
+name = "cxlib_utils"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+chrono.workspace = true
+inquire.workspace = true
+flate2.workspace = true
+log.workspace = true
+unicode-width.workspace = true

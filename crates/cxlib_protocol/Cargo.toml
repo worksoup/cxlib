@@ -1,0 +1,13 @@
+[package]
+name = "cxlib_protocol"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+cxlib_dir = { path = "../cxlib_dir" }
+cxlib_error = { path = "../cxlib_error" }
+onceinit.workspace = true
+log.workspace = true
+serde = { workspace = true, features = ["derive"] }
+toml.workspace = true
