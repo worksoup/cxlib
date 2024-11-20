@@ -10,7 +10,7 @@ cxlib_error = { path = "../cxlib_error" }
 cxlib_protocol = { path = "../cxlib_protocol" }
 #cxlib_store = { path = "../cxlib_store" }
 cxlib_user = { path = "../cxlib_user" }
-cxlib_utils = { path = "../cxlib_utils" }
+cxlib_utils = { path = "../cxlib_utils", features = ["date_time", "unicode_width_impl"] }
 log.workspace = true
 percent-encoding.workspace = true
 serde = { workspace = true, features = ["derive"] }

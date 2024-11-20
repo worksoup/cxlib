@@ -8,6 +8,21 @@ use std::collections::HashMap;
 pub fn is_enc_qrcode_url(url: &str) -> bool {
     url.contains(&*ProtocolItem::QrcodePat.to_string()) && url.contains("&enc=")
 }
+pub fn find_qrcode_sign_enc_in_url(url: &str) -> Option<String> {
+    // 在二维码图片中会有一个参数 `c`, 二维码预签到时需要。
+    // 但是该参数似乎暂时可以从 `signDetail` 接口获取到。所以此处先注释掉。
+    // let beg = r.find("&c=").unwrap();
+    // let c = &r[beg + 3..beg + 9];
+    // (c.to_owned(), enc.to_owned())
+    // 有时二维码里没有参数，原因不明。
+    let r = url
+        .find("&enc=")
+        .map(|beg| url[beg + 5..beg + 37].to_owned());
+    if r.is_none() {
+        warn!("{url:?}中没有找到二维码！")
+    }
+    r
+}
 pub fn scan_qrcode(
     image: image::DynamicImage,
     hints: &mut rxing::DecodingHintDictionary,
@@ -90,10 +105,10 @@ pub fn capture_screen_for_enc(is_refresh: bool, precise: bool) -> Option<String>
                     .unwrap_or_else(|e| panic!("{e:?}"));
                 let cut_pic = cxlib_imageproc::cut_picture(&pic, qrcode_pos_on_screen.0, qrcode_pos_on_screen.1);
                 let r = scan_qrcode(cut_pic.to_image().into(), &mut HashMap::new()).unwrap_or_else(|e| panic!("{e:?}"));
-                cxlib_utils::find_qrcode_sign_enc_in_url(r[0].getText())
+                find_qrcode_sign_enc_in_url(r[0].getText())
             } else {
                 // 如果不是精确截取的二维码，则不需要提示。
-                cxlib_utils::find_qrcode_sign_enc_in_url(url)
+                find_qrcode_sign_enc_in_url(url)
             };
         }
     }

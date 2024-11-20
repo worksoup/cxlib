@@ -2,6 +2,7 @@ use crate::sign::QrCodeSign;
 use cxlib_error::Error;
 use cxlib_utils::*;
 use std::path::PathBuf;
+use cxlib_qrcode_utils::find_qrcode_sign_enc_in_url;
 
 pub fn enc_gen(
     sign: &QrCodeSign,

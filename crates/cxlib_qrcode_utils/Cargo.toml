@@ -7,7 +7,7 @@ authors.workspace = true
 [dependencies]
 cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_protocol = { path = "../cxlib_protocol" }
-cxlib_utils = { path = "../cxlib_utils" }
+cxlib_utils = { path = "../cxlib_utils", features = ["inquire_impl"] }
 image.workspace = true
 log.workspace = true
 rxing.workspace = true

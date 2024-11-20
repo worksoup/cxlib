@@ -6,9 +6,9 @@ use std::collections::HashMap;
 use std::ops::{Deref, Index};
 use std::sync::{Arc, RwLock};
 use ureq::{Agent, AgentBuilder};
+use cxlib_utils::des_enc;
 
 pub mod protocol;
-pub mod utils;
 pub trait LoginSolverTrait: Send + Sync {
     fn login_type(&self) -> &str;
     fn is_logged_in(&self, agent: &Agent) -> bool;
@@ -89,7 +89,7 @@ impl LoginSolverTrait for DefaultLoginSolver {
     fn pwd_enc(&self, pwd: String) -> Result<String, Error> {
         let pwd = pwd.as_bytes();
         if (8..=16).contains(&pwd.len()) {
-            Ok(utils::des_enc(pwd, b"u2oh6Vu^".to_owned()))
+            Ok(des_enc(pwd, b"u2oh6Vu^".to_owned()))
         } else {
             Err(Error::EncError("密码长度不规范".to_string()))
         }
