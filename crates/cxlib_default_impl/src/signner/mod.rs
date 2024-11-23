@@ -39,10 +39,13 @@ pub trait LocationInfoGetterTrait {
         })
     }
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location>;
-    fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Location {
+    fn get_locations(
+        &self,
+        sign: &LocationSign,
+        location_str: &Option<String>,
+    ) -> Option<Location> {
         self.get_location_or_else(location_str, || self.get_preset_location(sign))
             .or_else(|| self.get_fallback_location(sign))
-            .unwrap_or_else(Location::get_none_location)
     }
 }
 
@@ -81,8 +84,6 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
             })
     }
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location> {
-        LocationTable::get_location_list_by_course(self.0, sign.as_inner().course.get_id())
-            .pop()
-            .or_else(|| LocationTable::get_location_list_by_course(self.0, -1).pop())
+        LocationTable::get_location_list_by_course(self.0, sign.as_inner().course.get_id()).pop()
     }
 }

@@ -147,7 +147,7 @@ impl SignTrait for RawSign {
             PreSignResult::Susses => Ok(SignResult::Susses),
             PreSignResult::Data(mut data) => {
                 let url = self.sign_url(session, &());
-                try_secondary_verification::<Self>(session, url, &data.remove_first())
+                try_secondary_verification::<Self>(session, url, &data.take_first())
             }
         }
     }

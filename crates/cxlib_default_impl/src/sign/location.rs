@@ -51,7 +51,7 @@ impl SignTrait for LocationSign {
                 self,
                 &self.location,
                 &self.preset_location,
-                data.remove_first(),
+                data.take_first(),
                 session,
             ),
         }

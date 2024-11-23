@@ -108,12 +108,12 @@ mod crypto {
     pub use des_impl::*;
     mod des_impl {
         #[cfg(feature = "des_impl")]
+        use crate::pkcs7_pad;
+        #[cfg(feature = "des_impl")]
         use des::{
             cipher::{generic_array::GenericArray, BlockEncrypt as _, KeyInit as _},
             Des,
         };
-        #[cfg(feature = "des_impl")]
-        use crate::pkcs7_pad;
 
         #[cfg(feature = "des_impl")]
         pub fn des_enc(data: &[u8], key: [u8; 8]) -> String {
@@ -151,7 +151,6 @@ mod crypto {
         }
     }
 }
-
 #[cfg(test)]
 mod test {
     #[test]

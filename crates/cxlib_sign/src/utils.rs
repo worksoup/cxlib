@@ -25,15 +25,14 @@ pub fn analysis_after_presign(
             return Ok(PreSignResult::Susses);
         }
     }
-    let mut captcha_id_and_location = Dioption::None;
-    if let Some(location) = LocationWithRange::find_in_html(&html) {
-        captcha_id_and_location.push_second(location);
-    }
-    if let Some(captcha_id) = find_captcha(session, &html) {
-        captcha_id_and_location.push_first(captcha_id);
-    }
+    let captcha_id_and_location = Dioption::from((
+        find_captcha(session, &html),
+        LocationWithRange::find_in_html(&html),
+    ));
     let response_of_analysis = protocol::analysis(session, active_id)?;
-    let data = response_of_analysis.into_string().unwrap();
+    let data = response_of_analysis
+        .into_string()
+        .expect("Convert response of analysis into String failed.");
     let code = {
         let start_of_code = data.find("code='+'").unwrap() + 8;
         let data = &data[start_of_code..data.len()];
@@ -44,8 +43,11 @@ pub fn analysis_after_presign(
     let _response_of_analysis2 = protocol::analysis2(session, code)?;
     debug!(
         "analysis 结果：{}",
-        _response_of_analysis2.into_string().unwrap()
+        _response_of_analysis2
+            .into_string()
+            .expect("Convert response of analysis2 into String failed.")
     );
+    // 防止行为检测导致失败。
     std::thread::sleep(std::time::Duration::from_millis(500));
     Ok(PreSignResult::Data(captcha_id_and_location))
 }

@@ -49,10 +49,11 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
         let location = self
             .location_info_getter
             .get_locations(sign.as_location_sign_mut(), self.location_str);
-        if location == Location::get_none_location() {
+        if let Some(location) = location {
+            sign.set_location(location);
+        } else {
             warn!("未获取到位置信息，请检查位置列表或检查输入。");
         }
-        sign.set_location(location);
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         let enc = crate::utils::enc_gen(sign, self.path, self.enc, self.precisely)?;
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]

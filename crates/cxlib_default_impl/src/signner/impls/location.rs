@@ -3,7 +3,6 @@ use crate::signner::LocationInfoGetterTrait;
 use cxlib_error::Error;
 use cxlib_sign::{SignResult, SignTrait};
 use cxlib_signner::SignnerTrait;
-use cxlib_types::Location;
 use cxlib_user::Session;
 use log::error;
 use std::collections::HashMap;
@@ -31,11 +30,11 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationS
     ) -> Result<HashMap<&'b Session, SignResult>, Error> {
         let location = self
             .location_info_getter
-            .get_locations(sign, self.location_str);
-        if location == Location::get_none_location() {
-            error!("未获取到位置信息，请检查位置列表或检查输入。");
-            return Err(Error::LocationError);
-        }
+            .get_locations(sign, self.location_str)
+            .ok_or_else(|| {
+                error!("未获取到位置信息，请检查位置列表或检查输入。");
+                Error::LocationError
+            })?;
         sign.set_location(location.clone());
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();

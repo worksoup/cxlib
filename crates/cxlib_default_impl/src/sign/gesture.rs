@@ -53,7 +53,7 @@ impl SignTrait for GestureSign {
             PreSignResult::Data(mut data) => self.sign_with_signcode(
                 session,
                 unsafe { self.gesture.as_ref().unwrap_unchecked() },
-                data.remove_first(),
+                data.take_first(),
             ),
         }
     }

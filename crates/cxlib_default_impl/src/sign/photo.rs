@@ -41,7 +41,7 @@ impl SignTrait for PhotoSign {
             PreSignResult::Data(mut data) => {
                 let photo = self.photo.as_ref().unwrap();
                 let url = self.sign_url(session, photo);
-                try_secondary_verification::<Self>(session, url, &data.remove_first())
+                try_secondary_verification::<Self>(session, url, &data.take_first())
             }
         }
     }

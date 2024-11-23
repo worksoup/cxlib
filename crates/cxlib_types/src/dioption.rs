@@ -1,89 +1,91 @@
 #[derive(Debug)]
-pub enum Dioption<T1, T2> {
-    None,
-    First(T1),
-    Second(T2),
-    Both(T1, T2),
+pub struct Dioption<T1, T2> {
+    first: Option<T1>,
+    second: Option<T2>,
 }
-fn steal<T>(dest: &mut T) -> T {
-    let zeroed = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-    std::mem::replace(dest, zeroed)
+impl<T1, T2> From<(Option<T1>, Option<T2>)> for Dioption<T1, T2> {
+    fn from(v: (Option<T1>, Option<T2>)) -> Self {
+        Self::from_tuple(v)
+    }
 }
 impl<T1, T2> Dioption<T1, T2> {
-    pub fn remove_first(&mut self) -> Option<T1> {
-        match self {
-            Dioption::First(f) => {
-                let f = steal(f);
-                *self = Dioption::None;
-                Some(f)
-            }
-            Dioption::Both(f, s) => {
-                let f = steal(f);
-                let s = steal(s);
-                *self = Dioption::Second(s);
-                Some(f)
-            }
-            _ => None,
+    pub fn new_none() -> Self {
+        Self {
+            first: None,
+            second: None,
         }
     }
-    pub fn remove_second(&mut self) -> Option<T2> {
-        match self {
-            Dioption::Second(s) => {
-                let s = steal(s);
-                *self = Dioption::None;
-                Some(s)
-            }
-            Dioption::Both(f, s) => {
-                let f = steal(f);
-                let s = steal(s);
-                *self = Dioption::First(f);
-                Some(s)
-            }
-            _ => None,
+    pub fn new_first(f: T1) -> Self {
+        Self {
+            first: Some(f),
+            second: None,
         }
+    }
+    pub fn new_second(s: T2) -> Self {
+        Self {
+            first: None,
+            second: Some(s),
+        }
+    }
+    pub fn new_both(f: T1, s: T2) -> Self {
+        Self {
+            first: Some(f),
+            second: Some(s),
+        }
+    }
+    pub fn into_tuple(self) -> (Option<T1>, Option<T2>) {
+        (self.first, self.second)
+    }
+    pub fn from_tuple((first, second): (Option<T1>, Option<T2>)) -> Self {
+        Self { first, second }
+    }
+    pub fn take_first(&mut self) -> Option<T1> {
+        self.first.take()
+    }
+    pub fn take_second(&mut self) -> Option<T2> {
+        self.second.take()
     }
     pub fn into_first(self) -> Option<T1> {
-        match self {
-            Dioption::First(f) => Some(f),
-            Dioption::Both(f, _) => Some(f),
-            _ => None,
-        }
+        self.first
     }
     pub fn into_second(self) -> Option<T2> {
-        match self {
-            Dioption::Second(s) => Some(s),
-            Dioption::Both(_, s) => Some(s),
-            _ => None,
-        }
+        self.second
     }
     pub fn into_both(self) -> Option<(T1, T2)> {
-        match self {
-            Dioption::Both(f, s) => Some((f, s)),
-            _ => None,
+        if let Self {
+            first: Some(first),
+            second: Some(second),
+        } = self
+        {
+            Some((first, second))
+        } else {
+            None
         }
     }
     pub fn first(&self) -> Option<&T1> {
-        match self {
-            Dioption::First(f) => Some(f),
-            Dioption::Both(f, _) => Some(f),
-            _ => None,
-        }
+        self.first.as_ref()
     }
     pub fn second(&self) -> Option<&T2> {
-        match self {
-            Dioption::Second(s) => Some(s),
-            Dioption::Both(_, s) => Some(s),
-            _ => None,
-        }
+        self.second.as_ref()
     }
     pub fn both(&self) -> Option<(&T1, &T2)> {
-        match self {
-            Dioption::Both(f, s) => Some((f, s)),
-            _ => None,
+        if let (Some(first), Some(second)) = (self.first.as_ref(), self.second.as_ref()) {
+            Some((first, second))
+        } else {
+            None
         }
     }
     pub fn is_both(&self) -> bool {
-        matches!(self, Dioption::Both(_, _))
+        self.first.is_some() && self.second.is_some()
+    }
+    pub fn is_none(&self) -> bool {
+        self.first.is_some() && self.second.is_some()
+    }
+    pub fn has_first(&self) -> bool {
+        self.first.is_some()
+    }
+    pub fn has_second(&self) -> bool {
+        self.second.is_some()
     }
     pub fn map<B1, B2, FF, SF>(self, mut ff: FF, mut sf: SF) -> Dioption<B1, B2>
     where
@@ -91,12 +93,9 @@ impl<T1, T2> Dioption<T1, T2> {
         FF: FnMut(T1) -> B1,
         SF: FnMut(T2) -> B2,
     {
-        match self {
-            Dioption::First(f) => Dioption::First(ff(f)),
-            Dioption::Second(s) => Dioption::Second(sf(s)),
-            Dioption::Both(f, s) => Dioption::Both(ff(f), sf(s)),
-            Dioption::None => Dioption::None,
-        }
+        let first = self.first.map(&mut ff);
+        let second = self.second.map(&mut sf);
+        Dioption { first, second }
     }
     pub fn map_first<B, FF>(self, ff: FF) -> Dioption<B, T2>
     where
@@ -113,69 +112,39 @@ impl<T1, T2> Dioption<T1, T2> {
         self.map(|f| f, f)
     }
     pub fn push_first(&mut self, value: T1) -> bool {
-        match self {
-            Dioption::None => {
-                *self = Dioption::First(value);
-                true
-            }
-            Dioption::Second(s) => {
-                *self = Dioption::Both(value, steal(s));
-                true
-            }
-            _ => false,
+        if self.first.is_none() {
+            self.first = Some(value);
+            true
+        } else {
+            false
         }
     }
     pub fn push_second(&mut self, value: T2) -> bool {
-        match self {
-            Dioption::None => {
-                *self = Dioption::Second(value);
-                true
-            }
-            Dioption::First(f) => {
-                *self = Dioption::Both(steal(f), value);
-                true
-            }
-            _ => false,
+        if self.second.is_none() {
+            self.second = Some(value);
+            true
+        } else {
+            false
         }
     }
     pub fn set_first(&mut self, value: T1) {
-        match self {
-            Dioption::None | Dioption::First(_) => {
-                *self = Dioption::First(value);
-            }
-            Dioption::Second(s) | Dioption::Both(_, s) => {
-                *self = Dioption::Both(value, steal(s));
-            }
-        }
+        self.first = Some(value);
     }
     pub fn set_second(&mut self, value: T2) {
-        match self {
-            Dioption::None | Dioption::Second(_) => {
-                *self = Dioption::Second(value);
-            }
-            Dioption::First(f) | Dioption::Both(f, _) => {
-                *self = Dioption::Both(steal(f), value);
-            }
-        }
+        self.second = Some(value);
     }
 }
 
 impl<T> Dioption<T, T> {
     pub fn push(&mut self, value: T) -> bool {
-        match self {
-            Dioption::None => {
-                *self = Dioption::First(value);
-                true
-            }
-            Dioption::First(f) => {
-                *self = Dioption::Both(steal(f), value);
-                true
-            }
-            Dioption::Second(f) => {
-                *self = Dioption::Both(value, steal(f));
-                true
-            }
-            _ => false,
+        if !self.has_first() {
+            self.first = Some(value);
+            true
+        } else if !self.has_second() {
+            self.second = Some(value);
+            true
+        } else {
+            false
         }
     }
 }
@@ -185,8 +154,8 @@ mod tests {
     use super::*;
     #[test]
     fn test_dioption() {
-        let mut a = Dioption::Both(1, 2);
-        let b = a.remove_first();
+        let mut a = Dioption::new_both(1, 2);
+        let b = a.take_first();
         println!("a: {a:?}, b: {b:?}");
     }
 }

@@ -11,11 +11,12 @@ cxlib_captcha = { path = "../cxlib_captcha" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_protocol = { path = "../cxlib_protocol" }
 #cxlib_store = { path = "../cxlib_store" }
+cxlib_types = { path = "../cxlib_types" }
 cxlib_user = { path = "../cxlib_user" }
 cxlib_utils = { path = "../cxlib_utils" }
 log.workspace = true
 num_enum.workspace = true
 percent-encoding.workspace = true
 serde = { workspace = true, features = ["derive"] }
-cxlib_types = { path = "../cxlib_types" }
+#terrors = "0.3"
 ureq = { workspace = true, features = ["cookies", "json"] }

@@ -73,7 +73,7 @@ impl SignTrait for QrCodeSign {
                 self,
                 &self.raw_sign.location,
                 &self.raw_sign.preset_location,
-                data.remove_first(),
+                data.take_first(),
                 session,
             ),
         }

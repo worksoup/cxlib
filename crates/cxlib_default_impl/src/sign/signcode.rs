@@ -42,7 +42,7 @@ impl SignTrait for SigncodeSign {
             PreSignResult::Data(mut data) => Ok(self.sign_with_signcode(
                 session,
                 unsafe { self.signcode.as_ref().unwrap_unchecked() },
-                data.remove_first(),
+                data.take_first(),
             )?),
         }
     }
