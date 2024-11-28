@@ -89,12 +89,12 @@ impl FromStr for AccountData {
     }
 }
 impl AccountTable {
-    pub fn get_sessions_by_accounts_str(db: &DataBase, accounts: &str) -> HashMap<String, Session> {
-        let str_list = accounts.split(',').map(|a| a.trim()).collect::<Vec<&str>>();
+    pub fn get_sessions_by_uid_list_str(db: &DataBase, uid_list_str: &str) -> HashMap<String, Session> {
+        let str_list = uid_list_str.split(',').map(|a| a.trim()).collect::<Vec<&str>>();
         let mut s = HashMap::new();
-        for account in str_list {
-            if let Some(session) = Self::get_session(db, account) {
-                s.insert(account.to_string(), session);
+        for uid in str_list {
+            if let Some(session) = Self::get_session(db, uid) {
+                s.insert(uid.to_string(), session);
             }
         }
         s
