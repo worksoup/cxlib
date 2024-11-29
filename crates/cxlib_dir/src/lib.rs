@@ -11,6 +11,12 @@ pub struct AppInfo {
     application: &'static str,
 }
 impl AppInfo {
+    const DEFAULT_CONFIG_DIR_INFO: AppInfo = AppInfo {
+        env_arg: "TEST_CXSIGN",
+        qualifier: "up.workso",
+        organization: "Worksoup",
+        application: "cxsign",
+    };
     pub fn env_arg(&self) -> &'static str {
         self.env_arg
     }
@@ -23,19 +29,16 @@ impl AppInfo {
     pub fn application(&self) -> &'static str {
         self.application
     }
-}
-static DEFAULT_CONFIG_DIR_INFO: AppInfo = AppInfo {
-    env_arg: "TEST_CXSIGN",
-    qualifier: "up.workso",
-    organization: "Worksoup",
-    application: "cxsign",
-};
-impl StaticDefault for AppInfo {
-    fn static_default() -> &'static Self {
-        &DEFAULT_CONFIG_DIR_INFO
+    pub fn get_instance() -> &'static AppInfo {
+        &APP_INFO
     }
 }
-static CONFIG_DIR_INFO: OnceInit<AppInfo> = OnceInit::new();
+impl StaticDefault for AppInfo {
+    fn static_default() -> &'static Self {
+        &AppInfo::DEFAULT_CONFIG_DIR_INFO
+    }
+}
+static APP_INFO: OnceInit<AppInfo> = OnceInit::new();
 
 static CONFIG_DIR: OnceInit<Dir> = OnceInit::new();
 
@@ -69,7 +72,7 @@ impl Dir {
             organization,
             application,
         });
-        let _ = CONFIG_DIR_INFO.set_boxed_data(data);
+        let _ = APP_INFO.set_boxed_data(data);
     }
     fn set_default_config_dir() {
         let AppInfo {
@@ -77,7 +80,7 @@ impl Dir {
             qualifier,
             organization,
             application,
-        } = { CONFIG_DIR_INFO.deref().to_owned() };
+        } = { APP_INFO.deref().to_owned() };
         let is_testing = std::env::var(env_arg).is_ok();
         let binding = directories::ProjectDirs::from(qualifier, organization, application).unwrap();
         let base_dir = if is_testing {
