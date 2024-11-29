@@ -4,24 +4,38 @@ use onceinit::{OnceInit, OnceInitState, StaticDefault};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
-struct ConfigDirInfo {
+pub struct AppInfo {
     env_arg: &'static str,
     qualifier: &'static str,
     organization: &'static str,
     application: &'static str,
 }
-static DEFAULT_CONFIG_DIR_INFO: ConfigDirInfo = ConfigDirInfo {
+impl AppInfo {
+    pub fn env_arg(&self) -> &'static str {
+        self.env_arg
+    }
+    pub fn qualifier(&self) -> &'static str {
+        self.qualifier
+    }
+    pub fn organization(&self) -> &'static str {
+        self.organization
+    }
+    pub fn application(&self) -> &'static str {
+        self.application
+    }
+}
+static DEFAULT_CONFIG_DIR_INFO: AppInfo = AppInfo {
     env_arg: "TEST_CXSIGN",
     qualifier: "up.workso",
     organization: "Worksoup",
     application: "cxsign",
 };
-impl StaticDefault for ConfigDirInfo {
+impl StaticDefault for AppInfo {
     fn static_default() -> &'static Self {
         &DEFAULT_CONFIG_DIR_INFO
     }
 }
-static CONFIG_DIR_INFO: OnceInit<ConfigDirInfo> = OnceInit::new();
+static CONFIG_DIR_INFO: OnceInit<AppInfo> = OnceInit::new();
 
 static CONFIG_DIR: OnceInit<Dir> = OnceInit::new();
 
@@ -49,7 +63,7 @@ impl Dir {
         organization: &'static str,
         application: &'static str,
     ) {
-        let data = Box::new(ConfigDirInfo {
+        let data = Box::new(AppInfo {
             env_arg,
             qualifier,
             organization,
@@ -58,7 +72,7 @@ impl Dir {
         let _ = CONFIG_DIR_INFO.set_boxed_data(data);
     }
     fn set_default_config_dir() {
-        let ConfigDirInfo {
+        let AppInfo {
             env_arg,
             qualifier,
             organization,
