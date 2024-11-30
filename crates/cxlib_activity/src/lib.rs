@@ -1,8 +1,3 @@
-#![feature(let_chains)]
-#![feature(map_try_insert)]
-#![allow(incomplete_features)]
-#![feature(inherent_associated_types)]
-
 pub mod protocol;
 mod raw;
 
