@@ -17,7 +17,7 @@ impl DefaultPhotoSignner {
         let path = path.as_ref().and_then(|pic| {
             std::fs::metadata(pic).ok().and_then(|metadata| {
                 if metadata.is_dir() {
-                    crate::utils::pic_dir_or_path_to_pic_path(pic).unwrap_or(None)
+                    crate::utils::pic_dir_or_path_to_pic_path(pic).ok()
                 } else {
                     Some(pic.to_owned())
                 }

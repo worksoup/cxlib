@@ -5,11 +5,12 @@ use std::path::PathBuf;
 
 fn pic_to_enc(pic: &PathBuf) -> Result<String, Error> {
     if std::fs::metadata(pic).expect("图片路径出错。").is_dir() {
-        pic_dir_or_path_to_pic_path(pic)?
-            .and_then(|pic| pic_path_to_qrcode_result(pic.to_str().unwrap()))
-            .ok_or_else(|| {
-                Error::EncError("图片文件夹下没有图片（`png` 或 `jpg` 文件）！".to_owned())
-            })
+        let pic = pic_dir_or_path_to_pic_path(pic)?;
+        pic_path_to_qrcode_result(pic.to_str().unwrap()).ok_or_else(|| {
+            Error::EncError(
+                "未能识别到二维码，可能是二维码模糊、过小等，请确保图片易于识别。".to_owned(),
+            )
+        })
     } else if let Some(enc) = pic_path_to_qrcode_result(pic.to_str().unwrap()) {
         Ok(enc)
     } else {
@@ -49,7 +50,7 @@ pub fn enc_gen(
     };
     Ok(enc)
 }
-pub fn pic_dir_or_path_to_pic_path(pic_dir: &PathBuf) -> Result<Option<PathBuf>, std::io::Error> {
+pub fn pic_dir_or_path_to_pic_path(pic_dir: &PathBuf) -> Result<PathBuf, Error> {
     loop {
         let yes = inquire_confirm("二维码图片是否就绪？", "本程序会读取 `--pic` 参数所指定的路径下最新修改的图片。你可以趁现在获取这张图片，然后按下回车进行签到。");
         if yes {
@@ -58,23 +59,26 @@ pub fn pic_dir_or_path_to_pic_path(pic_dir: &PathBuf) -> Result<Option<PathBuf>,
     }
     let pic_path = {
         let pic_dir = std::fs::read_dir(pic_dir)?;
-        let mut all_files_in_dir = Vec::new();
-        for k in pic_dir {
-            let k = k?;
-            let file_type = k.file_type()?;
-            if file_type.is_file() && {
-                let file_name = k.file_name();
-                file_name.to_str().is_some_and(|file_name| {
-                    file_name
-                        .split('.')
-                        .last()
-                        .is_some_and(|file_ext| file_ext == "png" || file_ext == "jpg")
+        let mut all_files_in_dir = pic_dir
+            .filter_map(|entry| {
+                entry.ok().and_then(|entry| {
+                    let file_type = entry.file_type().ok()?;
+                    if file_type.is_file() && {
+                        let file_name = entry.file_name();
+                        file_name.to_str().is_some_and(|file_name| {
+                            file_name
+                                .split('.')
+                                .last()
+                                .is_some_and(|file_ext| file_ext == "png" || file_ext == "jpg")
+                        })
+                    } {
+                        Some(entry)
+                    } else {
+                        None
+                    }
                 })
-            } {
-                all_files_in_dir.push(k);
-            }
-        }
-
+            })
+            .collect::<Vec<_>>();
         all_files_in_dir.sort_by(|a, b| {
             b.metadata()
                 .unwrap()
@@ -82,7 +86,9 @@ pub fn pic_dir_or_path_to_pic_path(pic_dir: &PathBuf) -> Result<Option<PathBuf>,
                 .unwrap()
                 .cmp(&a.metadata().unwrap().modified().unwrap())
         });
-        all_files_in_dir.first().map(|d| d.path())
+        all_files_in_dir.first().map(|d| d.path()).ok_or_else(|| {
+            Error::EncError("图片文件夹下没有图片（`png` 或 `jpg` 文件）！".to_owned())
+        })?
     };
     Ok(pic_path)
 }
