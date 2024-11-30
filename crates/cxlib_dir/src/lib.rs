@@ -1,5 +1,3 @@
-#![feature(sync_unsafe_cell)]
-
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};

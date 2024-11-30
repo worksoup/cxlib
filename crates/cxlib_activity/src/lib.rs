@@ -1,8 +1,3 @@
-#![feature(let_chains)]
-#![feature(map_try_insert)]
-#![allow(incomplete_features)]
-#![feature(inherent_associated_types)]
-
 pub mod protocol;
 mod raw;
 
@@ -190,12 +185,11 @@ impl Activity {
                     let c = c.clone();
                     let activities = activities.clone();
                     let handle = std::thread::spawn(move || {
-                        if let Some(other_id) = ar.other_id
-                            && {
-                                let other_id_i64: i64 = other_id.parse().unwrap();
-                                (0..=5).contains(&other_id_i64)
-                            }
-                        {
+                        if ar.other_id.as_ref().is_some_and(|oid| {
+                            let other_id_i64: i64 = oid.parse().unwrap();
+                            (0..=5).contains(&other_id_i64)
+                        }) {
+                            let other_id = unsafe { ar.other_id.unwrap_unchecked() };
                             let active_id = ar.id.to_string();
                             let base_sign = RawSign {
                                 active_id,

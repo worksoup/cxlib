@@ -3,31 +3,32 @@ use cxlib_qrcode_utils::find_qrcode_sign_enc_in_url;
 use cxlib_utils::*;
 use std::path::PathBuf;
 
+fn pic_to_enc(pic: &PathBuf) -> Result<String, Error> {
+    if std::fs::metadata(pic).expect("图片路径出错。").is_dir() {
+        pic_dir_or_path_to_pic_path(pic)?
+            .and_then(|pic| pic_path_to_qrcode_result(pic.to_str().unwrap()))
+            .ok_or_else(|| {
+                Error::EncError("图片文件夹下没有图片（`png` 或 `jpg` 文件）！".to_owned())
+            })
+    } else if let Some(enc) = pic_path_to_qrcode_result(pic.to_str().unwrap()) {
+        Ok(enc)
+    } else {
+        return Err(Error::EncError("二维码中没有 `enc` 参数！".to_owned()));
+    }
+}
+
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn enc_gen(path: &Option<PathBuf>, enc: &Option<String>) -> Result<String, Error> {
     let enc = if let Some(enc) = enc {
         enc.clone()
     } else if let Some(pic) = path {
-        if std::fs::metadata(pic).unwrap().is_dir() {
-            if let Some(pic) = crate::utils::pic_dir_or_path_to_pic_path(pic)?
-                && let Some(enc) = crate::utils::pic_path_to_qrcode_result(pic.to_str().unwrap())
-            {
-                enc
-            } else {
-                return Err(Error::EncError(
-                    "图片文件夹下没有图片（`png` 或 `jpg` 文件）！".to_owned(),
-                ));
-            }
-        } else if let Some(enc) = crate::utils::pic_path_to_qrcode_result(pic.to_str().unwrap()) {
-            enc
-        } else {
-            return Err(Error::EncError("二维码中没有 `enc` 参数！".to_owned()));
-        }
+        pic_to_enc(pic)?
     } else {
         return Err(Error::EncError("未获取到 `enc` 参数！".to_owned()));
     };
     Ok(enc)
 }
+
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 pub fn enc_gen(
     sign: &crate::sign::QrCodeSign,
@@ -38,21 +39,7 @@ pub fn enc_gen(
     let enc = if let Some(enc) = enc {
         enc.clone()
     } else if let Some(pic) = path {
-        if std::fs::metadata(pic).unwrap().is_dir() {
-            if let Some(pic) = pic_dir_or_path_to_pic_path(pic)?
-                && let Some(enc) = pic_path_to_qrcode_result(pic.to_str().unwrap())
-            {
-                enc
-            } else {
-                return Err(Error::EncError(
-                    "图片文件夹下没有图片（`png` 或 `jpg` 文件）！".to_owned(),
-                ));
-            }
-        } else if let Some(enc) = pic_path_to_qrcode_result(pic.to_str().unwrap()) {
-            enc
-        } else {
-            return Err(Error::EncError("二维码中没有 `enc` 参数！".to_owned()));
-        }
+        pic_to_enc(pic)?
     } else if let Some(enc) =
         cxlib_qrcode_utils::capture_screen_for_enc(sign.is_refresh(), precisely)
     {

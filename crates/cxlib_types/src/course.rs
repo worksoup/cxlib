@@ -2,10 +2,11 @@ use crate::protocol;
 use cxlib_user::Session;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::OccupiedError;
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::ops::Deref;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fmt::Display,
+    ops::Deref,
+};
 use ureq::serde_json;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -31,7 +32,7 @@ impl Course {
     pub fn get_courses<'a, Sessions: Iterator<Item = &'a Session>>(
         sessions: Sessions,
     ) -> Result<HashMap<Course, Vec<Session>>, cxlib_error::Error> {
-        let mut courses = HashMap::new();
+        let mut courses = HashMap::<_, Vec<_>>::new();
         for session in sessions {
             let courses_ = Course::get_session_courses(session).unwrap_or_else(|e| {
                 warn!(
@@ -41,12 +42,14 @@ impl Course {
                 Default::default()
             });
             for course in courses_ {
-                if let Err(OccupiedError {
-                    mut entry,
-                    value: _,
-                }) = courses.try_insert(course, vec![session.clone()])
-                {
-                    entry.get_mut().push(session.clone());
+                let entry = courses.entry(course);
+                match entry {
+                    Entry::Occupied(mut entry) => {
+                        entry.get_mut().push(session.clone());
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(vec![session.clone()]);
+                    }
                 }
             }
         }
