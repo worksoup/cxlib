@@ -56,7 +56,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         let enc = crate::utils::enc_gen(sign, self.path, self.enc, self.precisely)?;
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-        let enc = crate::utils::enc_gen(sign, self.path, self.enc)?;
+        let enc = crate::utils::enc_gen(self.path, self.enc)?;
         sign.set_enc(enc);
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
