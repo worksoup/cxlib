@@ -14,17 +14,15 @@ pub struct DefaultPhotoSignner {
 
 impl DefaultPhotoSignner {
     pub fn new(path: &Option<PathBuf>) -> Self {
-        let path = if let Some(pic) = path
-            && let Ok(metadata) = std::fs::metadata(pic)
-        {
-            if metadata.is_dir() {
-                crate::utils::pic_dir_or_path_to_pic_path(pic).unwrap_or(None)
-            } else {
-                Some(pic.to_owned())
-            }
-        } else {
-            None
-        };
+        let path = path.as_ref().and_then(|pic| {
+            std::fs::metadata(pic).ok().and_then(|metadata| {
+                if metadata.is_dir() {
+                    crate::utils::pic_dir_or_path_to_pic_path(pic).unwrap_or(None)
+                } else {
+                    Some(pic.to_owned())
+                }
+            })
+        });
         Self { path }
     }
 }

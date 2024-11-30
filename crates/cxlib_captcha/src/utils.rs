@@ -67,10 +67,7 @@ pub fn auto_solve_captcha(
     Ok(v)
 }
 
-pub fn captcha_solver(
-    agent: &ureq::Agent,
-    captcha_id: &str,
-) -> Result<String, cxlib_error::Error> {
+pub fn captcha_solver(agent: &ureq::Agent, captcha_id: &str) -> Result<String, cxlib_error::Error> {
     let time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -97,16 +94,18 @@ pub fn find_captcha(client: &ureq::Agent, presign_html: &str) -> Option<CaptchaI
         let id = &presign_html[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
         debug!("captcha_id: {id}");
         Some(id.to_string())
-    } else if let Ok(js) =
-        crate::protocol::my_sign_captcha_utils(client).map(|r| r.into_string().unwrap())
-        && let Some(start_of_captcha_id) = js.find("captchaId: '")
-    {
-        debug!("start_of_captcha_id: {start_of_captcha_id}");
-        let id = &js[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
-        debug!("captcha_id: {id}");
-        Some(id.to_string())
     } else {
-        None
+        crate::protocol::my_sign_captcha_utils(client)
+            .ok()
+            .and_then(|r| {
+                let js = r.into_string().unwrap();
+                js.find("captchaId: '").map(|start_of_captcha_id| {
+                    debug!("start_of_captcha_id: {start_of_captcha_id}");
+                    let id = &js[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
+                    debug!("captcha_id: {id}");
+                    id.to_string()
+                })
+            })
     }
 }
 
