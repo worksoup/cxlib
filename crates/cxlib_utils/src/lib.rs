@@ -85,6 +85,25 @@ mod date_time {
     }
 }
 pub use crypto::*;
+#[inline(always)]
+pub fn time_it<R, F: FnOnce() -> R>(f: F) -> (R, u128) {
+    #[cfg(debug_assertions)]
+    {
+        let start = std::time::Instant::now();
+        let r = f();
+        let elapsed = start.elapsed();
+        (r, elapsed.as_millis())
+    }
+}
+#[inline(always)]
+pub fn print_timed_result<T>(result: (T, u128)) -> T {
+    #[cfg(debug_assertions)]
+    {
+        println!("cost {}ms.", result.1);
+        result.0
+    }
+}
+
 mod crypto {
     #[cfg(feature = "pkcs7_pad")]
     pub fn pkcs7_pad<const BLOCK_SIZE: usize>(data: &[u8]) -> Vec<[u8; BLOCK_SIZE]> {

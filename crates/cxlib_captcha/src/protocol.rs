@@ -67,7 +67,11 @@ pub fn check_captcha(
         format_args!("type={}", captcha_type),
         "coordinate=%5B%5D",
         VERSION_PARAM,
-        "runEnv=10",
+        // WEB = 10
+        // ANDROID = 20
+        // IOS = 30
+        // MINIPROGRAM = 40
+        "runEnv=20",
     );
     let get = agent
         .get(&url)

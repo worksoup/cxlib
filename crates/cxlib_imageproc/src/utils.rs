@@ -1,7 +1,7 @@
-use crate::map::{map_colors, map_colors2};
+use crate::map::map_colors;
 use image::{
-    buffer::ConvertBuffer, DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer,
-    Luma, LumaA, Pixel, Primitive, Rgba, SubImage,
+    DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, Luma, LumaA, Pixel,
+    Primitive, Rgba, SubImage,
 };
 use imageproc::contours::find_contours;
 pub use imageproc::point::Point;
@@ -192,42 +192,108 @@ pub fn download_image(
     let img = image_from_bytes(v);
     Ok(img)
 }
-pub fn find_max_ncc(
-    big_image: SubImage<&DynamicImage>,
-    small_image: SubImage<&DynamicImage>,
-) -> u32 {
-    let mask = rgb_alpha_channel(&small_image.to_image());
-    let mask_mean = *image_mean(&mask, &[]).last().expect("No image mean");
-    let mask = mask
-        .iter()
-        .map(|p| (*p as f64) >= mask_mean)
-        .collect::<Vec<_>>();
-    let mean = image_mean(&*small_image, &mask);
-    let small_image: GrayImage = small_image.to_image().convert();
-    let small_image = map_colors(&small_image, |p| Luma([p[0] as f64 - mean[0]]));
-    let mut max_ncc = 0.0;
-    let mut max_x = 0;
-    let big_image: GrayImage = big_image.to_image().convert();
-    for x in 0..big_image.width() - small_image.width() {
-        let window = cut_picture(
-            &big_image,
-            Point { x, y: 0 },
-            Point {
-                x: small_image.width(),
-                y: small_image.height(),
-            },
-        );
-        let window_mean = image_mean(&*window, &mask);
-        let window = map_colors(&*window, |p| Luma([p[0] as f64 - window_mean[0]]));
-        let a = map_colors2(&window, &small_image, |w, t| Luma([w[0] * t[0]]));
-        let b = map_colors(&window, |w| Luma([w[0] * w[0]]));
-        let ncc = image_sum(&a, &mask).0[0] / image_sum(&b, &mask).0[0];
-        if ncc > max_ncc {
-            max_x = x;
-            max_ncc = ncc;
+pub mod slide_solvers {
+    use crate::map::{map_colors, map_colors2};
+    use crate::{cut_picture, image_mean, image_sum, rgb_alpha_channel};
+    use image::{buffer::ConvertBuffer, DynamicImage, GrayImage, Luma, SubImage};
+    use imageproc::definitions::Image;
+    use imageproc::point::Point;
+    use imageproc::template_matching::{
+        find_extremes, match_template_with_mask_parallel, MatchTemplateMethod,
+    };
+    pub fn find_max_ncc(
+        big_image: SubImage<&DynamicImage>,
+        small_image: SubImage<&DynamicImage>,
+    ) -> u32 {
+        let mask = rgb_alpha_channel(&small_image.to_image());
+        let mask_mean = *image_mean(&mask, &[]).last().expect("No image mean");
+        let mask = mask
+            .iter()
+            .map(|p| (*p as f64) >= mask_mean)
+            .collect::<Vec<_>>();
+        let mean = image_mean(&*small_image, &mask);
+        let small_image: GrayImage = small_image.to_image().convert();
+        let small_image = map_colors(&small_image, |p| Luma([p[0] as f64 - mean[0]]));
+        let mut max_ncc = 0.0;
+        let mut max_x = 0;
+        let big_image: GrayImage = big_image.to_image().convert();
+        for x in 0..big_image.width() - small_image.width() {
+            let window = cut_picture(
+                &big_image,
+                Point { x, y: 0 },
+                Point {
+                    x: small_image.width(),
+                    y: small_image.height(),
+                },
+            );
+            let window_mean = image_mean(&*window, &mask);
+            let window = map_colors(&*window, |p| Luma([p[0] as f64 - window_mean[0]]));
+            let a = map_colors2(&window, &small_image, |w, t| Luma([w[0] * t[0]]));
+            let b = map_colors(&window, |w| Luma([w[0] * w[0]]));
+            let ncc = image_sum(&a, &mask).0[0] / image_sum(&b, &mask).0[0];
+            if ncc > max_ncc {
+                max_x = x;
+                max_ncc = ncc;
+            }
         }
+        max_x
     }
-    max_x
+    /// 目前的最优解。
+    pub fn find_min_sum_of_squared_errors(
+        big_image: SubImage<&DynamicImage>,
+        small_image: SubImage<&DynamicImage>,
+    ) -> u32 {
+        let image = imageproc_match(
+            big_image,
+            small_image,
+            MatchTemplateMethod::SumOfSquaredErrors,
+        );
+        find_extremes(&image).min_value_location.0
+    }
+    pub fn find_min_sum_of_squared_errors_normalized(
+        big_image: SubImage<&DynamicImage>,
+        small_image: SubImage<&DynamicImage>,
+    ) -> u32 {
+        let image = imageproc_match(
+            big_image,
+            small_image,
+            MatchTemplateMethod::SumOfSquaredErrorsNormalized,
+        );
+        find_extremes(&image).min_value_location.0
+    }
+    pub fn find_max_cross_correlation(
+        big_image: SubImage<&DynamicImage>,
+        small_image: SubImage<&DynamicImage>,
+    ) -> u32 {
+        let image = imageproc_match(
+            big_image,
+            small_image,
+            MatchTemplateMethod::CrossCorrelation,
+        );
+        find_extremes(&image).max_value_location.0
+    }
+    pub fn find_max_cross_correlation_normalized(
+        big_image: SubImage<&DynamicImage>,
+        small_image: SubImage<&DynamicImage>,
+    ) -> u32 {
+        let image = imageproc_match(
+            big_image,
+            small_image,
+            MatchTemplateMethod::CrossCorrelationNormalized,
+        );
+        find_extremes(&image).max_value_location.0
+    }
+    pub fn imageproc_match(
+        big_image: SubImage<&DynamicImage>,
+        small_image: SubImage<&DynamicImage>,
+        method: MatchTemplateMethod,
+    ) -> Image<Luma<f32>> {
+        let big_image: GrayImage = big_image.to_image().convert();
+        let small_image = small_image.to_image();
+        let mask = rgb_alpha_channel(&small_image);
+        let template = small_image.convert();
+        match_template_with_mask_parallel(&big_image, &template, method, &mask)
+    }
 }
 pub fn find_sub_image<F: Fn(SubImage<&DynamicImage>, SubImage<&DynamicImage>) -> u32>(
     big_image: &DynamicImage,

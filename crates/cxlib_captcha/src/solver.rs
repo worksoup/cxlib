@@ -1,5 +1,6 @@
 use cxlib_error::Error;
-use cxlib_imageproc::{find_max_ncc, find_sub_image, Point};
+use cxlib_imageproc::{find_sub_image, Point};
+use cxlib_utils::{print_timed_result, time_it};
 use image::DynamicImage;
 use log::debug;
 use onceinit::{OnceInit, OnceInitError};
@@ -165,8 +166,16 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
         let big_img = cxlib_imageproc::download_image(agent, &self.big_img_url, referer)?;
         Ok((big_img, small_img))
     }
-    fn default_solver(input: (DynamicImage, DynamicImage)) -> std::result::Result<u32, Error> {
-        Ok(find_sub_image(&input.0, &input.1, find_max_ncc))
+    fn default_solver(
+        (big_image, small_image): (DynamicImage, DynamicImage),
+    ) -> std::result::Result<u32, Error> {
+        print_timed_result(time_it(move || {
+            Ok(find_sub_image(
+                &big_image,
+                &small_image,
+                cxlib_imageproc::slide_solvers::find_min_sum_of_squared_errors,
+            ))
+        }))
     }
     fn static_solver_holder() -> &'static OnceInit<SlideSolverRaw> {
         &SLIDE_SOLVER
