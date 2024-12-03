@@ -20,7 +20,7 @@ impl SigncodeSign {
     }
 }
 impl SignTrait for SigncodeSign {
-    type RuntimeData = String;
+    type RuntimeData = str;
     fn sign_url(&self, session: &Session, runtime_data: &Self::RuntimeData) -> PPTSignHelper {
         signcode_sign_url(session, &self.as_inner().active_id, runtime_data)
     }

@@ -1,7 +1,6 @@
 use crate::{protocol, PreSignResult, SignResult, SignTrait};
 use cxlib_activity::RawSign;
-use cxlib_captcha::utils::find_captcha;
-use cxlib_captcha::CaptchaId;
+use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
 use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Dioption, LocationWithRange};
 use cxlib_user::Session;
@@ -12,9 +11,11 @@ use ureq::{Agent, Response};
 pub fn analysis_after_presign(
     active_id: &str,
     session: &Session,
-    response_of_presign: ureq::Response,
+    response_of_presign: Response,
 ) -> Result<PreSignResult, cxlib_error::Error> {
-    let html = response_of_presign.into_string().unwrap();
+    let html = response_of_presign
+        .into_string()
+        .unwrap_or_else(cxlib_error::log_panic);
     trace!("预签到请求结果：{html}");
     if let Some(start_of_statuscontent_h1) = html.find("id=\"statuscontent\"") {
         let html = &html[start_of_statuscontent_h1 + 19..];
@@ -71,6 +72,15 @@ impl PPTSignHelper {
         self.url += validate;
         self
     }
+    pub fn path_enc_by_pre_sign_result_msg(self, msg: String) -> Self {
+        if msg.len() > 9 {
+            let enc2 = &msg[9..msg.len()];
+            debug!("enc2: {enc2:?}");
+            self.with_enc2(enc2)
+        } else {
+            self
+        }
+    }
 }
 impl Deref for PPTSignHelper {
     type Target = str;
@@ -90,42 +100,43 @@ impl From<String> for PPTSignHelper {
         Self { url: s }
     }
 }
-
+pub fn secondary_verification(
+    agent: &Agent,
+    url: PPTSignHelper,
+    captcha_id: &Option<CaptchaId>,
+) -> Result<SignResult, cxlib_error::Error> {
+    let captcha_id = if let Some(captcha_id) = captcha_id {
+        ProtocolItem::CaptchaId.update(captcha_id);
+        captcha_id
+    } else {
+        warn!("未找到 CaptchaId, 使用内建值。");
+        &ProtocolItem::CaptchaId.to_string()
+    };
+    let url_param = DEFAULT_CAPTCHA_TYPE.solve_captcha(agent, captcha_id, url.url())?;
+    let r = {
+        let url = url.with_validate(&url_param);
+        let r = url.get(agent)?;
+        RawSign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic))
+    };
+    Ok(r)
+}
 pub fn try_secondary_verification<Sign: SignTrait>(
-    agent: &ureq::Agent,
+    agent: &Agent,
     url: PPTSignHelper,
     captcha_id: &Option<CaptchaId>,
 ) -> Result<SignResult, cxlib_error::Error> {
     let r = url.get(agent)?;
-    match Sign::guess_sign_result_by_text(&r.into_string().unwrap()) {
+    match Sign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic))
+    {
         SignResult::Fail { msg } => {
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。
-                let url = if msg.len() > 9 {
-                    let enc2 = &msg[9..msg.len()];
-                    debug!("enc2: {enc2:?}");
-                    url.with_enc2(enc2)
-                } else {
-                    url
-                };
-                let captcha_id = if let Some(captcha_id) = captcha_id {
-                    ProtocolItem::CaptchaId.update(captcha_id);
-                    captcha_id
-                } else {
-                    warn!("未找到滑块 ID, 使用内建值。");
-                    &ProtocolItem::CaptchaId.to_string()
-                };
-                let url_param = cxlib_captcha::utils::captcha_solver(agent, captcha_id)?;
-                let r = {
-                    let url = url.with_validate(&url_param);
-                    let r = url.get(agent)?;
-                    RawSign::guess_sign_result_by_text(&r.into_string().unwrap())
-                };
-                Ok(r)
+                let url = url.path_enc_by_pre_sign_result_msg(msg);
+                secondary_verification(agent, url, captcha_id)
             } else {
                 Ok(SignResult::Fail { msg })
             }
         }
-        susses => Ok(susses),
+        success => Ok(success),
     }
 }

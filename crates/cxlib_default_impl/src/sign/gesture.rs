@@ -31,9 +31,9 @@ impl GestureSign {
     }
 }
 impl SignTrait for GestureSign {
-    type RuntimeData = String;
+    type RuntimeData = str;
 
-    fn sign_url(&self, session: &Session, data: &String) -> PPTSignHelper {
+    fn sign_url(&self, session: &Session, data: &str) -> PPTSignHelper {
         signcode_sign_url(session, &self.as_inner().active_id, data)
     }
 

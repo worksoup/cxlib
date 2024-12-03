@@ -151,6 +151,13 @@ mod crypto {
         }
     }
 }
+pub use url_encode::*;
+mod url_encode {
+    #[cfg(feature = "percent-encoding")]
+    pub fn url_encode(input: &str) -> String {
+        percent_encoding::utf8_percent_encode(input, percent_encoding::NON_ALPHANUMERIC).to_string()
+    }
+}
 #[cfg(test)]
 mod test {
     #[test]

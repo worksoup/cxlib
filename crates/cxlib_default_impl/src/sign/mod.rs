@@ -237,11 +237,11 @@ impl Sign {
 /// 为手势签到和签到码签到实现的一个特型，方便复用代码。
 ///
 /// 这两种签到除签到码格式以外没有任何不同之处。
-pub trait GestureOrSigncodeSignTrait: SignTrait<RuntimeData = String> + Sized {
+pub trait GestureOrSigncodeSignTrait: SignTrait<RuntimeData = str> + Sized {
     fn sign_with_signcode(
         &self,
         session: &Session,
-        signcode: &String,
+        signcode: &str,
         captcha_id: Option<CaptchaId>,
     ) -> Result<SignResult, cxlib_error::Error> {
         if Self::check_signcode(session, &self.as_inner().active_id, signcode)? {

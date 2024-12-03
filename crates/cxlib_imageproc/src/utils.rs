@@ -3,10 +3,10 @@ use image::{
     buffer::ConvertBuffer, DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer,
     Luma, LumaA, Pixel, Primitive, Rgba, SubImage,
 };
+use imageproc::contours::find_contours;
 pub use imageproc::point::Point;
 use num_traits::ToPrimitive;
 use std::ops::Add;
-use imageproc::contours::find_contours;
 
 pub type Image<P> = ImageBuffer<P, Vec<<P as Pixel>::Subpixel>>;
 pub fn get_rect_contains_vertex<T: Primitive, V: Iterator<Item = Point<T>>>(
@@ -179,10 +179,12 @@ pub fn image_from_bytes(bytes: Vec<u8>) -> DynamicImage {
 pub fn download_image(
     agent: &ureq::Agent,
     image_url: &str,
+    referer: &str,
 ) -> Result<DynamicImage, Box<ureq::Error>> {
     let mut v = Vec::new();
     agent
         .get(image_url)
+        .set("Referer", referer)
         .call()?
         .into_reader()
         .read_to_end(&mut v)

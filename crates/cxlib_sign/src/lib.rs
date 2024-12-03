@@ -29,7 +29,7 @@ pub mod utils;
 ///
 /// 细节详见各签到的文档。
 pub trait SignTrait: Ord {
-    type RuntimeData;
+    type RuntimeData: ?Sized;
     fn sign_url(&self, session: &Session, runtime_data: &Self::RuntimeData) -> PPTSignHelper;
     /// 获取各签到类型内部对原始签到类型的引用。
     /// [`RawSign`] 的各字段均为 `pub`,
@@ -62,7 +62,7 @@ pub trait SignTrait: Ord {
         }
         let Data {
             data: Status { status },
-        } = r.into_json().unwrap();
+        } = r.into_json().unwrap_or_else(cxlib_error::log_panic);
         Ok(status.into())
     }
     /// 通过签到结果的字符串判断签到结果如何。

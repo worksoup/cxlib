@@ -1,32 +1,9 @@
 use crate::sign::CaptchaId;
-use cxlib_activity::RawSign;
-use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
-use cxlib_sign::utils::PPTSignHelper;
+use cxlib_sign::utils::secondary_verification;
 use cxlib_sign::{SignResult, SignTrait};
 use cxlib_types::{Location, LocationWithRange};
 use cxlib_user::Session;
-use log::{debug, warn};
-
-pub fn secondary_verification(
-    agent: &ureq::Agent,
-    url: PPTSignHelper,
-    captcha_id: &Option<CaptchaId>,
-) -> Result<SignResult, cxlib_error::Error> {
-    let captcha_id = if let Some(captcha_id) = captcha_id {
-        ProtocolItem::CaptchaId.update(captcha_id);
-        captcha_id
-    } else {
-        warn!("未找到滑块 ID, 使用内建值。");
-        &ProtocolItem::CaptchaId.to_string()
-    };
-    let url_param = cxlib_captcha::utils::captcha_solver(agent, captcha_id)?;
-    let r = {
-        let url = url.with_validate(&url_param);
-        let r = url.get(agent)?;
-        RawSign::guess_sign_result_by_text(&r.into_string().unwrap())
-    };
-    Ok(r)
-}
+use log::{error, warn};
 
 pub fn sign_unchecked_with_location<T: SignTrait<RuntimeData = Location>>(
     sign: &T,
@@ -53,18 +30,15 @@ pub fn sign_unchecked_with_location<T: SignTrait<RuntimeData = Location>>(
     for location in locations {
         let url = sign.sign_url(session, &location);
         let r = url.get(session)?;
-        match T::guess_sign_result_by_text(&r.into_string().unwrap()) {
+        match T::guess_sign_result_by_text(&r.into_string().unwrap_or_else(|e| {
+            error!("{e}");
+            panic!()
+        })) {
             SignResult::Susses => return Ok(SignResult::Susses),
             SignResult::Fail { msg } => {
                 if msg.starts_with("validate") {
                     // 这里假设了二次验证只有在“签到成功”的情况下出现。
-                    let url = if msg.len() > 9 {
-                        let enc2 = &msg[9..msg.len()];
-                        debug!("enc2: {enc2:?}");
-                        url.with_enc2(enc2)
-                    } else {
-                        url
-                    };
+                    let url = url.path_enc_by_pre_sign_result_msg(msg);
                     return secondary_verification(session, url, &captcha_id);
                 } else if msg.contains("位置") || msg.contains("Location") || msg.contains("范围")
                 {
