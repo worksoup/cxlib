@@ -4,7 +4,7 @@ use crate::{
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
     TopSolver, DEFAULT_CAPTCHA_TYPE,
 };
-use cxlib_error::{CxlibResult, UnwrapOrLogPanic};
+use cxlib_error::UnwrapOrLogPanic;
 use log::{debug, warn};
 use onceinit::{OnceInitError, StaticDefault};
 use serde::Deserialize;
@@ -173,7 +173,7 @@ impl CaptchaType {
         (captcha_id, iv, token): (&str, &str, &str),
         text_click_arr: &str,
         server_time_mills: u128,
-    ) -> Result<ValidateResult, cxlib_error::Error> {
+    ) -> Result<String, cxlib_error::Error> {
         let r = check_captcha(
             agent,
             self,
@@ -185,8 +185,8 @@ impl CaptchaType {
         )?;
         let v: ValidateResult =
             trim_response_to_json(&r.into_string().unwrap_or_log_panic()).unwrap();
-        debug!("滑块结果：{v:?}");
-        Ok(v)
+        debug!("验证结果：{v:?}");
+        v.get_validate_info()
     }
     pub fn solve_captcha(
         &self,
@@ -213,8 +213,7 @@ impl CaptchaType {
                                 (captcha_id, &iv, &token),
                                 &text_click_arr,
                                 server_time + i,
-                            )?
-                            .get_validate_info()
+                            )
                         })
                     },
                 ) {

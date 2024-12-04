@@ -119,14 +119,13 @@ impl TopSolver {
         }
     }
 }
-pub trait VerificationInfoTrait<I, O> {
-    // Required methods
+pub trait VerificationInfoTrait<I, O>: Sized {
     /// 以自身的引用构造类型 `I`,
     /// 如：
     ///
     /// 验证信息可能包含图片 Url, 而计算验证结果需要图片类型，
     /// 则该函数需要做的应当为：下载图片并返回。
-    fn prepare_data(&self, agent: &Agent, referer: &str) -> Result<I, cxlib_error::Error>;
+    fn prepare_data(self, agent: &Agent, referer: &str) -> Result<I, cxlib_error::Error>;
     /// 默认过验证算法。如不实现则仅仅返回一个错误。
     fn default_solver(input: I) -> CxlibResult<O> {
         let _ = input;
@@ -141,7 +140,6 @@ pub trait VerificationInfoTrait<I, O> {
     fn static_solver_holder() -> &'static OnceInit<SolverRaw<I, O>>;
     /// 将结果转为字符串类型，用来向网站发送请求。
     fn result_to_string(result: O) -> String;
-    // Provided method
     fn solve(input: I) -> CxlibResult<O>
     where
         Self: VerificationInfoTrait<I, O> + 'static,
@@ -178,7 +176,7 @@ pub trait VerificationInfoTrait<I, O> {
         let solver: Box<dyn Fn(_) -> _ + Sync + 'static> = Box::new(solver);
         Self::static_solver_holder().set_boxed_data(solver)
     }
-    fn solver(&self, agent: &Agent, referer: &str) -> CxlibResult<String>
+    fn solver(self, agent: &Agent, referer: &str) -> CxlibResult<String>
     where
         Self: 'static,
         SolverRaw<I, O>: 'static,
@@ -206,7 +204,7 @@ static OBSTACLE_SOLVER: OnceInit<ObstacleSolverRaw> = OnceInit::new();
 
 impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     fn prepare_data(
-        &self,
+        self,
         agent: &Agent,
         referer: &str,
     ) -> Result<(DynamicImage, DynamicImage), cxlib_error::Error> {
@@ -237,7 +235,7 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
 }
 impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
     fn prepare_data(
-        &self,
+        self,
         agent: &Agent,
         referer: &str,
     ) -> Result<DynamicImage, cxlib_error::Error> {
@@ -256,7 +254,7 @@ impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
 
 impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextClickInfo {
     fn prepare_data(
-        &self,
+        self,
         agent: &Agent,
         referer: &str,
     ) -> Result<(String, DynamicImage), cxlib_error::Error> {
@@ -274,7 +272,7 @@ impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextCli
 }
 impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
     fn prepare_data(
-        &self,
+        self,
         agent: &Agent,
         referer: &str,
     ) -> Result<DynamicImage, cxlib_error::Error> {
@@ -293,7 +291,7 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
 }
 impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
     fn prepare_data(
-        &self,
+        self,
         agent: &Agent,
         referer: &str,
     ) -> Result<(DynamicImage, DynamicImage), cxlib_error::Error> {
