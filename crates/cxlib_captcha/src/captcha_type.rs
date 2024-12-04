@@ -4,7 +4,7 @@ use crate::{
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
     TopSolver, DEFAULT_CAPTCHA_TYPE,
 };
-use cxlib_error::UnwrapOrLogPanic;
+use cxlib_error::{CxlibResult, UnwrapOrLogPanic};
 use log::{debug, warn};
 use onceinit::{OnceInitError, StaticDefault};
 use serde::Deserialize;
@@ -167,24 +167,20 @@ impl CaptchaType {
         .expect("Failed trim_response_to_json");
         Ok(GetCaptchaResult { iv, data: r_data })
     }
-    fn solve_captcha_(
+    pub fn check_captcha(
         &self,
         agent: &Agent,
-        captcha_id: &str,
+        (captcha_id, iv, token): (&str, &str, &str),
+        text_click_arr: &str,
         server_time_mills: u128,
-        referer: &str,
     ) -> Result<ValidateResult, cxlib_error::Error> {
-        let GetCaptchaResult {
-            iv,
-            data: VerificationDataWithToken { token, data },
-        } = self.get_captcha(agent, captcha_id, server_time_mills, referer)?;
         let r = check_captcha(
             agent,
             self,
             captcha_id,
-            &TopSolver::solver(agent, self, data, referer)?,
-            &token,
-            &iv,
+            text_click_arr,
+            token,
+            iv,
             server_time_mills + 2,
         )?;
         let v: ValidateResult =
@@ -202,13 +198,32 @@ impl CaptchaType {
         let server_time = get_server_time(agent, captcha_id, local_time)?;
         // 事不过三。
         for i in 0..3 {
-            let validate_info =
-                Self::solve_captcha_(self, agent, captcha_id, server_time + i, referer)?
-                    .get_validate_info();
-            if validate_info.is_ok() {
-                return validate_info;
-            } else {
-                warn!("滑块验证失败，即将重试。")
+            match self
+                .get_captcha(agent, captcha_id, server_time + i, referer)
+                .map_err(cxlib_error::Error::from)
+                .and_then(
+                    |GetCaptchaResult {
+                         iv,
+                         data: VerificationDataWithToken { token, data },
+                     }| {
+                        TopSolver::solver(agent, self, data, referer).and_then(|text_click_arr| {
+                            Self::check_captcha(
+                                self,
+                                agent,
+                                (captcha_id, &iv, &token),
+                                &text_click_arr,
+                                server_time + i,
+                            )?
+                            .get_validate_info()
+                        })
+                    },
+                ) {
+                r @ Ok(_) => {
+                    return r;
+                }
+                Err(e) => {
+                    warn!("滑块验证失败：{e}，即将重试。")
+                }
             }
         }
         Err(cxlib_error::Error::CaptchaError("验证码为空。".to_owned()))
