@@ -1,7 +1,7 @@
 use crate::{CaptchaType, IconClickImage, ObstacleImage, RotateImages, SlideImages, TextClickInfo};
 use cxlib_error::{CxlibResult, Error};
 use cxlib_imageproc::{find_sub_image, Point};
-use cxlib_utils::{print_timed_result, time_it};
+use cxlib_utils::time_it_and_print_result;
 use image::DynamicImage;
 use log::debug;
 use onceinit::{OnceInit, OnceInitError};
@@ -219,13 +219,13 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     fn default_solver(
         (big_image, small_image): (DynamicImage, DynamicImage),
     ) -> Result<u32, Error> {
-        print_timed_result(time_it(move || {
+        time_it_and_print_result(move || {
             Ok(find_sub_image(
                 &big_image,
                 &small_image,
                 cxlib_imageproc::slide_solvers::find_min_sum_of_squared_errors,
             ))
-        }))
+        })
     }
     fn static_solver_holder() -> &'static OnceInit<SlideSolverRaw> {
         &SLIDE_SOLVER
