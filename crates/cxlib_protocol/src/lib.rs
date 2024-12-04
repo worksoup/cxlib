@@ -64,7 +64,7 @@ pub trait ProtocolTrait<ProtocolItem>: Sync {
 
 static PROTOCOL: OnceInit<dyn ProtocolTrait<ProtocolItem>> = OnceInit::new();
 
-impl<ProtocolItem, ProtocolData> StaticDefault for dyn ProtocolTrait<ProtocolItem>
+unsafe impl<ProtocolItem, ProtocolData> StaticDefault for dyn ProtocolTrait<ProtocolItem>
 where
     ProtocolItem: ProtocolItemTrait<ProtocolData = ProtocolData>,
     ProtocolData: Default

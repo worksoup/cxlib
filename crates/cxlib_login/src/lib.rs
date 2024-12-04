@@ -1,12 +1,12 @@
 use cxlib_error::Error;
 use cxlib_protocol::ProtocolItem;
+use cxlib_utils::des_enc;
 use log::{trace, warn};
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
 use std::collections::HashMap;
-use std::ops::{Deref, Index};
+use std::ops::Index;
 use std::sync::{Arc, RwLock};
 use ureq::{Agent, AgentBuilder};
-use cxlib_utils::des_enc;
 
 pub mod protocol;
 pub trait LoginSolverTrait: Send + Sync {
@@ -111,20 +111,18 @@ impl LoginSolvers {
     }
 }
 static LOGIN_SOLVERS: OnceInit<LoginSolvers> = OnceInit::new();
-impl StaticDefault for LoginSolvers {
+unsafe impl StaticDefault for LoginSolvers {
     fn static_default() -> &'static Self {
         if let OnceInitState::UNINITIALIZED = LOGIN_SOLVERS.get_state() {
             let mut map = HashMap::new();
-            let solver = Box::new(DefaultLoginSolver);
-            map.insert(solver.login_type().to_owned(), unsafe {
-                Box::from_raw(Box::into_raw(solver) as *mut dyn LoginSolverTrait)
-            });
+            let solver: Box<dyn LoginSolverTrait> = Box::new(DefaultLoginSolver);
+            map.insert(solver.login_type().to_owned(), solver);
             let login_solvers = LoginSolvers(Arc::new(RwLock::new(map)));
             LOGIN_SOLVERS
                 .set_boxed_data(Box::new(login_solvers))
                 .unwrap();
         }
-        LOGIN_SOLVERS.deref()
+        LOGIN_SOLVERS.as_data()
     }
 }
 /// # [`LoginSolverWrapper`]

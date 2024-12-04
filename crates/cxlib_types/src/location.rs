@@ -15,7 +15,7 @@ impl LocationPreprocessorTrait for DefaultLocationPreprocessor {
         location
     }
 }
-impl StaticDefault for dyn LocationPreprocessorTrait {
+unsafe impl StaticDefault for dyn LocationPreprocessorTrait {
     fn static_default() -> &'static Self {
         static NOP: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
         &NOP

@@ -31,7 +31,7 @@ impl AppInfo {
         &APP_INFO
     }
 }
-impl StaticDefault for AppInfo {
+unsafe impl StaticDefault for AppInfo {
     fn static_default() -> &'static Self {
         &AppInfo::DEFAULT_CONFIG_DIR_INFO
     }

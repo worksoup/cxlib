@@ -83,7 +83,7 @@ pub enum CaptchaType {
     /// 请参考其文档初始化 `Solver`.
     Obstacle,
 }
-impl StaticDefault for CaptchaType {
+unsafe impl StaticDefault for CaptchaType {
     fn static_default() -> &'static Self {
         &CaptchaType::Slide
     }
