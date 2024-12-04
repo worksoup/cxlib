@@ -1,11 +1,15 @@
-use crate::utils::CaptchaType;
 use onceinit::OnceInit;
 
+mod captcha_type;
 mod hash;
 pub mod protocol;
 mod solver;
 pub mod utils;
+mod verification_info;
+
+pub use captcha_type::*;
 pub use solver::*;
+pub use verification_info::*;
 
 pub type CaptchaId = String;
 

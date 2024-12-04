@@ -1,9 +1,9 @@
-use crate::utils::CaptchaType;
 use cxlib_protocol::ProtocolItem;
 use cxlib_utils::url_encode;
 use log::debug;
 use std::fmt::Display;
 use ureq::Agent;
+use crate::CaptchaType;
 
 // Doesn't matter.
 pub(crate) static CALLBACK_NAME: &str = "jQuery_114514_1919810";

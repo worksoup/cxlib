@@ -1,12 +1,13 @@
 use crate::map::map_colors;
 use image::{
-    DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, Luma, LumaA, Pixel,
-    Primitive, Rgba, SubImage,
+    DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, ImageError, Luma, LumaA,
+    Pixel, Primitive, Rgba, SubImage,
 };
 use imageproc::contours::find_contours;
 pub use imageproc::point::Point;
 use num_traits::ToPrimitive;
 use std::ops::Add;
+use std::path::Path;
 
 pub type Image<P> = ImageBuffer<P, Vec<<P as Pixel>::Subpixel>>;
 pub fn get_rect_contains_vertex<T: Primitive, V: Iterator<Item = Point<T>>>(
@@ -192,6 +193,9 @@ pub fn download_image(
     let img = image_from_bytes(v);
     Ok(img)
 }
+pub fn open_image<P: AsRef<Path>>(p: P) -> Result<DynamicImage, ImageError> {
+    image::ImageReader::open(p)?.with_guessed_format()?.decode()
+}
 pub mod slide_solvers {
     use crate::map::{map_colors, map_colors2};
     use crate::{cut_picture, image_mean, image_sum, rgb_alpha_channel};
@@ -315,4 +319,35 @@ pub fn find_sub_image<F: Fn(SubImage<&DynamicImage>, SubImage<&DynamicImage>) ->
         } + (rb - lt),
     );
     a(big_img, small_image)
+}
+pub mod click_captcha_utils {
+    use crate::cut_picture;
+    use crate::map::map_colors;
+    use image::{DynamicImage, GrayImage, Luma, Primitive};
+    use imageproc::point::Point;
+
+    pub fn find_icon(image: &DynamicImage) -> GrayImage {
+        let image = cut_picture(image, Point::new(0, 0), Point::new(320, 160));
+        let image = image.to_image();
+        map_colors(&image, |p| {
+            let [r, g, b, _a] = p.0;
+            fn sq<T: Primitive>(t: T) -> T {
+                t * t
+            }
+            const E: i32 = 7;
+            const M: i32 = 3 * E * E - E + 1015;
+            const B: i32 = E;
+            const W: i32 = 255 - E;
+            let [r, g, b] = [r as i32, g as i32, b as i32];
+            let m = (r + g + b) / 3;
+            let gray = sq(r - m) + sq(g - m) + sq(b - m) < M;
+            let black = r + g + b < 3 * B;
+            let white = r + g + b > 3 * W;
+            if gray && (white || black) {
+                Luma::from([if white { 255 } else { 0 }])
+            } else {
+                Luma::from([127])
+            }
+        })
+    }
 }

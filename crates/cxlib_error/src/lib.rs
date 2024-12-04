@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+pub type CxlibResult<T> = Result<T, crate::Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("登录失败：`{0}`.")]
