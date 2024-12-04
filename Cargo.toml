@@ -40,7 +40,7 @@ sqlite = "0.36"
 thiserror = "2.0"
 toml = "0.8"
 unicode-width = "0.2"
-ureq = "2.10"
+ureq = "2.12"
 xcap = { version = "0.0.14" }
 
 [dependencies]
