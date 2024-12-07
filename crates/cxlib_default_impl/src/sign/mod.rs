@@ -107,11 +107,6 @@ impl Sign {
                             HashMap::new()
                         });
                     let preset_location = preset_locations.remove(&raw.active_id);
-                    let location = if let Some(preset_location) = preset_location.as_ref() {
-                        preset_location.to_shifted_location()
-                    } else {
-                        Location::get_none_location()
-                    };
                     Sign::Location(LocationSign {
                         raw_sign: raw,
                         preset_location,
