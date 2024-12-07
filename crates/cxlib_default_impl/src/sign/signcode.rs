@@ -1,4 +1,4 @@
-use crate::sign::{RawSign, SignTrait};
+use crate::sign::RawSign;
 use cxlib_sign::GestureOrSigncodeSignTrait;
 use serde::{Deserialize, Serialize};
 

@@ -8,25 +8,15 @@ use cxlib_types::Location;
 pub use impls::*;
 
 pub trait LocationInfoGetterTrait {
-    fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
-        sign.get_preset_location()
-    }
-    fn map_location_str(&self, location_str: &str) -> Option<Location>;
-    fn get_location_or(
-        &self,
-        location_str: &Option<String>,
-        preset_location: Option<Location>,
-    ) -> Option<Location> {
-        self.get_location_or_else(location_str, || preset_location)
-    }
-
+    fn location_str_to_location(&self, location_str: &str) -> Option<Location>;
+    fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location>;
     fn get_location_or_else<GetPresetLocation: FnOnce() -> Option<Location>>(
         &self,
         location_str: &Option<String>,
         get_preset_location: GetPresetLocation,
     ) -> Option<Location> {
         location_str.as_ref().and_then(|location_str| {
-            self.map_location_str(location_str).or_else(|| {
+            self.location_str_to_location(location_str).or_else(|| {
                 get_preset_location().map(|mut l| {
                     if location_str.is_empty() {
                         l
@@ -38,7 +28,16 @@ pub trait LocationInfoGetterTrait {
             })
         })
     }
-    fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location>;
+    fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
+        sign.get_preset_location()
+    }
+    fn get_location_or(
+        &self,
+        location_str: &Option<String>,
+        preset_location: Option<Location>,
+    ) -> Option<Location> {
+        self.get_location_or_else(location_str, || preset_location)
+    }
     fn get_locations(
         &self,
         sign: &LocationSign,
@@ -62,7 +61,7 @@ impl<'a> From<&'a DataBase> for DefaultLocationInfoGetter<'a> {
 }
 
 impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
-    fn map_location_str(&self, location_str: &str) -> Option<Location> {
+    fn location_str_to_location(&self, location_str: &str) -> Option<Location> {
         let location_str = location_str.trim();
         location_str
             .parse()

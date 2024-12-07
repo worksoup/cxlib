@@ -1,4 +1,3 @@
-use crate::sign::utils::sign_unchecked_with_location;
 use crate::sign::{LocationSign, PreSignResult, RawSign, SignResult, SignTrait};
 use cxlib_sign::utils::PPTSignHelper;
 use cxlib_types::Location;

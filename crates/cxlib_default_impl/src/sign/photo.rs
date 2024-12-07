@@ -1,5 +1,5 @@
-use crate::sign::{PreSignResult, RawSign, SignResult, SignTrait};
-use cxlib_sign::utils::{try_secondary_verification, PPTSignHelper};
+use crate::sign::{RawSign, SignTrait};
+use cxlib_sign::utils::PPTSignHelper;
 use cxlib_types::Photo;
 use cxlib_user::Session;
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ impl PhotoSign {}
 impl SignTrait for PhotoSign {
     type PreSignData = ();
     type Data = Photo;
-    fn sign_url(&self, session: &Session,_: &(), runtime_data: &Photo) -> PPTSignHelper {
+    fn sign_url(&self, session: &Session, _: &(), runtime_data: &Photo) -> PPTSignHelper {
         cxlib_sign::protocol::photo_sign_url(
             session,
             &self.as_inner().active_id,

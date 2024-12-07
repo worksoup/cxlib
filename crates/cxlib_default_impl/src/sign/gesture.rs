@@ -1,5 +1,5 @@
 use crate::sign::RawSign;
-use cxlib_sign::{GestureOrSigncodeSignTrait, SignTrait};
+use cxlib_sign::GestureOrSigncodeSignTrait;
 use serde::{Deserialize, Serialize};
 
 /// 手势签到。

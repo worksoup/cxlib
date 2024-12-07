@@ -39,7 +39,9 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
     }
 }
 
-impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'_, T> {
+impl<T: LocationInfoGetterTrait + Sync + Send> SignnerTrait<QrCodeSign>
+    for DefaultQrCodeSignner<'_, T>
+{
     type ExtData<'e> = (&'e str, &'e Location);
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
@@ -49,12 +51,11 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
     ) -> Result<HashMap<&'a Session, SignResult>, Error> {
         let location = self
             .location_info_getter
-            .get_locations(sign.as_location_sign_mut(), self.location_str);
-        if let Some(location) = location {
-            sign.set_location(location);
-        } else {
-            warn!("未获取到位置信息，请检查位置列表或检查输入。");
-        }
+            .get_locations(sign.as_location_sign_mut(), self.location_str)
+            .unwrap_or_else(|| {
+                warn!("未获取到位置信息，请检查位置列表或检查输入。");
+                Location::get_none_location()
+            });
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         let enc = Self::enc_gen(sign, self.path, self.enc, self.precisely)?;
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
@@ -70,9 +71,9 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
                 let mut sign = sign.clone();
                 let session = session.clone();
                 let enc = enc.clone();
+                let location = location.clone();
                 let h = std::thread::spawn(move || {
-                    let a = self
-                        .sign_single(&mut sign, &session, (&enc,))
+                    let a = Self::sign_single(&mut sign, &session, (&enc, &location))
                         .unwrap_or_else(|e| SignResult::Fail { msg: e.to_string() });
                     index_result_map.lock().unwrap().insert(sessions_index, a);
                 });
@@ -90,7 +91,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
             }
         } else {
             for session in sessions {
-                let state = Self::sign_single(sign, session, (&enc,))?;
+                let state = Self::sign_single(sign, session, (&enc, &location))?;
                 map.insert(session, state);
             }
         }
@@ -98,7 +99,6 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
     }
 
     fn sign_single(
-        &mut self,
         sign: &mut QrCodeSign,
         session: &Session,
         (enc, location): (&str, &Location),

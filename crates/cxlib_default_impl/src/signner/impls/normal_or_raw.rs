@@ -36,7 +36,6 @@ impl SignnerTrait<NormalSign> for DefaultNormalOrRawSignner {
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single(
-        &mut self,
         sign: &mut NormalSign,
         session: &Session,
         _: Self::ExtData<'_>,
@@ -58,7 +57,6 @@ impl SignnerTrait<RawSign> for DefaultNormalOrRawSignner {
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single(
-        &mut self,
         sign: &mut RawSign,
         session: &Session,
         _: Self::ExtData<'_>,

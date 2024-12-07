@@ -65,7 +65,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
         for session in sessions {
             let index = session_to_index[session];
             if let Some(photo) = pic_map.get(&index).cloned() {
-                let a = self.sign_single(sign, session, &photo)?;
+                let a = Self::sign_single(sign, session, &photo)?;
                 map.insert(session, a);
             } else {
                 map.insert(
@@ -80,7 +80,6 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
     }
 
     fn sign_single(
-        &mut self,
         sign: &mut PhotoSign,
         session: &Session,
         photo: &Photo,

@@ -5,7 +5,6 @@ mod photo;
 pub mod protocol;
 mod qrcode;
 mod signcode;
-mod utils;
 
 pub use gesture::*;
 pub use location::*;
@@ -16,10 +15,8 @@ pub use qrcode::*;
 pub use signcode::*;
 
 use cxlib_activity::RawSign;
-use cxlib_error::{Error, UnwrapOrLogPanic};
-use cxlib_sign::utils::{try_secondary_verification, PPTSignHelper};
-use cxlib_sign::{PreSignResult, SignDetail, SignResult, SignState, SignTrait};
-use cxlib_types::{Location, LocationWithRange, Photo, Triple};
+use cxlib_sign::{PreSignResult, SignDetail, SignResult, SignTrait};
+use cxlib_types::{Location, LocationWithRange};
 use cxlib_user::Session;
 use serde::Deserialize;
 use std::collections::HashMap;

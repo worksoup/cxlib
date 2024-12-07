@@ -13,7 +13,7 @@ impl DefaultGestureOrSigncodeSignner {
 }
 
 impl SignnerTrait<GestureSign> for DefaultGestureOrSigncodeSignner {
-    type ExtData<'e> = ();
+    type ExtData<'e> = &'e str;
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
@@ -23,24 +23,23 @@ impl SignnerTrait<GestureSign> for DefaultGestureOrSigncodeSignner {
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
-            let a = self.sign_single(sign, session, ())?;
+            let a = Self::sign_single(sign, session, &self.0)?;
             map.insert(session, a);
         }
         Ok(map)
     }
 
     fn sign_single(
-        &mut self,
         sign: &mut GestureSign,
         session: &Session,
-        _: Self::ExtData<'_>,
+        signcode: &str,
     ) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session, &(), &self.0)
+        sign.pre_sign_and_sign(session, &(), signcode)
     }
 }
 
 impl SignnerTrait<SigncodeSign> for DefaultGestureOrSigncodeSignner {
-    type ExtData<'e> = ();
+    type ExtData<'e> = &'e str;
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
@@ -50,18 +49,17 @@ impl SignnerTrait<SigncodeSign> for DefaultGestureOrSigncodeSignner {
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
-            let a = self.sign_single(sign, session, ())?;
+            let a = Self::sign_single(sign, session, &self.0)?;
             map.insert(session, a);
         }
         Ok(map)
     }
 
     fn sign_single(
-        &mut self,
         sign: &mut SigncodeSign,
         session: &Session,
-        _: Self::ExtData<'_>,
+        gesture: &str,
     ) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session, &(), &self.0)
+        sign.pre_sign_and_sign(session, &(), gesture)
     }
 }

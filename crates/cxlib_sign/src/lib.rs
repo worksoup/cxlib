@@ -281,8 +281,8 @@ pub trait SignnerTrait<T: SignTrait> {
         sign: &mut T,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, Error>;
+    /// 此处不使用 self, 方便多线程实现。
     fn sign_single(
-        &mut self,
         sign: &mut T,
         session: &Session,
         extra_data: Self::ExtData<'_>,
