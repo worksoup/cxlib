@@ -1,15 +1,16 @@
 use crate::sign::CaptchaId;
 use cxlib_sign::utils::secondary_verification;
-use cxlib_sign::{SignResult, SignTrait};
+use cxlib_sign::{PreSignResult, SignResult, SignTrait};
 use cxlib_types::{Location, LocationWithRange};
 use cxlib_user::Session;
 use log::{error, warn};
 
-pub fn sign_unchecked_with_location<T: SignTrait<RuntimeData = Location>>(
+pub fn sign_unchecked_with_location<T: SignTrait<Data = Location>>(
     sign: &T,
+    pre_sign_data: &<T as SignTrait>::PreSignData,
     location: &Location,
     preset_location: &Option<LocationWithRange>,
-    captcha_id: Option<CaptchaId>,
+    captcha_id: &CaptchaId,
     session: &Session,
 ) -> Result<SignResult, cxlib_error::Error> {
     let mut locations = Vec::new();
@@ -28,7 +29,7 @@ pub fn sign_unchecked_with_location<T: SignTrait<RuntimeData = Location>>(
         });
     }
     for location in locations {
-        let url = sign.sign_url(session, &location);
+        let url = sign.sign_url(session, &pre_sign_data, &location);
         let r = url.get(session)?;
         match T::guess_sign_result_by_text(&r.into_string().unwrap_or_else(|e| {
             error!("{e}");

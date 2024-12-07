@@ -3,8 +3,7 @@ mod table;
 pub use table::*;
 
 use cxlib_activity::CourseExcludeInfoTrait;
-use cxlib_dir::Dir;
-use cxlib_store::{StorageTableCommandTrait, StorageTrait};
+use cxlib_store::{Dir, StorageTableCommandTrait, StorageTrait};
 use log::info;
 use sqlite::Connection;
 use std::fs::File;

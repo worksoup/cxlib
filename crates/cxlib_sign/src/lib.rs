@@ -1,10 +1,13 @@
-use log::info;
+use log::{info, warn};
+use std::collections::HashMap;
 use std::ops::Add;
 
-use crate::protocol::general_sign_url;
+use crate::protocol::{general_sign_url, signcode_sign_url};
 use crate::utils::{try_secondary_verification, PPTSignHelper};
 use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
+use cxlib_error::{Error, UnwrapOrLogPanic};
+use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Course, Dioption, LocationWithRange};
 use cxlib_user::Session;
 use serde::Deserialize;
@@ -29,16 +32,18 @@ pub mod utils;
 ///
 /// 细节详见各签到的文档。
 pub trait SignTrait: Ord {
-    type RuntimeData: ?Sized;
-    fn sign_url(&self, session: &Session, runtime_data: &Self::RuntimeData) -> PPTSignHelper;
+    type PreSignData: ?Sized;
+    type Data: ?Sized;
+    fn sign_url(
+        &self,
+        session: &Session,
+        pre_sign_data: &Self::PreSignData,
+        data: &Self::Data,
+    ) -> PPTSignHelper;
     /// 获取各签到类型内部对原始签到类型的引用。
     /// [`RawSign`] 的各字段均为 `pub`,
     /// 故可以通过本函数获取一些签到通用的信息。
     fn as_inner(&self) -> &RawSign;
-    /// 用来判断是否可以安全调用 [`SignTrait::sign_unchecked`].
-    fn is_ready_for_sign(&self) -> bool {
-        true
-    }
     /// 判断签到活动是否有效（目前认定两小时内未结束的签到为有效签到）。
     fn is_valid(&self) -> bool {
         let time = std::time::Duration::from_millis(self.as_inner().start_time_mills);
@@ -84,18 +89,22 @@ pub trait SignTrait: Ord {
         }
     }
     /// 预签到。
-    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxlib_error::Error> {
-        self.as_inner().pre_sign(session)
-    }
-    /// # Safety
-    /// 签到类型中有一些 `Option` 枚举，而本函数会使用 `unwrap_unchecked`.
-    /// 调用之前请设置相关信息（通过各签到类型的方法），保险起见可以调用 [`SignTrait::is_ready_for_sign`] 进行判断。
-    unsafe fn sign_unchecked(
+    fn pre_sign(
         &self,
         session: &Session,
-        pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, cxlib_error::Error> {
-        unsafe { self.as_inner().sign_unchecked(session, pre_sign_result) }
+        pre_sign_data: &Self::PreSignData,
+    ) -> Result<PreSignResult, cxlib_error::Error> {
+        let _ = pre_sign_data;
+        self.as_inner().pre_sign(session, &())
+    }
+    fn pre_check_data(
+        &self,
+        session: &Session,
+        data: &Self::Data,
+    ) -> Result<Result<(), SignResult>, cxlib_error::Error> {
+        let _ = session;
+        let _ = data;
+        Ok(Ok(()))
     }
     /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
     /// 调用 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 进行判断，如果真，则调用 [`sign_unchecked`](SignTrait::sign_unchecked), 否则返回
@@ -104,52 +113,61 @@ pub trait SignTrait: Ord {
         &self,
         session: &Session,
         pre_sign_result: PreSignResult,
+        pre_sign_data: &Self::PreSignData,
+        data: &Self::Data,
     ) -> Result<SignResult, cxlib_error::Error> {
-        if self.is_ready_for_sign() {
-            unsafe { self.sign_unchecked(session, pre_sign_result) }
-        } else {
-            Ok(SignResult::Fail {
-                msg: "签到未准备好！".to_string(),
-            })
+        match pre_sign_result {
+            PreSignResult::Susses => Ok(SignResult::Susses),
+            PreSignResult::Data(ref pre_sign_result_data) => {
+                match self.pre_check_data(session, data)? {
+                    Ok(_) => {
+                        let url = self.sign_url(session, pre_sign_data, data);
+                        if let Some(captcha_id) = pre_sign_result_data.first() {
+                            try_secondary_verification::<Self>(session, url, captcha_id)
+                        } else {
+                            warn!("未找到 CaptchaId, 使用内建值。");
+                            try_secondary_verification::<Self>(
+                                session,
+                                url,
+                                &ProtocolItem::CaptchaId.get(),
+                            )
+                        }
+                    }
+                    Err(msg) => Ok(msg),
+                }
+            }
         }
     }
     /// 预签到并签到。
-    fn pre_sign_and_sign(&self, session: &Session) -> Result<SignResult, cxlib_error::Error> {
-        let r = self.pre_sign(session)?;
-        self.sign(session, r)
+    fn pre_sign_and_sign(
+        &self,
+        session: &Session,
+        pre_sign_data: &Self::PreSignData,
+        data: &Self::Data,
+    ) -> Result<SignResult, cxlib_error::Error> {
+        let r = self.pre_sign(session, pre_sign_data)?;
+        self.sign(session, r, pre_sign_data, data)
     }
 }
 
 impl SignTrait for RawSign {
-    type RuntimeData = ();
+    type PreSignData = ();
+    type Data = ();
 
-    fn sign_url(&self, session: &Session, _: &()) -> PPTSignHelper {
+    fn sign_url(&self, session: &Session, _: &(), _: &()) -> PPTSignHelper {
         general_sign_url(session, &self.active_id)
     }
 
     fn as_inner(&self) -> &RawSign {
         self
     }
-    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxlib_error::Error> {
+    fn pre_sign(&self, session: &Session, _: &()) -> Result<PreSignResult, cxlib_error::Error> {
         let active_id = self.active_id.as_str();
         let uid = session.get_uid();
         let response_of_pre_sign =
             protocol::pre_sign(session, self.course.clone(), active_id, uid)?;
         info!("用户[{}]预签到已请求。", session.get_stu_name());
         utils::analysis_after_presign(active_id, session, response_of_pre_sign)
-    }
-    unsafe fn sign_unchecked(
-        &self,
-        session: &Session,
-        pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, cxlib_error::Error> {
-        match pre_sign_result {
-            PreSignResult::Susses => Ok(SignResult::Susses),
-            PreSignResult::Data(mut data) => {
-                let url = self.sign_url(session, &());
-                try_secondary_verification::<Self>(session, url, &data.take_first())
-            }
-        }
     }
 }
 
@@ -253,5 +271,73 @@ impl SignDetail {
     }
     pub fn sign_code(&self) -> Option<&str> {
         self.c.as_deref()
+    }
+}
+/// 针对同一个签到，但不同 Session 的处理程序。
+pub trait SignnerTrait<T: SignTrait> {
+    type ExtData<'e>;
+    fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
+        &mut self,
+        sign: &mut T,
+        sessions: Sessions,
+    ) -> Result<HashMap<&'a Session, SignResult>, Error>;
+    fn sign_single(
+        &mut self,
+        sign: &mut T,
+        session: &Session,
+        extra_data: Self::ExtData<'_>,
+    ) -> Result<SignResult, Error>;
+}
+
+/// 为手势签到和签到码签到实现的一个特型，方便复用代码。
+///
+/// 这两种签到除签到码格式以外没有任何不同之处。
+pub trait GestureOrSigncodeSignTrait: Ord {
+    fn as_inner(&self) -> &RawSign;
+    /// 检查签到码是否正确而不进行签到。
+    ///
+    /// 如果是手势签到，九宫格对应数字如下：
+    /// ``` matlab
+    /// 1 2 3
+    /// 4 5 6
+    /// 7 8 9
+    /// ```
+    fn check_signcode(
+        session: &Session,
+        active_id: &str,
+        signcode: &str,
+    ) -> Result<Result<(), SignResult>, Error> {
+        #[derive(Deserialize)]
+        struct CheckR {
+            #[allow(unused)]
+            result: i64,
+        }
+        let CheckR { result } = protocol::check_signcode(session, active_id, signcode)?
+            .into_json()
+            .unwrap_or_log_panic();
+        if result == 1 {
+            Ok(Ok(()))
+        } else {
+            Ok(Err(SignResult::Fail {
+                msg: "签到码或手势不正确".into(),
+            }))
+        }
+    }
+}
+impl<T: GestureOrSigncodeSignTrait> SignTrait for T {
+    type PreSignData = ();
+    type Data = str;
+
+    fn sign_url(
+        &self,
+        session: &Session,
+        _: &Self::PreSignData,
+        data: &Self::Data,
+    ) -> PPTSignHelper {
+        signcode_sign_url(session, &self.as_inner().active_id, data)
+    }
+
+    fn as_inner(&self) -> &RawSign {
+        <Self as GestureOrSigncodeSignTrait>::as_inner(self)
     }
 }

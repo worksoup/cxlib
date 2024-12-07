@@ -1,15 +1,14 @@
 use crate::sign::NormalSign;
 use cxlib_activity::RawSign;
 use cxlib_error::Error;
-use cxlib_sign::{SignResult, SignTrait};
-use cxlib_signner::SignnerTrait;
+use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_user::Session;
 use std::collections::HashMap;
 
 pub struct DefaultNormalOrRawSignner;
 
 fn sign_single_(sign: &RawSign, session: &Session) -> Result<SignResult, Error> {
-    sign.pre_sign_and_sign(session)
+    sign.pre_sign_and_sign(session, &(), &())
 }
 fn sign_<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
     sign: &RawSign,
@@ -37,6 +36,7 @@ impl SignnerTrait<NormalSign> for DefaultNormalOrRawSignner {
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single(
+        &mut self,
         sign: &mut NormalSign,
         session: &Session,
         _: Self::ExtData<'_>,
@@ -58,6 +58,7 @@ impl SignnerTrait<RawSign> for DefaultNormalOrRawSignner {
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single(
+        &mut self,
         sign: &mut RawSign,
         session: &Session,
         _: Self::ExtData<'_>,

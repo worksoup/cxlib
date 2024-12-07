@@ -11,4 +11,4 @@ proc-macro = true
 #syn = "*"
 quote = "*"
 proc-macro2 = "*"
-cxlib_utils = { path = "../cxlib_utils", features = ["zlib_impl"] }
+cxlib_utils = { path = "../cxlib_utils" }

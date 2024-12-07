@@ -1,7 +1,6 @@
-use crate::cookies::UserCookies;
-use cxlib_dir::Dir;
-use cxlib_login::{DefaultLoginSolver, LoginSolverTrait};
+use crate::{cookies::UserCookies, DefaultLoginSolver, LoginSolverTrait};
 use cxlib_protocol::ProtocolItem;
+use cxlib_store::Dir;
 use log::info;
 use std::{hash::Hash, ops::Deref, path::Path};
 use ureq::{Agent, AgentBuilder};

@@ -1,9 +1,7 @@
 use crate::store::{DataBase, DataBaseTableTrait};
-use cxlib_dir::Dir;
 use cxlib_error::Error;
-use cxlib_login::{DefaultLoginSolver, LoginSolverTrait, LoginSolverWrapper};
-use cxlib_store::StorageTableCommandTrait;
-use cxlib_user::Session;
+use cxlib_store::{Dir, StorageTableCommandTrait};
+use cxlib_user::{DefaultLoginSolver, LoginSolverTrait, LoginSolverWrapper, Session};
 use log::{info, warn};
 use std::{
     collections::{HashMap, HashSet},
@@ -89,8 +87,14 @@ impl FromStr for AccountData {
     }
 }
 impl AccountTable {
-    pub fn get_sessions_by_uid_list_str(db: &DataBase, uid_list_str: &str) -> HashMap<String, Session> {
-        let str_list = uid_list_str.split(',').map(|a| a.trim()).collect::<Vec<&str>>();
+    pub fn get_sessions_by_uid_list_str(
+        db: &DataBase,
+        uid_list_str: &str,
+    ) -> HashMap<String, Session> {
+        let str_list = uid_list_str
+            .split(',')
+            .map(|a| a.trim())
+            .collect::<Vec<&str>>();
         let mut s = HashMap::new();
         for uid in str_list {
             if let Some(session) = Self::get_session(db, uid) {

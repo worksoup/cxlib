@@ -1,8 +1,6 @@
-use crate::sign::LocationSign;
-use crate::signner::LocationInfoGetterTrait;
+use crate::{sign::LocationSign, signner::LocationInfoGetterTrait};
 use cxlib_error::Error;
-use cxlib_sign::{SignResult, SignTrait};
-use cxlib_signner::SignnerTrait;
+use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_user::Session;
 use log::error;
 use std::collections::HashMap;
@@ -28,6 +26,21 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationS
         sign: &mut LocationSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'b Session, SignResult>, Error> {
+        #[allow(clippy::mutable_key_type)]
+        let mut map = HashMap::new();
+        for session in sessions {
+            let r = self.sign_single(sign, session, ())?;
+            map.insert(session, r);
+        }
+        Ok(map)
+    }
+
+    fn sign_single(
+        &mut self,
+        sign: &mut LocationSign,
+        session: &Session,
+        _: (),
+    ) -> Result<SignResult, Error> {
         let location = self
             .location_info_getter
             .get_locations(sign, self.location_str)
@@ -35,17 +48,6 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationS
                 error!("未获取到位置信息，请检查位置列表或检查输入。");
                 Error::LocationError
             })?;
-        sign.set_location(location.clone());
-        #[allow(clippy::mutable_key_type)]
-        let mut map = HashMap::new();
-        for session in sessions {
-            let r = Self::sign_single(sign, session, ())?;
-            map.insert(session, r);
-        }
-        Ok(map)
-    }
-
-    fn sign_single(sign: &mut LocationSign, session: &Session, _: ()) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session)
+        sign.pre_sign_and_sign(session, &(), &location)
     }
 }

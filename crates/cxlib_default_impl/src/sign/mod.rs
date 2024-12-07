@@ -16,6 +16,7 @@ pub use qrcode::*;
 pub use signcode::*;
 
 use cxlib_activity::RawSign;
+use cxlib_error::{Error, UnwrapOrLogPanic};
 use cxlib_sign::utils::{try_secondary_verification, PPTSignHelper};
 use cxlib_sign::{PreSignResult, SignDetail, SignResult, SignState, SignTrait};
 use cxlib_types::{Location, LocationWithRange, Photo, Triple};
@@ -42,95 +43,6 @@ pub enum Sign {
     Signcode(SigncodeSign),
     /// 未知
     Unknown(RawSign),
-}
-impl SignTrait for Sign {
-    type RuntimeData = Triple<Photo, Location, String>;
-
-    fn sign_url(&self, session: &Session, data: &Self::RuntimeData) -> PPTSignHelper {
-        match self {
-            Sign::Photo(a) => a.sign_url(session, data.first().unwrap()),
-            Sign::Normal(a) => a.sign_url(session, &()),
-            Sign::QrCode(a) => a.sign_url(session, data.second().unwrap()),
-            Sign::Gesture(a) => a.sign_url(session, data.last().unwrap()),
-            Sign::Location(a) => a.sign_url(session, data.second().unwrap()),
-            Sign::Signcode(a) => a.sign_url(session, data.last().unwrap()),
-            Sign::Unknown(a) => a.sign_url(session, &()),
-        }
-    }
-
-    fn as_inner(&self) -> &RawSign {
-        match self {
-            Sign::Photo(a) => a.as_inner(),
-            Sign::Normal(a) => a.as_inner(),
-            Sign::QrCode(a) => a.as_inner(),
-            Sign::Gesture(a) => a.as_inner(),
-            Sign::Location(a) => a.as_inner(),
-            Sign::Signcode(a) => a.as_inner(),
-            Sign::Unknown(a) => a.as_inner(),
-        }
-    }
-    fn is_ready_for_sign(&self) -> bool {
-        match self {
-            Sign::Photo(a) => a.is_ready_for_sign(),
-            Sign::Normal(a) => a.is_ready_for_sign(),
-            Sign::QrCode(a) => a.is_ready_for_sign(),
-            Sign::Gesture(a) => a.is_ready_for_sign(),
-            Sign::Location(a) => a.is_ready_for_sign(),
-            Sign::Signcode(a) => a.is_ready_for_sign(),
-            Sign::Unknown(a) => a.is_ready_for_sign(),
-        }
-    }
-    fn is_valid(&self) -> bool {
-        match self {
-            Sign::Photo(a) => a.is_valid(),
-            Sign::Normal(a) => a.is_valid(),
-            Sign::QrCode(a) => a.is_valid(),
-            Sign::Gesture(a) => a.is_valid(),
-            Sign::Location(a) => a.is_valid(),
-            Sign::Signcode(a) => a.is_valid(),
-            Sign::Unknown(a) => a.is_valid(),
-        }
-    }
-
-    fn get_sign_state(&self, session: &Session) -> Result<SignState, cxlib_error::Error> {
-        match self {
-            Sign::Photo(a) => a.get_sign_state(session),
-            Sign::Normal(a) => a.get_sign_state(session),
-            Sign::QrCode(a) => a.get_sign_state(session),
-            Sign::Gesture(a) => a.get_sign_state(session),
-            Sign::Location(a) => a.get_sign_state(session),
-            Sign::Signcode(a) => a.get_sign_state(session),
-            Sign::Unknown(a) => a.get_sign_state(session),
-        }
-    }
-    fn pre_sign(&self, session: &Session) -> Result<PreSignResult, cxlib_error::Error> {
-        match self {
-            Sign::Photo(a) => a.pre_sign(session),
-            Sign::Normal(a) => a.pre_sign(session),
-            Sign::QrCode(a) => a.pre_sign(session),
-            Sign::Gesture(a) => a.pre_sign(session),
-            Sign::Location(a) => a.pre_sign(session),
-            Sign::Signcode(a) => a.pre_sign(session),
-            Sign::Unknown(a) => a.pre_sign(session),
-        }
-    }
-    unsafe fn sign_unchecked(
-        &self,
-        session: &Session,
-        pre_sign_result: PreSignResult,
-    ) -> Result<SignResult, cxlib_error::Error> {
-        unsafe {
-            match self {
-                Sign::Photo(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Normal(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::QrCode(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Gesture(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Location(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Signcode(a) => a.sign_unchecked(session, pre_sign_result),
-                Sign::Unknown(a) => a.sign_unchecked(session, pre_sign_result),
-            }
-        }
-    }
 }
 impl Sign {
     pub fn get_sign_detail(
@@ -164,10 +76,7 @@ impl Sign {
             match raw.other_id.parse::<u8>().unwrap_or_else(r#else) {
                 0 => {
                     if sign_detail.is_photo() {
-                        Sign::Photo(PhotoSign {
-                            raw_sign: raw,
-                            photo: None,
-                        })
+                        Sign::Photo(PhotoSign { raw_sign: raw })
                     } else {
                         Sign::Normal(NormalSign { raw_sign: raw })
                     }
@@ -181,29 +90,19 @@ impl Sign {
                         });
                     let preset_location = preset_locations.remove(&raw.active_id);
                     let raw_sign = raw;
-                    let location = if let Some(preset_location) = preset_location.as_ref() {
-                        preset_location.to_shifted_location()
-                    } else {
-                        Location::get_none_location()
-                    };
                     let raw_sign = LocationSign {
                         raw_sign,
-                        location,
                         preset_location,
                     };
                     let is_refresh = sign_detail.is_refresh_qrcode();
                     Sign::QrCode(QrCodeSign {
                         is_refresh,
-                        enc: None,
                         // TODO: bad `unwrap`.
                         c: sign_detail.sign_code().unwrap().to_string(),
                         raw_sign,
                     })
                 }
-                3 => Sign::Gesture(GestureSign {
-                    raw_sign: raw,
-                    gesture: None,
-                }),
+                3 => Sign::Gesture(GestureSign { raw_sign: raw }),
                 4 => {
                     let mut preset_locations = LocationWithRange::from_log(session, &raw.course)
                         .unwrap_or_else(|e| {
@@ -218,68 +117,14 @@ impl Sign {
                     };
                     Sign::Location(LocationSign {
                         raw_sign: raw,
-                        location,
                         preset_location,
                     })
                 }
-                5 => Sign::Signcode(SigncodeSign {
-                    signcode: None,
-                    raw_sign: raw,
-                }),
+                5 => Sign::Signcode(SigncodeSign { raw_sign: raw }),
                 _ => Sign::Unknown(raw),
             }
         } else {
             Sign::Unknown(raw)
         }
-    }
-}
-
-/// 为手势签到和签到码签到实现的一个特型，方便复用代码。
-///
-/// 这两种签到除签到码格式以外没有任何不同之处。
-pub trait GestureOrSigncodeSignTrait: SignTrait<RuntimeData = str> + Sized {
-    fn sign_with_signcode(
-        &self,
-        session: &Session,
-        signcode: &str,
-        captcha_id: Option<CaptchaId>,
-    ) -> Result<SignResult, cxlib_error::Error> {
-        if Self::check_signcode(session, &self.as_inner().active_id, signcode)? {
-            let url = self.sign_url(session, signcode);
-            try_secondary_verification::<Self>(session, url, &captcha_id)
-        } else {
-            Ok(SignResult::Fail {
-                msg: "签到码或手势不正确".into(),
-            })
-        }
-    }
-    /// 设置签到时所需的签到码或手势。
-    fn set_signcode(&mut self, signcode: String);
-    fn check_signcode(
-        session: &Session,
-        active_id: &str,
-        signcode: &str,
-    ) -> Result<bool, cxlib_error::Error> {
-        #[derive(Deserialize)]
-        struct CheckR {
-            #[allow(unused)]
-            result: i64,
-        }
-        let CheckR { result } = protocol::check_signcode(session, active_id, signcode)?
-            .into_json()
-            .unwrap();
-        Ok(result == 1)
-    }
-}
-
-impl GestureOrSigncodeSignTrait for GestureSign {
-    fn set_signcode(&mut self, signcode: String) {
-        self.set_gesture(signcode)
-    }
-}
-
-impl GestureOrSigncodeSignTrait for SigncodeSign {
-    fn set_signcode(&mut self, signcode: String) {
-        self.set_signcode(signcode)
     }
 }

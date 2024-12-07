@@ -6,11 +6,13 @@ authors.workspace = true
 
 [dependencies]
 cookie_store.workspace = true
-cxlib_dir = { path = "../cxlib_dir" }
+cxlib_store = { path = "../cxlib_store" }
 cxlib_error = { path = "../cxlib_error" }
-cxlib_login = { path = "../cxlib_login" }
 cxlib_protocol = { path = "../cxlib_protocol" }
+cxlib_utils = { path = "../cxlib_utils" }
+des.workspace = true
+hex.workspace = true
 log = { workspace = true, features = ["release_max_level_info"] }
+onceinit.workspace = true
 serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }

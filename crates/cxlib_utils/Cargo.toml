@@ -5,22 +5,16 @@ version.workspace = true
 authors.workspace = true
 
 [features]
-date_time = ["chrono"]
-crypto = ["zlib_impl", "des_impl"]
-interact = ["unicode_width_impl", "inquire_impl"]
-unicode_width_impl = ["unicode-width"]
-inquire_impl = ["inquire", "log"]
-des_impl = ["pkcs7_pad", "des", "hex"]
-zlib_impl = ["flate2"]
-pkcs7_pad = []
-url_encode = ["percent-encoding"]
 
 [dependencies]
-chrono = { workspace = true, optional = true }
-des = { workspace = true, optional = true }
-hex = { workspace = true, optional = true }
-inquire = { workspace = true, optional = true }
-flate2 = { workspace = true, optional = true }
-log = { workspace = true, optional = true }
-percent-encoding = { workspace = true, optional = true }
-unicode-width = { workspace = true, optional = true }
+chrono.workspace = true
+inquire.workspace = true
+flate2.workspace = true
+log.workspace = true
+percent-encoding.workspace = true
+unicode-width.workspace = true
+image.workspace = true
+imageproc.workspace = true
+rxing.workspace = true
+ureq.workspace = true
+num-traits.workspace = true

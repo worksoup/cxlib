@@ -10,10 +10,11 @@ pub struct NormalSign {
 }
 
 impl SignTrait for NormalSign {
-    type RuntimeData = ();
+    type PreSignData = ();
+    type Data = ();
 
-    fn sign_url(&self, session: &Session, runtime_data: &Self::RuntimeData) -> PPTSignHelper {
-        self.as_inner().sign_url(session, runtime_data)
+    fn sign_url(&self, session: &Session, _: &(), runtime_data: &Self::Data) -> PPTSignHelper {
+        self.as_inner().sign_url(session, &(), runtime_data)
     }
 
     fn as_inner(&self) -> &RawSign {

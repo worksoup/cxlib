@@ -4,9 +4,9 @@
 
 这些 crate 仅依赖于外部库。
 
-- ### [`cxlib_dir`](./cxlib_dir)
+- ### [`cxlib_dir`](./cxlib_store)
 
-  通过手动设置或应用信息（如作者、应用名称等）确定数据目录的位置。见 [`Dir`@`lib.rs:90`](cxlib_dir/src/lib.rs).
+  通过手动设置或应用信息（如作者、应用名称等）确定数据目录的位置。见 [`Dir`@`lib.rs:90`](cxlib_store/src/lib.rs).
 - ### [`cxlib_error`](./cxlib_error)
 
   cxsign 库中所使用的错误类型。见 [lib.rs](cxlib_error/src/lib.rs).

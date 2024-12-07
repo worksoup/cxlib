@@ -362,7 +362,7 @@ where
     /// 在设置协议出错时返回 [`SetProtocolError`](cxlib_error::Error::SetProtocolError).
     pub fn init() -> Result<(), cxlib_error::Error> {
         let protocol_config_path =
-            cxlib_dir::Dir::get_config_file_path(ProtocolItem::config_file_name());
+            cxlib_store::Dir::get_config_file_path(ProtocolItem::config_file_name());
         let protocol = CXProtocol::<ProtocolData>::load(&protocol_config_path)?;
         ProtocolItem::set_boxed_protocol(Box::new(protocol))
             .map_err(|_| cxlib_error::Error::SetProtocolError)

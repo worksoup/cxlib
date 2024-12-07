@@ -6,10 +6,9 @@ authors.workspace = true
 
 [dependencies]
 cxlib_error = { path = "../cxlib_error" }
-cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_obfuscate = { path = "../cxlib_obfuscate" }
 cxlib_protocol = { path = "../cxlib_protocol" }
-cxlib_utils = { path = "../cxlib_utils", features = ["url_encode"] }
+cxlib_utils = { path = "../cxlib_utils" }
 getset2.workspace = true
 hex.workspace = true
 image.workspace = true

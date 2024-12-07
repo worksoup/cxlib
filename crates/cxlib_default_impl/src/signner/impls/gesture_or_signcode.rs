@@ -1,7 +1,6 @@
 use crate::sign::{GestureSign, SigncodeSign};
 use cxlib_error::Error;
-use cxlib_sign::{SignResult, SignTrait};
-use cxlib_signner::SignnerTrait;
+use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_user::Session;
 use std::collections::HashMap;
 
@@ -23,20 +22,20 @@ impl SignnerTrait<GestureSign> for DefaultGestureOrSigncodeSignner {
     ) -> Result<HashMap<&'a Session, SignResult>, Error> {
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
-        sign.set_gesture(self.0.clone());
         for session in sessions {
-            let a = Self::sign_single(sign, session, ())?;
+            let a = self.sign_single(sign, session, ())?;
             map.insert(session, a);
         }
         Ok(map)
     }
 
     fn sign_single(
+        &mut self,
         sign: &mut GestureSign,
         session: &Session,
         _: Self::ExtData<'_>,
     ) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session)
+        sign.pre_sign_and_sign(session, &(), &self.0)
     }
 }
 
@@ -48,21 +47,21 @@ impl SignnerTrait<SigncodeSign> for DefaultGestureOrSigncodeSignner {
         sign: &mut SigncodeSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, Error> {
-        sign.set_signcode(self.0.clone());
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
-            let a = Self::sign_single(sign, session, ())?;
+            let a = self.sign_single(sign, session, ())?;
             map.insert(session, a);
         }
         Ok(map)
     }
 
     fn sign_single(
+        &mut self,
         sign: &mut SigncodeSign,
         session: &Session,
         _: Self::ExtData<'_>,
     ) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session)
+        sign.pre_sign_and_sign(session, &(), &self.0)
     }
 }
