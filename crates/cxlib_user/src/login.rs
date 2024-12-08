@@ -109,7 +109,7 @@ impl LoginSolverTrait for DefaultLoginSolver {
         if (8..=16).contains(&pwd.len()) {
             Ok(Self::des_enc(pwd, b"u2oh6Vu^".to_owned()))
         } else {
-            Err(LoginError::BadPassword("密码长度不规范".to_string()))
+            Err(LoginError::CryptoError("密码长度不规范".to_string()))
         }
     }
 }
