@@ -82,6 +82,8 @@ pub enum CaptchaType {
     /// 对应的验证信息类型为 [`ObstacleImage`],
     /// 请参考其文档初始化 `Solver`.
     Obstacle,
+    /// ## 自定义类型验证码
+    Custom(&'static str),
 }
 unsafe impl StaticDefault for CaptchaType {
     fn static_default() -> &'static Self {
@@ -101,6 +103,7 @@ impl AsRef<str> for CaptchaType {
             CaptchaType::Rotate => "rotate",
             CaptchaType::IconClick => "iconclick",
             CaptchaType::Obstacle => "obstacle",
+            CaptchaType::Custom(r#type) => r#type,
         }
     }
 }

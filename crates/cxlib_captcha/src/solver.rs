@@ -6,6 +6,10 @@ use image::DynamicImage;
 use log::debug;
 use onceinit::{OnceInit, OnceInitError};
 use serde::de::DeserializeOwned;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 use ureq::{serde_json, Agent};
 
 mod click_captcha_helper {
@@ -60,9 +64,13 @@ mod click_captcha_helper {
     }
 }
 pub struct TopSolver;
-type TopSolverGlobal =
-    dyn Fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError> + Sync;
-static TOP_SOLVER: [OnceInit<TopSolverGlobal>; 5] = [const { OnceInit::new() }; 5];
+type TopSolverGlobalInner = fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError>;
+type TopSolverGlobal = [OnceInit<TopSolverGlobalInner>; 6];
+type CustomSolverGlobalInner = fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError>;
+type CustomSolverGlobal =
+    OnceInit<Arc<RwLock<HashMap<&'static str, Box<CustomSolverGlobalInner>>>>>;
+static TOP_SOLVER: TopSolverGlobal = [const { OnceInit::new() }; 6];
+static CUSTOM_SOLVER: CustomSolverGlobal = OnceInit::new();
 impl TopSolver {
     fn solver_generic<I, O, T>(
         agent: &Agent,
@@ -83,6 +91,7 @@ impl TopSolver {
             CaptchaType::Rotate => 2,
             CaptchaType::IconClick => 3,
             CaptchaType::Obstacle => 4,
+            CaptchaType::Custom(_) => unreachable!(),
         }
     }
     fn default_solver_impl(
@@ -94,6 +103,7 @@ impl TopSolver {
             CaptchaType::Rotate => Self::solver_generic::<_, _, RotateImages>,
             CaptchaType::IconClick => Self::solver_generic::<_, _, IconClickImage>,
             CaptchaType::Obstacle => Self::solver_generic::<_, _, ObstacleImage>,
+            CaptchaType::Custom(_) => unreachable!(),
         }
     }
     /// 该函数可以替换验证码枚举对应的验证信息类型为自定义实现。
@@ -106,7 +116,27 @@ impl TopSolver {
         T: VerificationInfoTrait<I, O> + DeserializeOwned + 'static,
         SolverRaw<I, O>: 'static,
     {
-        TOP_SOLVER[Self::type_to_index(captcha_type)].set_data(&Self::solver_generic::<_, _, T>)
+        match captcha_type {
+            CaptchaType::Custom(r#type) => match CUSTOM_SOLVER.get_data() {
+                Ok(map) => {
+                    let mut map = map.write().unwrap();
+                    if map.contains_key(r#type) {
+                        Err(OnceInitError::DataInitialized)
+                    } else {
+                        map.insert(r#type, Box::new(Self::solver_generic::<_, _, T>));
+                        Ok(())
+                    }
+                }
+                Err(_) => {
+                    let mut map = HashMap::<&'static str, Box<CustomSolverGlobalInner>>::new();
+                    map.insert(r#type, Box::new(Self::solver_generic::<_, _, T>));
+                    let map = Arc::new(RwLock::new(map));
+                    CUSTOM_SOLVER.set_boxed_data(Box::new(map))
+                }
+            },
+            t => TOP_SOLVER[Self::type_to_index(t)]
+                .set_boxed_data(Box::new(Self::solver_generic::<_, _, T>)),
+        }
     }
     pub fn solver(
         agent: &Agent,
@@ -114,9 +144,21 @@ impl TopSolver {
         image: serde_json::Value,
         referer: &str,
     ) -> Result<String, CaptchaError> {
-        match TOP_SOLVER[Self::type_to_index(captcha_type)].get_data() {
-            Err(_) => Self::default_solver_impl(captcha_type)(agent, image, referer),
-            Ok(solver_) => solver_(agent, image, referer),
+        match captcha_type {
+            CaptchaType::Custom(r#type) => CUSTOM_SOLVER
+                .get_data()
+                .ok()
+                .and_then(|map| {
+                    map.read()
+                        .unwrap()
+                        .get(r#type)
+                        .map(|a| a(agent, image, referer))
+                })
+                .ok_or_else(|| CaptchaError::UnsupportedType)?,
+            t => match TOP_SOLVER[Self::type_to_index(t)].get_data() {
+                Err(_) => Self::default_solver_impl(t)(agent, image, referer),
+                Ok(solver_) => solver_(agent, image, referer),
+            },
         }
     }
 }
