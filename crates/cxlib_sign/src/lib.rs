@@ -268,12 +268,12 @@ pub trait SignnerTrait<T: SignTrait> {
     type ExtData<'e>;
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut T,
+        sign: &T,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, SignError>;
     /// 此处不使用 self, 方便多线程实现。
     fn sign_single(
-        sign: &mut T,
+        sign: &T,
         session: &Session,
         extra_data: Self::ExtData<'_>,
     ) -> Result<SignResult, SignError>;

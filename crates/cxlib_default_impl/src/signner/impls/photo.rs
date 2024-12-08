@@ -30,7 +30,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut PhotoSign,
+        sign: &PhotoSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         let mut pic_map = HashMap::new();
@@ -80,7 +80,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
     }
 
     fn sign_single(
-        sign: &mut PhotoSign,
+        sign: &PhotoSign,
         session: &Session,
         photo: &Photo,
     ) -> Result<SignResult, SignError> {

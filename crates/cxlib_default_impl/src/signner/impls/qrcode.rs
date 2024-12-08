@@ -45,7 +45,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut QrCodeSign,
+        sign: &QrCodeSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         fn get_locations<T: LocationInfoGetterTrait>(
@@ -75,12 +75,12 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
             let mut handles = Vec::new();
             for (sessions_index, session) in sessions.clone().into_iter().enumerate() {
                 let index_result_map = Arc::clone(&index_result_map);
-                let mut sign = sign.clone();
+                let sign = sign.clone();
                 let session = session.clone();
                 let enc = enc.clone();
                 let locations = locations.clone();
                 let h = std::thread::spawn(move || {
-                    let a = Self::sign_single(&mut sign, &session, (&enc, locations))
+                    let a = Self::sign_single(&sign, &session, (&enc, locations))
                         .unwrap_or_else(|e| SignResult::Fail { msg: e.to_string() });
                     index_result_map.lock().unwrap().insert(sessions_index, a);
                 });
@@ -106,16 +106,12 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
     }
 
     fn sign_single(
-        sign: &mut QrCodeSign,
+        sign: &QrCodeSign,
         session: &Session,
         (enc, locations): (&str, Option<Vec<Location>>),
     ) -> Result<SignResult, SignError> {
         if let Some(locations) = locations {
-            crate::signner::impls::utils::sign_single_retry(
-                sign,
-                session,
-                (enc, locations),
-            )
+            crate::signner::impls::utils::sign_single_retry(sign, session, (enc, locations))
         } else {
             sign.pre_sign_and_sign(session, enc, &None)
         }

@@ -17,7 +17,7 @@ impl SignnerTrait<GestureSign> for DefaultGestureOrSigncodeSignner {
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut GestureSign,
+        sign: &GestureSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         #[allow(clippy::mutable_key_type)]
@@ -30,7 +30,7 @@ impl SignnerTrait<GestureSign> for DefaultGestureOrSigncodeSignner {
     }
 
     fn sign_single(
-        sign: &mut GestureSign,
+        sign: &GestureSign,
         session: &Session,
         signcode: &str,
     ) -> Result<SignResult, SignError> {
@@ -43,7 +43,7 @@ impl SignnerTrait<SigncodeSign> for DefaultGestureOrSigncodeSignner {
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut SigncodeSign,
+        sign: &SigncodeSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         #[allow(clippy::mutable_key_type)]
@@ -56,7 +56,7 @@ impl SignnerTrait<SigncodeSign> for DefaultGestureOrSigncodeSignner {
     }
 
     fn sign_single(
-        sign: &mut SigncodeSign,
+        sign: &SigncodeSign,
         session: &Session,
         gesture: &str,
     ) -> Result<SignResult, SignError> {

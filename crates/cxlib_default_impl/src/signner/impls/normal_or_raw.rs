@@ -28,7 +28,7 @@ impl SignnerTrait<NormalSign> for DefaultNormalOrRawSignner {
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut NormalSign,
+        sign: &NormalSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         sign_(sign.as_inner(), sessions)
@@ -36,7 +36,7 @@ impl SignnerTrait<NormalSign> for DefaultNormalOrRawSignner {
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single(
-        sign: &mut NormalSign,
+        sign: &NormalSign,
         session: &Session,
         _: Self::ExtData<'_>,
     ) -> Result<SignResult, SignError> {
@@ -49,7 +49,7 @@ impl SignnerTrait<RawSign> for DefaultNormalOrRawSignner {
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut RawSign,
+        sign: &RawSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         sign_(sign, sessions)
@@ -57,7 +57,7 @@ impl SignnerTrait<RawSign> for DefaultNormalOrRawSignner {
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single(
-        sign: &mut RawSign,
+        sign: &RawSign,
         session: &Session,
         _: Self::ExtData<'_>,
     ) -> Result<SignResult, SignError> {

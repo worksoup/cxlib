@@ -23,7 +23,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationS
 
     fn sign<'b, Sessions: Iterator<Item = &'b Session> + Clone>(
         &mut self,
-        sign: &mut LocationSign,
+        sign: &LocationSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'b Session, SignResult>, SignError> {
         let locations = self
@@ -44,7 +44,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationS
     }
 
     fn sign_single(
-        sign: &mut LocationSign,
+        sign: &LocationSign,
         session: &Session,
         locations: &Vec<Location>,
     ) -> Result<SignResult, SignError> {
