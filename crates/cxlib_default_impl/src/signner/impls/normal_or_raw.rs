@@ -1,20 +1,19 @@
 use crate::sign::NormalSign;
 use cxlib_activity::RawSign;
-use cxlib_error::Error;
-use cxlib_sign::{SignResult, SignTrait};
-use cxlib_signner::SignnerTrait;
+use cxlib_error::SignError;
+use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_user::Session;
 use std::collections::HashMap;
 
 pub struct DefaultNormalOrRawSignner;
 
-fn sign_single_(sign: &RawSign, session: &Session) -> Result<SignResult, Error> {
-    sign.pre_sign_and_sign(session)
+fn sign_single_(sign: &RawSign, session: &Session) -> Result<SignResult, SignError> {
+    sign.pre_sign_and_sign(session, &(), &())
 }
 fn sign_<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
     sign: &RawSign,
     sessions: Sessions,
-) -> Result<HashMap<&'a Session, SignResult>, Error> {
+) -> Result<HashMap<&'a Session, SignResult>, SignError> {
     #[allow(clippy::mutable_key_type)]
     let mut map = HashMap::new();
     for session in sessions {
@@ -29,18 +28,18 @@ impl SignnerTrait<NormalSign> for DefaultNormalOrRawSignner {
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut NormalSign,
+        sign: &NormalSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, Error> {
+    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         sign_(sign.as_inner(), sessions)
     }
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single(
-        sign: &mut NormalSign,
+        sign: &NormalSign,
         session: &Session,
         _: Self::ExtData<'_>,
-    ) -> Result<SignResult, Error> {
+    ) -> Result<SignResult, SignError> {
         sign_single_(sign.as_inner(), session)
     }
 }
@@ -50,18 +49,18 @@ impl SignnerTrait<RawSign> for DefaultNormalOrRawSignner {
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut RawSign,
+        sign: &RawSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, Error> {
+    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         sign_(sign, sessions)
     }
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single(
-        sign: &mut RawSign,
+        sign: &RawSign,
         session: &Session,
         _: Self::ExtData<'_>,
-    ) -> Result<SignResult, Error> {
+    ) -> Result<SignResult, SignError> {
         sign_single_(sign, session)
     }
 }

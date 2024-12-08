@@ -11,7 +11,7 @@ pub struct Photo {
 
 impl Photo {
     pub fn get_pan_token(session: &Session) -> Result<String, Box<ureq::Error>> {
-        let r = cxlib_pan::protocol::pan_token(session)?;
+        let r = crate::protocol::pan_token(session)?;
         #[derive(Deserialize)]
         struct Tmp {
             #[serde(rename = "_token")]
@@ -23,8 +23,7 @@ impl Photo {
 
     pub fn new(session: &Session, file: &File, file_name: &str) -> Result<Self, Box<ureq::Error>> {
         let token = Self::get_pan_token(session)?;
-        let r =
-            cxlib_pan::protocol::pan_upload(session, file, session.get_uid(), &token, file_name)?;
+        let r = crate::protocol::pan_upload(session, file, session.get_uid(), &token, file_name)?;
         #[derive(Deserialize)]
         struct Tmp {
             #[serde(rename = "objectId")]
@@ -45,7 +44,7 @@ impl Photo {
         session: &Session,
         p: impl Fn(&str) -> bool,
     ) -> Result<Option<Self>, Box<ureq::Error>> {
-        let r = cxlib_pan::protocol::pan_chaoxing(session)?;
+        let r = crate::protocol::pan_chaoxing(session)?;
         let r_text = r.into_string().unwrap();
         let start_of_enc = r_text.find("enc =\"").unwrap() + 6;
         let end_of_enc = r_text[start_of_enc..r_text.len()].find('"').unwrap() + start_of_enc;
@@ -54,7 +53,7 @@ impl Photo {
         let end_of_root_dir =
             r_text[start_of_root_dir..r_text.len()].find('"').unwrap() + start_of_root_dir;
         let parent_id = &r_text[start_of_root_dir..end_of_root_dir];
-        let r = cxlib_pan::protocol::pan_list(session, parent_id, enc)?;
+        let r = crate::protocol::pan_list(session, parent_id, enc)?;
         #[derive(Deserialize)]
         struct CloudFile {
             name: String,

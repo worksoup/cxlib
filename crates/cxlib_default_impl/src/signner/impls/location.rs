@@ -1,10 +1,8 @@
-use crate::sign::LocationSign;
-use crate::signner::LocationInfoGetterTrait;
-use cxlib_error::Error;
-use cxlib_sign::{SignResult, SignTrait};
-use cxlib_signner::SignnerTrait;
+use crate::{sign::LocationSign, signner::LocationInfoGetterTrait};
+use cxlib_error::SignError;
+use cxlib_sign::{SignResult, SignnerTrait};
+use cxlib_types::Location;
 use cxlib_user::Session;
-use log::error;
 use std::collections::HashMap;
 
 pub struct DefaultLocationSignner<'a, T: LocationInfoGetterTrait> {
@@ -21,31 +19,35 @@ impl<'a, T: LocationInfoGetterTrait> DefaultLocationSignner<'a, T> {
     }
 }
 impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationSignner<'_, T> {
-    type ExtData<'e> = ();
+    type ExtData<'e> = &'e Vec<Location>;
 
     fn sign<'b, Sessions: Iterator<Item = &'b Session> + Clone>(
         &mut self,
-        sign: &mut LocationSign,
+        sign: &LocationSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'b Session, SignResult>, Error> {
-        let location = self
+    ) -> Result<HashMap<&'b Session, SignResult>, SignError> {
+        let locations = self
             .location_info_getter
-            .get_locations(sign, self.location_str)
-            .ok_or_else(|| {
-                error!("未获取到位置信息，请检查位置列表或检查输入。");
-                Error::LocationError
-            })?;
-        sign.set_location(location.clone());
+            .get_locations(sign, self.location_str);
+        if locations.is_empty() {
+            return Err(SignError::LocationError(
+                "未获取到位置信息，请检查位置列表或检查输入。".to_owned(),
+            ));
+        }
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
-            let r = Self::sign_single(sign, session, ())?;
+            let r = Self::sign_single(sign, session, &locations)?;
             map.insert(session, r);
         }
         Ok(map)
     }
 
-    fn sign_single(sign: &mut LocationSign, session: &Session, _: ()) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session)
+    fn sign_single(
+        sign: &LocationSign,
+        session: &Session,
+        locations: &Vec<Location>,
+    ) -> Result<SignResult, SignError> {
+        crate::signner::impls::utils::sign_single_retry(sign, session, (&(), locations))
     }
 }

@@ -1,6 +1,7 @@
 use crate::store::{DataBase, DataBaseTableTrait};
 use cxlib_store::StorageTableCommandTrait;
 use log::warn;
+use std::collections::HashSet;
 
 pub struct ExcludeTable;
 
@@ -17,15 +18,15 @@ impl ExcludeTable {
         query.read::<i64, _>(0).unwrap() > 0
     }
 
-    pub fn get_excludes(db: &DataBase) -> Vec<i64> {
+    pub fn get_excludes(db: &DataBase) -> HashSet<i64> {
         let mut query = db
             .prepare(format!("SELECT * FROM {};", Self::TABLE_NAME))
             .unwrap();
-        let mut excludes = Vec::new();
+        let mut excludes = HashSet::new();
         for c in query.iter() {
             if let Ok(row) = c {
                 let id = row.read("id");
-                excludes.push(id);
+                excludes.insert(id);
             } else {
                 warn!("账号解析行出错：{c:?}.");
             }
@@ -53,7 +54,7 @@ impl ExcludeTable {
         }
     }
 
-    pub fn update_excludes(db: &DataBase, excludes: &[i64]) {
+    pub fn update_excludes<'a, I: IntoIterator<Item = &'a i64>>(db: &DataBase, excludes: I) {
         Self::delete(db);
         for exclude in excludes {
             Self::add_exclude(db, *exclude);

@@ -1,4 +1,5 @@
 use crate::store::{AliasTable, DataBase, DataBaseTableTrait};
+use cxlib_error::StoreError;
 use cxlib_store::StorageTableCommandTrait;
 use cxlib_types::Location;
 use log::{debug, warn};
@@ -36,14 +37,12 @@ impl FromStr for LocationAndAliasesPair {
                         aliases,
                     })
                 }
-                Err(e) => Err(cxlib_error::Error::ParseError(format!(
-                    "位置解析出错：{e}."
-                ))),
+                Err(e) => Err(StoreError::ParseError(format!("位置解析出错：{e}.")))?,
             }
         } else {
-            Err(cxlib_error::Error::ParseError(
+            Err(StoreError::ParseError(
                 "格式应为 `课程号$地址,经度,纬度,海拔$别名/...`".to_string(),
-            ))
+            ))?
         }
     }
 }

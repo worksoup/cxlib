@@ -1,6 +1,7 @@
 use crate::{protocol, PreSignResult, SignResult, SignTrait};
 use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
+use cxlib_error::SignError;
 use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Dioption, LocationWithRange};
 use cxlib_user::Session;
@@ -12,7 +13,7 @@ pub fn analysis_after_presign(
     active_id: &str,
     session: &Session,
     response_of_presign: Response,
-) -> Result<PreSignResult, cxlib_error::Error> {
+) -> Result<PreSignResult, SignError> {
     let html = response_of_presign
         .into_string()
         .unwrap_or_else(cxlib_error::log_panic);
@@ -103,14 +104,13 @@ impl From<String> for PPTSignHelper {
 pub fn secondary_verification(
     agent: &Agent,
     url: PPTSignHelper,
-    captcha_id: &Option<CaptchaId>,
-) -> Result<SignResult, cxlib_error::Error> {
+    captcha_id: Option<&CaptchaId>,
+) -> Result<SignResult, SignError> {
     let captcha_id = if let Some(captcha_id) = captcha_id {
-        ProtocolItem::CaptchaId.update(captcha_id);
         captcha_id
     } else {
         warn!("未找到 CaptchaId, 使用内建值。");
-        &ProtocolItem::CaptchaId.to_string()
+        &ProtocolItem::CaptchaId.get()
     };
     let url_param = DEFAULT_CAPTCHA_TYPE.solve_captcha(agent, captcha_id, url.url())?;
     let r = {
@@ -120,14 +120,13 @@ pub fn secondary_verification(
     };
     Ok(r)
 }
-pub fn try_secondary_verification<Sign: SignTrait>(
+pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
     agent: &Agent,
     url: PPTSignHelper,
-    captcha_id: &Option<CaptchaId>,
-) -> Result<SignResult, cxlib_error::Error> {
+    captcha_id: Option<&CaptchaId>,
+) -> Result<SignResult, SignError> {
     let r = url.get(agent)?;
-    match Sign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic))
-    {
+    match Sign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic)) {
         SignResult::Fail { msg } => {
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。

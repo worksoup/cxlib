@@ -1,9 +1,7 @@
 use crate::store::{DataBase, DataBaseTableTrait};
-use cxlib_dir::Dir;
-use cxlib_error::Error;
-use cxlib_login::{DefaultLoginSolver, LoginSolverTrait, LoginSolverWrapper};
-use cxlib_store::StorageTableCommandTrait;
-use cxlib_user::Session;
+use cxlib_error::{LoginError, StoreError};
+use cxlib_store::{Dir, StorageTableCommandTrait};
+use cxlib_user::{DefaultLoginSolver, LoginSolverTrait, LoginSolverWrapper, Session};
 use log::{info, warn};
 use std::{
     collections::{HashMap, HashSet},
@@ -65,9 +63,9 @@ impl FromStr for AccountData {
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>();
         if s.len() < 2 {
-            Err(Error::ParseError(
+            Err(StoreError::ParseError(
                 "登录所需信息解析出错！格式为 `uname,enc_pwd[, login_typ]`.".to_string(),
-            ))
+            ))?
         } else {
             let uname = s[0].to_string();
             let enc_pwd = s[1].to_string();
@@ -89,8 +87,14 @@ impl FromStr for AccountData {
     }
 }
 impl AccountTable {
-    pub fn get_sessions_by_uid_list_str(db: &DataBase, uid_list_str: &str) -> HashMap<String, Session> {
-        let str_list = uid_list_str.split(',').map(|a| a.trim()).collect::<Vec<&str>>();
+    pub fn get_sessions_by_uid_list_str(
+        db: &DataBase,
+        uid_list_str: &str,
+    ) -> HashMap<String, Session> {
+        let str_list = uid_list_str
+            .split(',')
+            .map(|a| a.trim())
+            .collect::<Vec<&str>>();
         let mut s = HashMap::new();
         for uid in str_list {
             if let Some(session) = Self::get_session(db, uid) {
@@ -257,8 +261,8 @@ impl AccountTable {
         uname: String,
         pwd: Option<String>,
         login_type: String,
-    ) -> Result<Session, cxlib_error::Error> {
-        let pwd = pwd.ok_or(Error::LoginError("没有密码！".to_string()))?;
+    ) -> Result<Session, LoginError> {
+        let pwd = pwd.ok_or(LoginError::BadPassword("没有密码。".to_owned()))?;
         let solver = LoginSolverWrapper::new(&login_type);
         let enc_pwd = solver.pwd_enc(pwd)?;
         let session = Session::relogin(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;

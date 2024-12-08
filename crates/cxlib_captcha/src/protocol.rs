@@ -1,13 +1,11 @@
+use crate::CaptchaType;
 use cxlib_protocol::ProtocolItem;
-use cxlib_utils::url_encode;
 use log::debug;
 use std::fmt::Display;
 use ureq::Agent;
-use crate::CaptchaType;
 
 // Doesn't matter.
-pub(crate) static CALLBACK_NAME: &str = "jQuery_114514_1919810";
-
+pub(crate) static CALLBACK_NAME: &str = "cx_captcha_function";
 // 获取服务器时间。
 pub fn get_server_time(
     agent: &Agent,
@@ -41,7 +39,11 @@ pub fn get_captcha(
         iv = format_args!("iv={}", iv),
         type_ = format_args!("type={}", captcha_type),
         version = VERSION_PARAM,
-        referer_ = format_args!("referer={}", url_encode(referer)),
+        referer_ = format_args!(
+            "referer={}",
+            percent_encoding::utf8_percent_encode(referer, percent_encoding::NON_ALPHANUMERIC)
+                .to_string()
+        ),
     );
     Ok(agent.get(&url).set("Referer", referer).call()?)
 }

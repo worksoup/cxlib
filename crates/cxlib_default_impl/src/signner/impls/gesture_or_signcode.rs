@@ -1,7 +1,6 @@
 use crate::sign::{GestureSign, SigncodeSign};
-use cxlib_error::Error;
-use cxlib_sign::{SignResult, SignTrait};
-use cxlib_signner::SignnerTrait;
+use cxlib_error::SignError;
+use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_user::Session;
 use std::collections::HashMap;
 
@@ -14,55 +13,53 @@ impl DefaultGestureOrSigncodeSignner {
 }
 
 impl SignnerTrait<GestureSign> for DefaultGestureOrSigncodeSignner {
-    type ExtData<'e> = ();
+    type ExtData<'e> = &'e str;
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut GestureSign,
+        sign: &GestureSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, Error> {
+    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
-        sign.set_gesture(self.0.clone());
         for session in sessions {
-            let a = Self::sign_single(sign, session, ())?;
+            let a = Self::sign_single(sign, session, &self.0)?;
             map.insert(session, a);
         }
         Ok(map)
     }
 
     fn sign_single(
-        sign: &mut GestureSign,
+        sign: &GestureSign,
         session: &Session,
-        _: Self::ExtData<'_>,
-    ) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session)
+        signcode: &str,
+    ) -> Result<SignResult, SignError> {
+        sign.pre_sign_and_sign(session, &(), signcode)
     }
 }
 
 impl SignnerTrait<SigncodeSign> for DefaultGestureOrSigncodeSignner {
-    type ExtData<'e> = ();
+    type ExtData<'e> = &'e str;
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut SigncodeSign,
+        sign: &SigncodeSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, Error> {
-        sign.set_signcode(self.0.clone());
+    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
-            let a = Self::sign_single(sign, session, ())?;
+            let a = Self::sign_single(sign, session, &self.0)?;
             map.insert(session, a);
         }
         Ok(map)
     }
 
     fn sign_single(
-        sign: &mut SigncodeSign,
+        sign: &SigncodeSign,
         session: &Session,
-        _: Self::ExtData<'_>,
-    ) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session)
+        gesture: &str,
+    ) -> Result<SignResult, SignError> {
+        sign.pre_sign_and_sign(session, &(), gesture)
     }
 }

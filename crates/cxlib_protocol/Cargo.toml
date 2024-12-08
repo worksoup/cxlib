@@ -5,7 +5,7 @@ version.workspace = true
 authors.workspace = true
 
 [dependencies]
-cxlib_dir = { path = "../cxlib_dir" }
+cxlib_store = { path = "../cxlib_store" }
 cxlib_error = { path = "../cxlib_error" }
 onceinit.workspace = true
 log.workspace = true

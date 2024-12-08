@@ -2,6 +2,7 @@ use cxlib_types::Course;
 use cxlib_utils::get_width_str_should_be;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::time::{Duration, SystemTime};
 
 /// # RawSign
 ///
@@ -17,6 +18,14 @@ pub struct RawSign {
     pub other_id: String,
     pub status_code: i32,
 }
+fn time_string_from_mills(mills: u64) -> String {
+    pub fn time_string(t: SystemTime) -> String {
+        chrono::DateTime::<chrono::Local>::from(t)
+            .format("%+")
+            .to_string()
+    }
+    time_string(std::time::UNIX_EPOCH + Duration::from_millis(mills))
+}
 
 impl Display for RawSign {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -27,7 +36,7 @@ impl Display for RawSign {
             self.active_id,
             self.name,
             self.status_code,
-            cxlib_utils::time_string_from_mills(self.start_time_mills),
+            time_string_from_mills(self.start_time_mills),
             self.course.get_id(),
             self.course.get_name(),
             width = name_width,
@@ -43,7 +52,7 @@ impl RawSign {
             self.active_id,
             self.name,
             self.status_code,
-            cxlib_utils::time_string_from_mills(self.start_time_mills),
+            time_string_from_mills(self.start_time_mills),
             width = name_width,
         )
     }

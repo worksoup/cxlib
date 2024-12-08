@@ -1,7 +1,6 @@
 use crate::sign::PhotoSign;
-use cxlib_error::Error;
-use cxlib_sign::{SignResult, SignTrait};
-use cxlib_signner::SignnerTrait;
+use cxlib_error::SignError;
+use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_types::Photo;
 use cxlib_user::Session;
 use log::warn;
@@ -17,7 +16,7 @@ impl DefaultPhotoSignner {
         let path = path.as_ref().and_then(|pic| {
             std::fs::metadata(pic).ok().and_then(|metadata| {
                 if metadata.is_dir() {
-                    crate::utils::pic_dir_or_path_to_pic_path(pic).ok()
+                    crate::utils::find_latest_pic(pic).ok()
                 } else {
                     Some(pic.to_owned())
                 }
@@ -27,13 +26,13 @@ impl DefaultPhotoSignner {
     }
 }
 impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
-    type ExtData<'e> = ();
+    type ExtData<'e> = &'e Photo;
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
-        sign: &mut PhotoSign,
+        sign: &PhotoSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, Error> {
+    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         let mut pic_map = HashMap::new();
         #[allow(clippy::mutable_key_type)]
         let mut session_to_index = HashMap::new();
@@ -66,8 +65,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
         for session in sessions {
             let index = session_to_index[session];
             if let Some(photo) = pic_map.get(&index).cloned() {
-                sign.set_photo(photo);
-                let a = Self::sign_single(sign, session, ())?;
+                let a = Self::sign_single(sign, session, &photo)?;
                 map.insert(session, a);
             } else {
                 map.insert(
@@ -82,10 +80,10 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
     }
 
     fn sign_single(
-        sign: &mut PhotoSign,
+        sign: &PhotoSign,
         session: &Session,
-        _: Self::ExtData<'_>,
-    ) -> Result<SignResult, Error> {
-        sign.pre_sign_and_sign(session)
+        photo: &Photo,
+    ) -> Result<SignResult, SignError> {
+        sign.pre_sign_and_sign(session, &(), photo)
     }
 }

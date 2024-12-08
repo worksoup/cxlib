@@ -6,23 +6,18 @@ authors.workspace = true
 
 [dependencies]
 cxlib_activity = { path = "../cxlib_activity" }
-cxlib_captcha = { path = "../cxlib_captcha" }
 cxlib_error = { path = "../cxlib_error" }
-cxlib_dir = { path = "../cxlib_dir" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
-cxlib_login = { path = "../cxlib_login" }
 cxlib_protocol = { path = "../cxlib_protocol" }
-cxlib_qrcode_utils = { path = "../cxlib_qrcode_utils" }
 cxlib_sign = { path = "../cxlib_sign" }
-cxlib_signner = { path = "../cxlib_signner" }
 cxlib_store = { path = "../cxlib_store" }
 cxlib_types = { path = "../cxlib_types" }
 cxlib_user = { path = "../cxlib_user" }
 cxlib_utils = { path = "../cxlib_utils" }
+image.workspace = true
 log.workspace = true
-num_enum.workspace = true
-percent-encoding.workspace = true
+rxing.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sqlite.workspace = true
-toml.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }
+xcap.workspace = true

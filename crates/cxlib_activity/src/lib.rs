@@ -7,9 +7,16 @@ use cxlib_types::Course;
 use cxlib_user::Session;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
 
+fn time_delta_from_mills(mills: u64) -> chrono::TimeDelta {
+    let start_time = std::time::UNIX_EPOCH + Duration::from_millis(mills);
+    let now = SystemTime::now();
+    let duration = now.duration_since(start_time).unwrap();
+    chrono::TimeDelta::from_std(duration).unwrap()
+}
 /// # Activity
 ///
 /// 活动类型，是一个枚举，可能是一个[暂未被分类的课程签到](RawSign)，也可能是[其他活动](OtherActivity)，如通知、作业等。
@@ -21,44 +28,71 @@ pub enum Activity {
 /// # CourseExcludeInfoTrait
 /// 课程排除列表特型。在获取[活动](Activity)列表时排除部分课程的活动，以此提高加载速度。
 pub trait CourseExcludeInfoTrait {
+    /// 默认排除逻辑，即 160 天内没有任何签到即排除。
+    fn if_should_exclude<'a, I: IntoIterator<Item = &'a Activity>>(&self, activities: I) -> bool {
+        for activity in activities {
+            if let Activity::RawSign(sign) = activity {
+                if time_delta_from_mills(sign.start_time_mills).num_days() < 160 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
     /// 课程是否被排除，参数为课程 ID.
     fn is_excluded(&self, id: i64) -> bool;
     /// 获取所有被排除的课程的 ID
-    fn get_excludes(&self) -> Vec<i64>;
+    fn get_excludes(&self) -> HashSet<i64>;
     /// 排除某课程，参数为课程 ID.
     fn exclude(&self, id: i64);
     /// 取消对某课程的排除，参数为课程 ID.
-    fn disable_exclude(&self, id: i64);
+    fn cancel_exclude(&self, id: i64);
     /// 更新排除列表，参数为课程 ID 的列表。
     /// 在默认实现中，该函数会完全删除旧数据，并更新为新数据。
-    fn update_excludes(&self, excludes: &[i64]);
+    fn update_excludes<'a, I: IntoIterator<Item = &'a i64>>(&self, excludes: I);
+}
+impl CourseExcludeInfoTrait for Mutex<HashSet<i64>> {
+    fn is_excluded(&self, id: i64) -> bool {
+        self.lock().unwrap().contains(&id)
+    }
+
+    fn get_excludes(&self) -> HashSet<i64> {
+        self.lock().unwrap().clone()
+    }
+
+    fn exclude(&self, id: i64) {
+        self.lock().unwrap().insert(id);
+    }
+
+    fn cancel_exclude(&self, id: i64) {
+        self.lock().unwrap().remove(&id);
+    }
+
+    fn update_excludes<'a, I: IntoIterator<Item = &'a i64>>(&self, excludes: I) {
+        self.lock().unwrap().clear();
+        self.lock().unwrap().extend(excludes);
+    }
 }
 impl Activity {
     /// 获取指定的**单个**课程的活动，并决定是否将该课程加入到排除列表中。
     ///
-    /// 具体逻辑为：若该课程在 160 天内无任何活动，则排除该课程，否则取消排除。
-    ///
-    /// 另见：[`CourseExcludeInfoTrait`].
+    /// 具体逻辑参见 [`CourseExcludeInfoTrait::if_should_exclude`].
     pub fn get_course_activities(
         table: &impl CourseExcludeInfoTrait,
         session: &Session,
         course: &Course,
+        set_excludes: bool,
     ) -> Result<Vec<Activity>, Box<ureq::Error>> {
         let activities = Self::get_list_from_course(session, course).unwrap_or_default();
-        let mut dont_exclude = false;
-        for activity in &activities {
-            if let Self::RawSign(sign) = activity {
-                if cxlib_utils::time_delta_since_to_now(sign.start_time_mills).num_days() < 160 {
-                    dont_exclude = true;
-                }
+        if set_excludes {
+            let id = course.get_id();
+            let dont_exclude = table.if_should_exclude(&activities);
+            let excluded = table.is_excluded(id);
+            if dont_exclude && excluded {
+                table.cancel_exclude(id);
+            } else if !dont_exclude && !excluded {
+                table.exclude(id);
             }
-        }
-        let id = course.get_id();
-        let excluded = table.is_excluded(id);
-        if dont_exclude && excluded {
-            table.disable_exclude(id);
-        } else if !dont_exclude && !excluded {
-            table.exclude(id);
         }
         Ok(activities)
     }
@@ -66,7 +100,7 @@ impl Activity {
     ///
     /// 当 `set_excludes` 为 `true` 时，该函数会获取所有这些课程的活动，并根据结果改变排除列表。
     ///
-    /// 具体逻辑参见 [`Activity::get_course_activities`].
+    /// 具体逻辑参见 [`CourseExcludeInfoTrait::if_should_exclude`].
     ///
     /// 反之，则会根据排除列表排除部分课程，以此提高获取速度。
     ///
@@ -84,7 +118,7 @@ impl Activity {
             .filter(|course| set_excludes || !excludes.contains(&course.get_id()))
             .cloned()
             .collect::<Vec<_>>();
-        let excludes = Arc::new(Mutex::new(Vec::new()));
+        let excludes = Arc::new(Mutex::new(excludes));
         let valid_signs = Arc::new(Mutex::new(HashMap::new()));
         let thread_count = 256;
         let len = courses.len();
@@ -106,28 +140,15 @@ impl Activity {
                     let excludes = excludes.clone();
                     let sessions = course_sessions_map[&course].clone();
                     let handle = std::thread::spawn(move || {
-                        let activities =
-                            Self::get_list_from_course(&session, &course).unwrap_or(vec![]);
-                        // NOTE: 此处也会将没有过签到的课程排除掉。
-                        // TODO: 需要修改。
-                        let mut dont_exclude = false;
-                        for activity in &activities {
-                            if let Self::RawSign(sign) = activity {
-                                if set_excludes
-                                    && cxlib_utils::time_delta_since_to_now(sign.start_time_mills)
-                                        .num_days()
-                                        < 160
-                                {
-                                    dont_exclude = true;
-                                }
-                            }
-                        }
+                        let activities = Self::get_course_activities(
+                            &*excludes,
+                            &session,
+                            &course,
+                            set_excludes,
+                        )
+                        .unwrap_or(vec![]);
                         for v in activities {
                             activities_.lock().unwrap().insert(v, sessions.clone());
-                        }
-                        debug!("course: list_activities, ok.");
-                        if set_excludes && !dont_exclude {
-                            excludes.lock().unwrap().push(course.get_id())
                         }
                     });
                     handles.push(handle);
@@ -148,7 +169,7 @@ impl Activity {
     ///
     /// 当 `set_excludes` 为 `true` 时，该函数会获取所有活动，并根据结果改变排除列表。
     ///
-    /// 具体逻辑参见 [`Activity::get_course_activities`].
+    /// 具体逻辑参见 [`CourseExcludeInfoTrait::if_should_exclude`].
     ///
     /// 反之，则会根据排除列表排除部分课程，以此提高获取速度。
     ///
