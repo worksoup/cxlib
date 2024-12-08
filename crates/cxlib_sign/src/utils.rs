@@ -2,9 +2,10 @@ use crate::{protocol, PreSignResult, SignResult, SignTrait};
 use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
 use cxlib_error::SignError;
+use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Dioption, LocationWithRange};
 use cxlib_user::Session;
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use std::ops::{Deref, DerefMut};
 use ureq::{Agent, Response};
 
@@ -103,8 +104,14 @@ impl From<String> for PPTSignHelper {
 pub fn secondary_verification(
     agent: &Agent,
     url: PPTSignHelper,
-    captcha_id: &CaptchaId,
+    captcha_id: Option<&CaptchaId>,
 ) -> Result<SignResult, SignError> {
+    let captcha_id = if let Some(captcha_id) = captcha_id {
+        captcha_id
+    } else {
+        warn!("未找到 CaptchaId, 使用内建值。");
+        &ProtocolItem::CaptchaId.get()
+    };
     let url_param = DEFAULT_CAPTCHA_TYPE.solve_captcha(agent, captcha_id, url.url())?;
     let r = {
         let url = url.with_validate(&url_param);
@@ -116,7 +123,7 @@ pub fn secondary_verification(
 pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
     agent: &Agent,
     url: PPTSignHelper,
-    captcha_id: &CaptchaId,
+    captcha_id: Option<&CaptchaId>,
 ) -> Result<SignResult, SignError> {
     let r = url.get(agent)?;
     match Sign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic)) {

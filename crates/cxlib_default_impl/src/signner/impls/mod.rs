@@ -3,6 +3,7 @@ mod location;
 mod normal_or_raw;
 mod photo;
 mod qrcode;
+mod utils;
 
 pub use gesture_or_signcode::*;
 pub use location::*;

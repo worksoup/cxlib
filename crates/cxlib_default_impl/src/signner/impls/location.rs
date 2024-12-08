@@ -1,6 +1,6 @@
 use crate::{sign::LocationSign, signner::LocationInfoGetterTrait};
 use cxlib_error::SignError;
-use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
+use cxlib_sign::{SignResult, SignnerTrait};
 use cxlib_types::Location;
 use cxlib_user::Session;
 use std::collections::HashMap;
@@ -19,23 +19,25 @@ impl<'a, T: LocationInfoGetterTrait> DefaultLocationSignner<'a, T> {
     }
 }
 impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationSignner<'_, T> {
-    type ExtData<'e> = &'e Location;
+    type ExtData<'e> = &'e Vec<Location>;
 
     fn sign<'b, Sessions: Iterator<Item = &'b Session> + Clone>(
         &mut self,
         sign: &mut LocationSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'b Session, SignResult>, SignError> {
-        let location = self
+        let locations = self
             .location_info_getter
-            .get_locations(sign, self.location_str)
-            .ok_or_else(|| {
-                SignError::LocationError("未获取到位置信息，请检查位置列表或检查输入。".to_owned())
-            })?;
+            .get_locations(sign, self.location_str);
+        if locations.is_empty() {
+            return Err(SignError::LocationError(
+                "未获取到位置信息，请检查位置列表或检查输入。".to_owned(),
+            ));
+        }
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
-            let r = Self::sign_single(sign, session, &location)?;
+            let r = Self::sign_single(sign, session, &locations)?;
             map.insert(session, r);
         }
         Ok(map)
@@ -44,8 +46,8 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<LocationSign> for DefaultLocationS
     fn sign_single(
         sign: &mut LocationSign,
         session: &Session,
-        location: &Location,
+        locations: &Vec<Location>,
     ) -> Result<SignResult, SignError> {
-        sign.pre_sign_and_sign(session, &(), location)
+        crate::signner::impls::utils::sign_single_retry(sign, session, (&(), locations))
     }
 }

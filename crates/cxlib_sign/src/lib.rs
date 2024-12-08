@@ -1,16 +1,15 @@
-use log::{info, warn};
-use std::collections::HashMap;
-use std::ops::Add;
-
-use crate::protocol::{general_sign_url, signcode_sign_url};
-use crate::utils::{try_secondary_verification, PPTSignHelper};
+use crate::{
+    protocol::{general_sign_url, signcode_sign_url},
+    utils::{try_secondary_verification, PPTSignHelper},
+};
 use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
 use cxlib_error::{Error, SignError, UnwrapOrLogPanic};
-use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Course, Dioption, LocationWithRange};
 use cxlib_user::Session;
+use log::info;
 use serde::Deserialize;
+use std::{collections::HashMap, ops::Add};
 
 pub mod protocol;
 pub mod utils;
@@ -112,30 +111,16 @@ pub trait SignTrait: Ord {
     fn sign(
         &self,
         session: &Session,
-        pre_sign_result: PreSignResult,
+        pre_sign_result_data: &Dioption<CaptchaId, LocationWithRange>,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
     ) -> Result<SignResult, SignError> {
-        match pre_sign_result {
-            PreSignResult::Susses => Ok(SignResult::Susses),
-            PreSignResult::Data(ref pre_sign_result_data) => {
-                match self.pre_check_data(session, data)? {
-                    Ok(_) => {
-                        let url = self.sign_url(session, pre_sign_data, data);
-                        if let Some(captcha_id) = pre_sign_result_data.first() {
-                            try_secondary_verification::<Self>(session, url, captcha_id)
-                        } else {
-                            warn!("未找到 CaptchaId, 使用内建值。");
-                            try_secondary_verification::<Self>(
-                                session,
-                                url,
-                                &ProtocolItem::CaptchaId.get(),
-                            )
-                        }
-                    }
-                    Err(msg) => Ok(msg),
-                }
+        match self.pre_check_data(session, data)? {
+            Ok(_) => {
+                let url = self.sign_url(session, pre_sign_data, data);
+                try_secondary_verification::<Self>(session, url, pre_sign_result_data.first())
             }
+            Err(msg) => Ok(msg),
         }
     }
     /// 预签到并签到。
@@ -146,7 +131,12 @@ pub trait SignTrait: Ord {
         data: &Self::Data,
     ) -> Result<SignResult, SignError> {
         let r = self.pre_sign(session, pre_sign_data)?;
-        self.sign(session, r, pre_sign_data, data)
+        match r {
+            PreSignResult::Susses => Ok(SignResult::Susses),
+            PreSignResult::Data(pre_sign_result_data) => {
+                self.sign(session, &pre_sign_result_data, pre_sign_data, data)
+            }
+        }
     }
 }
 

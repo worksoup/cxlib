@@ -41,26 +41,34 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
 }
 
 impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'_, T> {
-    type ExtData<'e> = (&'e str, &'e Location);
+    type ExtData<'e> = (&'e str, Option<Vec<Location>>);
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
         &mut self,
         sign: &mut QrCodeSign,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
-        let location = self
-            .location_info_getter
-            .get_locations(sign.as_location_sign_mut(), self.location_str)
-            .unwrap_or_else(|| {
-                warn!("未获取到位置信息，请检查位置列表或检查输入。");
-                Location::get_none_location()
-            });
+        fn get_locations<T: LocationInfoGetterTrait>(
+            self_: &DefaultQrCodeSignner<T>,
+            sign: &QrCodeSign,
+        ) -> Option<Vec<Location>> {
+            if sign.raw_sign.get_preset_location().is_some() {
+                Some(
+                    self_
+                        .location_info_getter
+                        .get_locations(sign.as_location_sign(), self_.location_str),
+                )
+            } else {
+                None
+            }
+        }
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         let enc = Self::enc_gen(sign, self.path, self.enc, self.precisely)?;
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         let enc = Self::enc_gen(self.path, self.enc)?;
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
+        let locations = get_locations(self, sign).clone();
         if sign.is_refresh() {
             let sessions = sessions.collect::<Vec<&'a Session>>();
             let index_result_map = Arc::new(Mutex::new(HashMap::new()));
@@ -70,9 +78,9 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
                 let mut sign = sign.clone();
                 let session = session.clone();
                 let enc = enc.clone();
-                let location = location.clone();
+                let locations = locations.clone();
                 let h = std::thread::spawn(move || {
-                    let a = Self::sign_single(&mut sign, &session, (&enc, &location))
+                    let a = Self::sign_single(&mut sign, &session, (&enc, locations))
                         .unwrap_or_else(|e| SignResult::Fail { msg: e.to_string() });
                     index_result_map.lock().unwrap().insert(sessions_index, a);
                 });
@@ -90,7 +98,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
             }
         } else {
             for session in sessions {
-                let state = Self::sign_single(sign, session, (&enc, &location))?;
+                let state = Self::sign_single(sign, session, (&enc, locations.clone()))?;
                 map.insert(session, state);
             }
         }
@@ -100,9 +108,17 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
     fn sign_single(
         sign: &mut QrCodeSign,
         session: &Session,
-        (enc, location): (&str, &Location),
+        (enc, locations): (&str, Option<Vec<Location>>),
     ) -> Result<SignResult, SignError> {
-        sign.pre_sign_and_sign(session, enc, location)
+        if let Some(locations) = locations {
+            crate::signner::impls::utils::sign_single_retry(
+                sign,
+                session,
+                (enc, locations),
+            )
+        } else {
+            sign.pre_sign_and_sign(session, enc, &None)
+        }
     }
 }
 

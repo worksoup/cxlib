@@ -38,13 +38,25 @@ pub trait LocationInfoGetterTrait {
     ) -> Option<Location> {
         self.get_location_or_else(location_str, || preset_location)
     }
-    fn get_locations(
-        &self,
-        sign: &LocationSign,
-        location_str: &Option<String>,
-    ) -> Option<Location> {
-        self.get_location_or_else(location_str, || self.get_preset_location(sign))
-            .or_else(|| self.get_fallback_location(sign))
+    fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Vec<Location> {
+        let mut locations = Vec::new();
+        let l1 = location_str
+            .as_ref()
+            .and_then(|location_str| self.location_str_to_location(location_str));
+        if let Some(l1) = l1 {
+            locations.push(l1);
+        }
+        // 该位置保证能够签到成功。
+        let l2 = self.get_preset_location(sign);
+        if let Some(l2) = l2 {
+            locations.push(l2);
+        } else {
+            let l3 = self.get_fallback_location(sign);
+            if let Some(l3) = l3 {
+                locations.push(l3);
+            }
+        }
+        locations
     }
 }
 

@@ -1,10 +1,10 @@
 use crate::sign::{LocationSign, PreSignResult, RawSign, SignTrait};
+use cxlib_error::SignError;
 use cxlib_sign::utils::PPTSignHelper;
 use cxlib_types::Location;
 use cxlib_user::Session;
 use log::info;
 use serde::{Deserialize, Serialize};
-use cxlib_error::SignError;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct QrCodeSign {
@@ -16,20 +16,23 @@ impl QrCodeSign {
     pub fn as_location_sign_mut(&mut self) -> &mut LocationSign {
         &mut self.raw_sign
     }
+    pub fn as_location_sign(&self) -> &LocationSign {
+        &self.raw_sign
+    }
     pub fn is_refresh(&self) -> bool {
         self.is_refresh
     }
 }
 impl SignTrait for QrCodeSign {
     type PreSignData = str;
-    type Data = Location;
+    type Data = Option<Location>;
 
-    fn sign_url(&self, session: &Session, enc: &str, location: &Location) -> PPTSignHelper {
+    fn sign_url(&self, session: &Session, enc: &str, location: &Option<Location>) -> PPTSignHelper {
         cxlib_sign::protocol::qrcode_sign_url(
             session,
             enc,
             self.as_inner().active_id.as_str(),
-            Some(location),
+            location.as_ref(),
         )
     }
 
