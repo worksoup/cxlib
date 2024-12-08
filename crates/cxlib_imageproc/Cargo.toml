@@ -1,0 +1,10 @@
+[package]
+name = "cxlib_imageproc"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+image.workspace = true
+num-traits.workspace = true
+imageproc.workspace = true
