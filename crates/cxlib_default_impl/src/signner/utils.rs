@@ -1,7 +1,7 @@
-use cxlib_error::Error;
+use cxlib_error::SignError;
 use std::path::PathBuf;
 
-pub fn find_latest_pic(pic_dir: &PathBuf) -> Result<PathBuf, Error> {
+pub fn find_latest_pic(pic_dir: &PathBuf) -> Result<PathBuf, SignError> {
     let pic_path = {
         let pic_dir = std::fs::read_dir(pic_dir)?;
         let mut all_files_in_dir = pic_dir
@@ -32,7 +32,7 @@ pub fn find_latest_pic(pic_dir: &PathBuf) -> Result<PathBuf, Error> {
                 .cmp(&a.metadata().unwrap().modified().unwrap())
         });
         all_files_in_dir.first().map(|d| d.path()).ok_or_else(|| {
-            Error::EncError("图片文件夹下没有图片（`png` 或 `jpg` 文件）！".to_owned())
+            SignError::SignDataNotFound("图片文件夹下没有图片（`png` 或 `jpg` 文件）！".to_owned())
         })?
     };
     Ok(pic_path)

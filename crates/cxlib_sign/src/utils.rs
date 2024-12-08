@@ -1,6 +1,7 @@
 use crate::{protocol, PreSignResult, SignResult, SignTrait};
 use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
+use cxlib_error::SignError;
 use cxlib_types::{Dioption, LocationWithRange};
 use cxlib_user::Session;
 use log::{debug, trace};
@@ -11,7 +12,7 @@ pub fn analysis_after_presign(
     active_id: &str,
     session: &Session,
     response_of_presign: Response,
-) -> Result<PreSignResult, cxlib_error::Error> {
+) -> Result<PreSignResult, SignError> {
     let html = response_of_presign
         .into_string()
         .unwrap_or_else(cxlib_error::log_panic);
@@ -103,7 +104,7 @@ pub fn secondary_verification(
     agent: &Agent,
     url: PPTSignHelper,
     captcha_id: &CaptchaId,
-) -> Result<SignResult, cxlib_error::Error> {
+) -> Result<SignResult, SignError> {
     let url_param = DEFAULT_CAPTCHA_TYPE.solve_captcha(agent, captcha_id, url.url())?;
     let r = {
         let url = url.with_validate(&url_param);
@@ -116,7 +117,7 @@ pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
     agent: &Agent,
     url: PPTSignHelper,
     captcha_id: &CaptchaId,
-) -> Result<SignResult, cxlib_error::Error> {
+) -> Result<SignResult, SignError> {
     let r = url.get(agent)?;
     match Sign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic)) {
         SignResult::Fail { msg } => {

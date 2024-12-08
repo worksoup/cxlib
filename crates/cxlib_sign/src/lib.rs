@@ -6,7 +6,7 @@ use crate::protocol::{general_sign_url, signcode_sign_url};
 use crate::utils::{try_secondary_verification, PPTSignHelper};
 use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
-use cxlib_error::{Error, UnwrapOrLogPanic};
+use cxlib_error::{Error, SignError, UnwrapOrLogPanic};
 use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Course, Dioption, LocationWithRange};
 use cxlib_user::Session;
@@ -55,7 +55,7 @@ pub trait SignTrait: Ord {
                 < two_hours
     }
     /// 获取签到后状态。参见返回类型 [`SignState`].
-    fn get_sign_state(&self, session: &Session) -> Result<SignState, cxlib_error::Error> {
+    fn get_sign_state(&self, session: &Session) -> Result<SignState, SignError> {
         let r = crate::protocol::get_attend_info(session, &self.as_inner().active_id)?;
         #[derive(Deserialize)]
         struct Status {
@@ -93,7 +93,7 @@ pub trait SignTrait: Ord {
         &self,
         session: &Session,
         pre_sign_data: &Self::PreSignData,
-    ) -> Result<PreSignResult, cxlib_error::Error> {
+    ) -> Result<PreSignResult, SignError> {
         let _ = pre_sign_data;
         self.as_inner().pre_sign(session, &())
     }
@@ -101,7 +101,7 @@ pub trait SignTrait: Ord {
         &self,
         session: &Session,
         data: &Self::Data,
-    ) -> Result<Result<(), SignResult>, cxlib_error::Error> {
+    ) -> Result<Result<(), SignResult>, SignError> {
         let _ = session;
         let _ = data;
         Ok(Ok(()))
@@ -115,7 +115,7 @@ pub trait SignTrait: Ord {
         pre_sign_result: PreSignResult,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
-    ) -> Result<SignResult, cxlib_error::Error> {
+    ) -> Result<SignResult, SignError> {
         match pre_sign_result {
             PreSignResult::Susses => Ok(SignResult::Susses),
             PreSignResult::Data(ref pre_sign_result_data) => {
@@ -144,7 +144,7 @@ pub trait SignTrait: Ord {
         session: &Session,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
-    ) -> Result<SignResult, cxlib_error::Error> {
+    ) -> Result<SignResult, SignError> {
         let r = self.pre_sign(session, pre_sign_data)?;
         self.sign(session, r, pre_sign_data, data)
     }
@@ -161,7 +161,7 @@ impl SignTrait for RawSign {
     fn as_inner(&self) -> &RawSign {
         self
     }
-    fn pre_sign(&self, session: &Session, _: &()) -> Result<PreSignResult, cxlib_error::Error> {
+    fn pre_sign(&self, session: &Session, _: &()) -> Result<PreSignResult, SignError> {
         let active_id = self.active_id.as_str();
         let uid = session.get_uid();
         let response_of_pre_sign =
@@ -280,13 +280,13 @@ pub trait SignnerTrait<T: SignTrait> {
         &mut self,
         sign: &mut T,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, Error>;
+    ) -> Result<HashMap<&'a Session, SignResult>, SignError>;
     /// 此处不使用 self, 方便多线程实现。
     fn sign_single(
         sign: &mut T,
         session: &Session,
         extra_data: Self::ExtData<'_>,
-    ) -> Result<SignResult, Error>;
+    ) -> Result<SignResult, SignError>;
 }
 
 /// 为手势签到和签到码签到实现的一个特型，方便复用代码。

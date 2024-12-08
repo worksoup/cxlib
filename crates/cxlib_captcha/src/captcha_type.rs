@@ -4,7 +4,7 @@ use crate::{
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
     TopSolver, DEFAULT_CAPTCHA_TYPE,
 };
-use cxlib_error::UnwrapOrLogPanic;
+use cxlib_error::{CaptchaError, UnwrapOrLogPanic};
 use log::{debug, warn};
 use onceinit::{OnceInitError, StaticDefault};
 use serde::Deserialize;
@@ -30,7 +30,7 @@ pub struct ValidateResult {
 }
 
 impl ValidateResult {
-    pub fn get_validate_info(&self) -> Result<String, cxlib_error::Error> {
+    pub fn get_validate_info(&self) -> Result<String, CaptchaError> {
         #[derive(Deserialize)]
         struct Tmp {
             validate: String,
@@ -42,7 +42,7 @@ impl ValidateResult {
                 let Tmp { validate } = serde_json::from_str(s).unwrap();
                 validate
             })
-            .ok_or_else(|| cxlib_error::Error::CaptchaError("验证码为空。".to_owned()))
+            .ok_or_else(|| CaptchaError::VerifyFailed)
     }
 }
 /// # [`CaptchaType`]
@@ -173,7 +173,7 @@ impl CaptchaType {
         (captcha_id, iv, token): (&str, &str, &str),
         text_click_arr: &str,
         server_time_mills: u128,
-    ) -> Result<String, cxlib_error::Error> {
+    ) -> Result<String, CaptchaError> {
         let r = check_captcha(
             agent,
             self,
@@ -193,14 +193,14 @@ impl CaptchaType {
         agent: &Agent,
         captcha_id: &str,
         referer: &str,
-    ) -> Result<String, cxlib_error::Error> {
+    ) -> Result<String, CaptchaError> {
         let local_time = get_now_timestamp_mills();
         let server_time = get_server_time(agent, captcha_id, local_time)?;
         // 事不过三。
         for i in 0..3 {
             match self
                 .get_captcha(agent, captcha_id, server_time + i, referer)
-                .map_err(cxlib_error::Error::from)
+                .map_err(CaptchaError::from)
                 .and_then(
                     |GetCaptchaResult {
                          iv,
@@ -220,12 +220,15 @@ impl CaptchaType {
                 r @ Ok(_) => {
                     return r;
                 }
-                Err(e) => {
-                    warn!("滑块验证失败：{e}，即将重试。")
-                }
+                Err(e) => match e {
+                    r @ CaptchaError::Canceled(_) => {
+                        return Err(r);
+                    }
+                    _ => warn!("滑块验证失败：{e}，即将重试。"),
+                },
             }
         }
-        Err(cxlib_error::Error::CaptchaError("验证码为空。".to_owned()))
+        Err(CaptchaError::VerifyFailed)
     }
 }
 

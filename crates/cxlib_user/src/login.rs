@@ -1,5 +1,5 @@
 use crate::protocol;
-use cxlib_error::Error;
+use cxlib_error::LoginError;
 use cxlib_protocol::ProtocolItem;
 use log::{trace, warn};
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
@@ -13,13 +13,13 @@ use ureq::{serde, Agent, AgentBuilder};
 pub trait LoginSolverTrait: Send + Sync {
     fn login_type(&self) -> &str;
     fn is_logged_in(&self, agent: &Agent) -> bool;
-    fn login_s(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error>;
-    fn pwd_enc(&self, pwd: String) -> Result<String, Error>;
+    fn login_s(&self, account: &str, enc_passwd: &str) -> Result<Agent, LoginError>;
+    fn pwd_enc(&self, pwd: String) -> Result<String, LoginError>;
 }
 pub struct DefaultLoginSolver;
 impl DefaultLoginSolver {
-    pub fn find_stu_name_in_html(agent: &Agent) -> Result<String, cxlib_error::Error> {
-        let login_expired_err = || cxlib_error::Error::LoginExpired("无法获取姓名！".to_string());
+    pub fn find_stu_name_in_html(agent: &Agent) -> Result<String, LoginError> {
+        let login_expired_err = || LoginError::LoginExpired("无法获取姓名！".to_string());
         let r = protocol::account_manage(agent)?;
         let html_content = r.into_string().unwrap();
         trace!("{html_content}");
@@ -33,7 +33,7 @@ impl DefaultLoginSolver {
             .index(0..html_content.find('<').unwrap())
             .trim();
         if name.is_empty() {
-            return Err(cxlib_error::Error::LoginExpired("姓名为空！".to_string()));
+            return Err(LoginError::LoginExpired("姓名为空！".to_string()));
         }
         Ok(name.to_owned())
     }
@@ -82,7 +82,7 @@ impl LoginSolverTrait for DefaultLoginSolver {
         Self::find_stu_name_in_html(agent).is_ok()
     }
 
-    fn login_s(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error> {
+    fn login_s(&self, account: &str, enc_passwd: &str) -> Result<Agent, LoginError> {
         let cookie_store = cookie_store::CookieStore::new(None);
         let client = AgentBuilder::new()
             .user_agent(&ProtocolItem::UserAgent.to_string())
@@ -117,17 +117,17 @@ impl LoginSolverTrait for DefaultLoginSolver {
             for mes in &mes {
                 warn!("{mes:?}");
             }
-            return Err(Error::LoginError(format!("{mes:?}")));
+            return Err(LoginError::ServerError(format!("{mes:?}")));
         }
         Ok(client)
     }
 
-    fn pwd_enc(&self, pwd: String) -> Result<String, Error> {
+    fn pwd_enc(&self, pwd: String) -> Result<String, LoginError> {
         let pwd = pwd.as_bytes();
         if (8..=16).contains(&pwd.len()) {
             Ok(Self::des_enc(pwd, b"u2oh6Vu^".to_owned()))
         } else {
-            Err(Error::EncError("密码长度不规范".to_string()))
+            Err(LoginError::BadPassword("密码长度不规范".to_string()))
         }
     }
 }
@@ -136,7 +136,7 @@ impl LoginSolverTrait for DefaultLoginSolver {
 pub struct LoginSolvers(Arc<RwLock<HashMap<String, Box<dyn LoginSolverTrait>>>>);
 impl LoginSolvers {
     /// 注册登录协议，参数须实现 [`LoginSolverTrait`].
-    pub fn register(solver: impl LoginSolverTrait + 'static) -> Result<(), Error> {
+    pub fn register(solver: impl LoginSolverTrait + 'static) -> Result<(), LoginError> {
         let solver = Box::new(solver);
         LOGIN_SOLVERS
             .0
@@ -183,23 +183,23 @@ impl LoginSolverTrait for LoginSolverWrapper<'_> {
             .is_some_and(|l| l.is_logged_in(agent))
     }
 
-    fn login_s(&self, account: &str, enc_passwd: &str) -> Result<Agent, Error> {
+    fn login_s(&self, account: &str, enc_passwd: &str) -> Result<Agent, LoginError> {
         LOGIN_SOLVERS
             .0
             .read()
             .unwrap()
             .get(self.0)
-            .ok_or_else(|| Error::LoginError("不支持的登录协议！".to_string()))?
+            .ok_or_else(|| LoginError::UnsupportedProtocol)?
             .login_s(account, enc_passwd)
     }
 
-    fn pwd_enc(&self, pwd: String) -> Result<String, Error> {
+    fn pwd_enc(&self, pwd: String) -> Result<String, LoginError> {
         LOGIN_SOLVERS
             .0
             .read()
             .unwrap()
             .get(self.0)
-            .ok_or_else(|| Error::LoginError("不支持的登录协议！".to_string()))?
+            .ok_or_else(|| LoginError::UnsupportedProtocol)?
             .pwd_enc(pwd)
     }
 }

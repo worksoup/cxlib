@@ -1,5 +1,5 @@
 use crate::{CaptchaType, IconClickImage, ObstacleImage, RotateImages, SlideImages, TextClickInfo};
-use cxlib_error::{CxlibResult, Error};
+use cxlib_error::CaptchaError;
 use cxlib_imageproc::{find_sub_image, image_from_bytes, Point};
 use cxlib_utils::{time_it_and_print_result, ureq_get_bytes};
 use image::DynamicImage;
@@ -60,14 +60,15 @@ mod click_captcha_helper {
     }
 }
 pub struct TopSolver;
-type TopSolverGlobal = dyn Fn(&Agent, serde_json::Value, &str) -> CxlibResult<String> + Sync;
+type TopSolverGlobal =
+    dyn Fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError> + Sync;
 static TOP_SOLVER: [OnceInit<TopSolverGlobal>; 5] = [const { OnceInit::new() }; 5];
 impl TopSolver {
     fn solver_generic<I, O, T>(
         agent: &Agent,
         image: serde_json::Value,
         referer: &str,
-    ) -> CxlibResult<String>
+    ) -> Result<String, CaptchaError>
     where
         T: VerificationInfoTrait<I, O> + DeserializeOwned + 'static,
         SolverRaw<I, O>: 'static,
@@ -86,7 +87,7 @@ impl TopSolver {
     }
     fn default_solver_impl(
         captcha_type: &CaptchaType,
-    ) -> fn(&Agent, serde_json::Value, &str) -> CxlibResult<String> {
+    ) -> fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError> {
         match captcha_type {
             CaptchaType::Slide => Self::solver_generic::<_, _, SlideImages>,
             CaptchaType::TextClick => Self::solver_generic::<_, _, TextClickInfo>,
@@ -112,7 +113,7 @@ impl TopSolver {
         captcha_type: &CaptchaType,
         image: serde_json::Value,
         referer: &str,
-    ) -> CxlibResult<String> {
+    ) -> Result<String, CaptchaError> {
         match TOP_SOLVER[Self::type_to_index(captcha_type)].get_data() {
             Err(_) => Self::default_solver_impl(captcha_type)(agent, image, referer),
             Ok(solver_) => solver_(agent, image, referer),
@@ -125,11 +126,11 @@ pub trait VerificationInfoTrait<I, O>: Sized {
     ///
     /// 验证信息可能包含图片 Url, 而计算验证结果需要图片类型，
     /// 则该函数需要做的应当为：下载图片并返回。
-    fn prepare_data(self, agent: &Agent, referer: &str) -> Result<I, cxlib_error::Error>;
+    fn prepare_data(self, agent: &Agent, referer: &str) -> Result<I, CaptchaError>;
     /// 默认过验证算法。如不实现则仅仅返回一个错误。
-    fn default_solver(input: I) -> CxlibResult<O> {
+    fn default_solver(input: I) -> Result<O, CaptchaError> {
         let _ = input;
-        Err(Error::CaptchaError("不支持该类型的验证码。".to_owned()))
+        Err(CaptchaError::UnsupportedType)
     }
     /// 设置全局过验证算法所需。
     ///
@@ -140,7 +141,7 @@ pub trait VerificationInfoTrait<I, O>: Sized {
     fn static_solver_holder() -> &'static OnceInit<SolverRaw<I, O>>;
     /// 将结果转为字符串类型，用来向网站发送请求。
     fn result_to_string(result: O) -> String;
-    fn solve(input: I) -> CxlibResult<O>
+    fn solve(input: I) -> Result<O, CaptchaError>
     where
         Self: VerificationInfoTrait<I, O> + 'static,
         SolverRaw<I, O>: 'static,
@@ -153,7 +154,7 @@ pub trait VerificationInfoTrait<I, O>: Sized {
     /// 初始化 `Solver`.
     ///
     /// 另见 [`VerificationInfoTrait::init_owned_solver`].
-    fn init_solver<F: Fn(I) -> CxlibResult<O> + Sync>(
+    fn init_solver<F: Fn(I) -> Result<O, CaptchaError> + Sync>(
         solver: &'static F,
     ) -> Result<(), OnceInitError>
     where
@@ -165,7 +166,7 @@ pub trait VerificationInfoTrait<I, O>: Sized {
     /// 初始化 `Solver`.
     ///
     /// 另见 [`VerificationInfoTrait::init_solver`].
-    fn init_owned_solver<F: Fn(I) -> CxlibResult<O> + Sync + 'static>(
+    fn init_owned_solver<F: Fn(I) -> Result<O, CaptchaError> + Sync + 'static>(
         solver: F,
     ) -> Result<(), OnceInitError>
     where
@@ -176,7 +177,7 @@ pub trait VerificationInfoTrait<I, O>: Sized {
         let solver: Box<dyn Fn(_) -> _ + Sync + 'static> = Box::new(solver);
         Self::static_solver_holder().set_boxed_data(solver)
     }
-    fn solver(self, agent: &Agent, referer: &str) -> CxlibResult<String>
+    fn solver(self, agent: &Agent, referer: &str) -> Result<String, CaptchaError>
     where
         Self: 'static,
         SolverRaw<I, O>: 'static,
@@ -190,7 +191,7 @@ pub trait VerificationInfoTrait<I, O>: Sized {
 /// 类型别名，三个一组的 [`Point`] 类型。
 pub type TriplePoint<T> = (Point<T>, Point<T>, Point<T>);
 /// 类型别名，本质上是一个 `dyn Fn` 类型。
-pub type SolverRaw<I, O> = dyn Fn(I) -> CxlibResult<O> + Sync;
+pub type SolverRaw<I, O> = dyn Fn(I) -> Result<O, CaptchaError> + Sync;
 type SlideSolverRaw = SolverRaw<(DynamicImage, DynamicImage), u32>;
 type IconClickSolverRaw = SolverRaw<DynamicImage, TriplePoint<u32>>;
 type TextClickSolverRaw = SolverRaw<(String, DynamicImage), TriplePoint<u32>>;
@@ -214,7 +215,7 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
         self,
         agent: &Agent,
         referer: &str,
-    ) -> Result<(DynamicImage, DynamicImage), cxlib_error::Error> {
+    ) -> Result<(DynamicImage, DynamicImage), CaptchaError> {
         debug!("small_image_url：{}", self.small_img_url());
         debug!("big_image_url：{}", self.big_img_url());
         let small_img = download_image(agent, self.small_img_url(), referer)?;
@@ -223,7 +224,7 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     }
     fn default_solver(
         (big_image, small_image): (DynamicImage, DynamicImage),
-    ) -> Result<u32, Error> {
+    ) -> Result<u32, CaptchaError> {
         time_it_and_print_result(move || {
             Ok(find_sub_image(
                 &big_image,
@@ -241,11 +242,7 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     }
 }
 impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
-    fn prepare_data(
-        self,
-        agent: &Agent,
-        referer: &str,
-    ) -> Result<DynamicImage, cxlib_error::Error> {
+    fn prepare_data(self, agent: &Agent, referer: &str) -> Result<DynamicImage, CaptchaError> {
         let img = download_image(agent, self.image_url(), referer)?;
         Ok(img)
     }
@@ -264,7 +261,7 @@ impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextCli
         self,
         agent: &Agent,
         referer: &str,
-    ) -> Result<(String, DynamicImage), cxlib_error::Error> {
+    ) -> Result<(String, DynamicImage), CaptchaError> {
         debug!("点选文字：{}", self.hanzi());
         debug!("图片 url：{}", self.img_url());
         let img = download_image(agent, self.img_url(), referer)?;
@@ -278,11 +275,7 @@ impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextCli
     }
 }
 impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
-    fn prepare_data(
-        self,
-        agent: &Agent,
-        referer: &str,
-    ) -> Result<DynamicImage, cxlib_error::Error> {
+    fn prepare_data(self, agent: &Agent, referer: &str) -> Result<DynamicImage, CaptchaError> {
         debug!("图片 url：{}", self.img_url());
         let img = download_image(agent, self.img_url(), referer)?;
         Ok(img)
@@ -301,7 +294,7 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
         self,
         agent: &Agent,
         referer: &str,
-    ) -> Result<(DynamicImage, DynamicImage), cxlib_error::Error> {
+    ) -> Result<(DynamicImage, DynamicImage), CaptchaError> {
         debug!(
             "验证码图片 url：{}, {}",
             self.fixed_img_url(),

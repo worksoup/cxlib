@@ -4,6 +4,7 @@ use cxlib_types::Location;
 use cxlib_user::Session;
 use log::info;
 use serde::{Deserialize, Serialize};
+use cxlib_error::SignError;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct QrCodeSign {
@@ -35,7 +36,7 @@ impl SignTrait for QrCodeSign {
     fn as_inner(&self) -> &RawSign {
         self.raw_sign.as_inner()
     }
-    fn pre_sign(&self, session: &Session, enc: &str) -> Result<PreSignResult, cxlib_error::Error> {
+    fn pre_sign(&self, session: &Session, enc: &str) -> Result<PreSignResult, SignError> {
         let raw = self.as_inner();
         let active_id = raw.active_id.as_str();
         let uid = session.get_uid();

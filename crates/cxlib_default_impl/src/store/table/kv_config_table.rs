@@ -1,4 +1,5 @@
 use crate::store::{DataBase, DataBaseTableTrait};
+use cxlib_error::StoreError;
 use cxlib_store::StorageTableCommandTrait;
 use log::warn;
 use std::collections::{HashMap, HashSet};
@@ -31,9 +32,9 @@ impl FromStr for KVPair {
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>();
         if s.len() < 2 {
-            Err(cxlib_error::Error::ParseError(
+            Err(StoreError::ParseError(
                 "键值表解析出错！格式为 `key = value`.".to_string(),
-            ))
+            ))?
         } else {
             let key = s[0].to_string();
             let value = s[1].to_string();

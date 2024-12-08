@@ -10,6 +10,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex, RwLock},
 };
+use cxlib_error::ProtocolError;
 
 pub enum ProtocolItem {
     ActiveList,
@@ -289,8 +290,8 @@ where
     ///
     /// # Errors
     ///
-    /// 在设置协议出错时返回 [`SetProtocolError`](cxlib_error::Error::ParseError).
-    pub fn load(protocol_config_path: &PathBuf) -> Result<Self, cxlib_error::Error> {
+    /// 在设置协议出错时返回 [`SetProtocolError`](ProtocolError::ParseError).
+    pub fn load(protocol_config_path: &PathBuf) -> Result<Self, ProtocolError> {
         let metadata = protocol_config_path.metadata();
         let mut read = false;
         let mut file = match metadata {
@@ -359,13 +360,13 @@ where
     ///
     /// # Errors
     ///
-    /// 在设置协议出错时返回 [`SetProtocolError`](cxlib_error::Error::SetProtocolError).
-    pub fn init() -> Result<(), cxlib_error::Error> {
+    /// 在设置协议出错时返回 [`SetProtocolError`](ProtocolError::SetProtocolError).
+    pub fn init() -> Result<(), ProtocolError> {
         let protocol_config_path =
             cxlib_store::Dir::get_config_file_path(ProtocolItem::config_file_name());
         let protocol = CXProtocol::<ProtocolData>::load(&protocol_config_path)?;
         ProtocolItem::set_boxed_protocol(Box::new(protocol))
-            .map_err(|_| cxlib_error::Error::SetProtocolError)
+            .map_err(|_| ProtocolError::SetProtocolError)
     }
 }
 impl<ProtocolItem, ProtocolData> ProtocolTrait<ProtocolItem> for CXProtocol<ProtocolData>
@@ -393,7 +394,7 @@ where
     fn set(&self, t: &ProtocolItem, value: &str) {
         self.data.write().unwrap().set(t, value)
     }
-    fn store(&self) -> Result<(), cxlib_error::Error> {
+    fn store(&self) -> Result<(), ProtocolError> {
         let toml =
             toml::to_string_pretty(&*self.data.read().unwrap()).expect("若看到此消息说明有 bug.");
         self.file
@@ -401,9 +402,7 @@ where
             .map(|f| f.lock().unwrap().write_all(toml.as_bytes()))
             .transpose()?
             .ok_or_else(|| {
-                cxlib_error::Error::FunctionIsDisabled(
-                    "文件为只读状态，保存功能已禁用。".to_string(),
-                )
+                ProtocolError::FunctionIsDisabled("文件为只读状态，保存功能已禁用。".to_string())
             })
     }
     /// 更新字段，相当于 [`set`](Self::set) + [`store`](Self::store), 具体逻辑为：若传入值与原有值不同，则更新字段并保存至文件。保存成功返回 `true`, 其余情况返回 `false`.

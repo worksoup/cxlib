@@ -1,4 +1,5 @@
 use crate::{cookies::UserCookies, DefaultLoginSolver, LoginSolverTrait};
+use cxlib_error::LoginError;
 use cxlib_protocol::ProtocolItem;
 use cxlib_store::Dir;
 use log::info;
@@ -34,7 +35,7 @@ impl Session {
         uname: String,
         agent: Agent,
         cookies: UserCookies,
-    ) -> Result<Session, cxlib_error::Error> {
+    ) -> Result<Session, LoginError> {
         let stu_name = DefaultLoginSolver::find_stu_name_in_html(&agent)?;
         let session = Session {
             agent,
@@ -55,7 +56,7 @@ impl Session {
             .build())
     }
     /// 加载本地 Cookies 并返回 [`Session`].
-    pub fn load_cookies(uid: &str, uname: &str) -> Result<Session, cxlib_error::Error> {
+    pub fn load_cookies(uid: &str, uname: &str) -> Result<Session, LoginError> {
         let agent = Self::load_cookies_raw(Dir::get_json_file_path(uid))?;
         let cookies = UserCookies::new(&agent);
         let session = Self::from_raw(uname.to_string(), agent, cookies)?;
@@ -67,7 +68,7 @@ impl Session {
         uname: &str,
         enc_pwd: &str,
         login_solver: &LoginSolver,
-    ) -> Result<(Agent, UserCookies), cxlib_error::Error> {
+    ) -> Result<(Agent, UserCookies), LoginError> {
         let agent = login_solver.login_s(uname, enc_pwd)?;
         let cookies = UserCookies::new(&agent);
         Ok((agent, cookies))
@@ -77,7 +78,7 @@ impl Session {
         uname: &str,
         enc_pwd: &str,
         login_solver: &LoginSolver,
-    ) -> Result<Session, cxlib_error::Error> {
+    ) -> Result<Session, LoginError> {
         let (agent, cookies) = Session::relogin_raw(uname, enc_pwd, login_solver)?;
         Self::store_cookies(&agent, cookies.get_uid())?;
         let session = Self::from_raw(uname.to_string(), agent, cookies)?;
@@ -90,32 +91,27 @@ impl Session {
         uid: &str,
         enc_passwd: &str,
         login_solver: &LoginSolver,
-    ) -> Result<Session, cxlib_error::Error> {
+    ) -> Result<Session, LoginError> {
         match Session::load_cookies(uid, uname) {
             Ok(s) => Ok(s),
             Err(e) => match e {
-                cxlib_error::Error::LoginExpired(_) => {
-                    Session::relogin(uname, enc_passwd, login_solver)
-                }
-                cxlib_error::Error::IoError(e) => match e.kind() {
+                LoginError::LoginExpired(_) => Session::relogin(uname, enc_passwd, login_solver),
+                LoginError::IoError(e) => match e.kind() {
                     std::io::ErrorKind::NotFound => {
                         Session::relogin(uname, enc_passwd, login_solver)
                     }
-                    _ => Err(cxlib_error::Error::IoError(e)),
+                    _ => Err(LoginError::IoError(e)),
                 },
                 _ => Err(e),
             },
         }
     }
     /// 将 Cookies 保存在某位置。具体请查看代码：[`Session::store_cookies`].
-    pub fn store_cookies(
-        agent: &Agent,
-        file_name_without_ext: &str,
-    ) -> Result<(), cxlib_error::Error> {
+    pub fn store_cookies(agent: &Agent, file_name_without_ext: &str) -> Result<(), LoginError> {
         let store_path = Dir::get_json_file_path(file_name_without_ext);
         let mut writer = std::fs::File::create(store_path).map(std::io::BufWriter::new)?;
         cookie_store::serde::json::save(&agent.cookie_store(), &mut writer)
-            .map_err(|e| cxlib_error::Error::LoginError(format!("Cookies 持久化失败：{e}")))
+            .map_err(LoginError::CookiesStoreError)
     }
     pub fn get_uid(&self) -> &str {
         self.cookies.get_uid()

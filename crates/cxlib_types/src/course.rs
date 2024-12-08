@@ -1,4 +1,5 @@
 use crate::protocol;
+use cxlib_error::{LoginError, UnwrapOrLogPanic};
 use cxlib_user::Session;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -62,7 +63,7 @@ impl Course {
         Ok(courses)
     }
     fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, cxlib_error::Error> {
-        let r: GetCoursesR = r.into_json().unwrap();
+        let r: GetCoursesR = r.into_json().unwrap_or_log_panic();
         let mut arr = Vec::new();
         if let Some(channel_list) = r.channel_list {
             for c in channel_list {
@@ -82,9 +83,9 @@ impl Course {
             }
             Ok(arr)
         } else {
-            Err(cxlib_error::Error::LoginExpired(
+            Err(LoginError::LoginExpired(
                 "`channelList` 字段为空!".to_string(),
-            ))
+            ))?
         }
     }
 

@@ -1,5 +1,5 @@
 use crate::{sign::QrCodeSign, signner::LocationInfoGetterTrait};
-use cxlib_error::Error;
+use cxlib_error::SignError;
 use cxlib_imageproc::Point;
 use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_types::Location;
@@ -47,7 +47,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
         &mut self,
         sign: &mut QrCodeSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, Error> {
+    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         let location = self
             .location_info_getter
             .get_locations(sign.as_location_sign_mut(), self.location_str)
@@ -101,13 +101,13 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
         sign: &mut QrCodeSign,
         session: &Session,
         (enc, location): (&str, &Location),
-    ) -> Result<SignResult, Error> {
+    ) -> Result<SignResult, SignError> {
         sign.pre_sign_and_sign(session, enc, location)
     }
 }
 
 impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
-    fn pic_to_enc(pic: &PathBuf) -> Result<String, Error> {
+    fn pic_to_enc(pic: &PathBuf) -> Result<String, SignError> {
         if std::fs::metadata(pic).expect("图片路径出错。").is_dir() {
             loop {
                 let yes = inquire_confirm("二维码图片是否就绪？", "本程序会读取 `--pic` 参数所指定的路径下最新修改的图片。你可以趁现在获取这张图片，然后按下回车进行签到。");
@@ -117,14 +117,16 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
             }
             let pic = crate::utils::find_latest_pic(pic)?;
             Self::pic_path_to_qrcode_result(pic.to_str().unwrap()).ok_or_else(|| {
-                Error::EncError(
+                SignError::SignDataNotFound(
                     "未能识别到二维码，可能是二维码模糊、过小等，请确保图片易于识别。".to_owned(),
                 )
             })
         } else if let Some(enc) = Self::pic_path_to_qrcode_result(pic.to_str().unwrap()) {
             Ok(enc)
         } else {
-            return Err(Error::EncError("二维码中没有 `enc` 参数！".to_owned()));
+            return Err(SignError::SignDataNotFound(
+                "二维码中没有 `enc` 参数！".to_owned(),
+            ));
         }
     }
 
@@ -213,7 +215,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
         path: &Option<PathBuf>,
         enc: &Option<String>,
         precisely: bool,
-    ) -> Result<String, Error> {
+    ) -> Result<String, SignError> {
         let enc = if let Some(enc) = enc {
             enc.clone()
         } else if let Some(pic) = path {
@@ -221,7 +223,9 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
         } else if let Some(enc) = Self::capture_screen_for_enc(sign.is_refresh(), precisely) {
             enc
         } else {
-            return Err(Error::EncError("截屏时未获取到 `enc` 参数！".to_owned()));
+            return Err(SignError::SignDataNotFound(
+                "截屏时未获取到 `enc` 参数！".to_owned(),
+            ));
         };
         Ok(enc)
     }

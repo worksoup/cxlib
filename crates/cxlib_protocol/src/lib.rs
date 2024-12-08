@@ -2,6 +2,7 @@ mod default_impl;
 
 pub use default_impl::*;
 
+use cxlib_error::ProtocolError;
 use onceinit::{OnceInit, OnceInitError, OnceInitState, StaticDefault};
 
 pub trait ProtocolItemTrait: Sized + 'static {
@@ -24,7 +25,7 @@ pub trait ProtocolItemTrait: Sized + 'static {
     fn set(&self, value: &str) {
         Self::get_protocol().set(self, value)
     }
-    fn store() -> Result<(), cxlib_error::Error> {
+    fn store() -> Result<(), ProtocolError> {
         Self::get_protocol().store()
     }
     fn update(&self, value: &str) -> bool {
@@ -58,7 +59,7 @@ pub trait ProtocolTrait<ProtocolItem>: Sync {
     fn get(&self, t: &ProtocolItem) -> String;
 
     fn set(&self, t: &ProtocolItem, value: &str);
-    fn store(&self) -> Result<(), cxlib_error::Error>;
+    fn store(&self) -> Result<(), ProtocolError>;
     fn update(&self, t: &ProtocolItem, value: &str) -> bool;
 }
 

@@ -1,5 +1,5 @@
 use crate::sign::PhotoSign;
-use cxlib_error::Error;
+use cxlib_error::SignError;
 use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_types::Photo;
 use cxlib_user::Session;
@@ -32,7 +32,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
         &mut self,
         sign: &mut PhotoSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, Error> {
+    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
         let mut pic_map = HashMap::new();
         #[allow(clippy::mutable_key_type)]
         let mut session_to_index = HashMap::new();
@@ -83,7 +83,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
         sign: &mut PhotoSign,
         session: &Session,
         photo: &Photo,
-    ) -> Result<SignResult, Error> {
+    ) -> Result<SignResult, SignError> {
         sign.pre_sign_and_sign(session, &(), photo)
     }
 }

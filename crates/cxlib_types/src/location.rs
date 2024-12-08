@@ -2,7 +2,7 @@ use std::{collections::HashMap, f64::consts::PI, ops::Deref, str::FromStr};
 
 use crate::Course;
 use cxlib_user::Session;
-use onceinit::{OnceInit, StaticDefault};
+use onceinit::{OnceInit, OnceInitError, StaticDefault};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -40,17 +40,13 @@ impl Location {
 
     pub fn set_location_preprocessor(
         preprocessor: &'static dyn LocationPreprocessorTrait,
-    ) -> Result<(), cxlib_error::Error> {
-        LOCATION_PREPROCESSOR
-            .set_data(preprocessor)
-            .map_err(|_| cxlib_error::Error::SetLocationPreprocessorError)
+    ) -> Result<(), OnceInitError> {
+        LOCATION_PREPROCESSOR.set_data(preprocessor)
     }
     pub fn set_boxed_location_preprocessor(
         preprocessor: Box<dyn LocationPreprocessorTrait>,
-    ) -> Result<(), cxlib_error::Error> {
-        LOCATION_PREPROCESSOR
-            .set_boxed_data(preprocessor)
-            .map_err(|_| cxlib_error::Error::SetLocationPreprocessorError)
+    ) -> Result<(), OnceInitError> {
+        LOCATION_PREPROCESSOR.set_boxed_data(preprocessor)
     }
     pub fn to_owned_fields(self) -> [String; 4] {
         let Location {
