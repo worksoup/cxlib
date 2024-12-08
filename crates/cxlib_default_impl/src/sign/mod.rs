@@ -120,4 +120,15 @@ impl Sign {
             Sign::Unknown(raw)
         }
     }
+    pub fn as_raw(&self) -> &RawSign {
+        match self {
+            Sign::Photo(a) => a.as_inner(),
+            Sign::Normal(a) => a.as_inner(),
+            Sign::QrCode(a) => a.as_inner(),
+            Sign::Gesture(a) => a.as_inner(),
+            Sign::Location(a) => a.as_inner(),
+            Sign::Signcode(a) => a.as_inner(),
+            Sign::Unknown(a) => a.as_inner(),
+        }
+    }
 }
