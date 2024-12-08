@@ -40,9 +40,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
     }
 }
 
-impl<T: LocationInfoGetterTrait + Sync + Send> SignnerTrait<QrCodeSign>
-    for DefaultQrCodeSignner<'_, T>
-{
+impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'_, T> {
     type ExtData<'e> = (&'e str, &'e Location);
 
     fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
@@ -211,7 +209,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
     }
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     pub fn enc_gen(
-        sign: &crate::sign::QrCodeSign,
+        sign: &QrCodeSign,
         path: &Option<PathBuf>,
         enc: &Option<String>,
         precisely: bool,
@@ -238,7 +236,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
             .find("&enc=")
             .map(|beg| url[beg + 5..beg + 37].to_owned());
         if r.is_none() {
-            log::warn!("{url:?}中没有找到二维码！");
+            warn!("{url:?}中没有找到二维码！");
         }
         r
     }
