@@ -249,6 +249,8 @@ impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
     fn static_solver_holder() -> &'static OnceInit<IconClickSolverRaw> {
         &ICON_CLICK_SOLVER
     }
+    /// \[{"x":82,"y":114},{"x":286,"y":68},{"x":154,"y":90}\] <br/>
+    /// x, y 为图标相对 origin_image 右上角的位置。
     fn result_to_string(result: TriplePoint<u32>) -> String {
         let points = click_captcha_helper::Point3::from((result.0, result.1, result.2));
         debug!("本地滑块结果：{points}");
@@ -270,6 +272,9 @@ impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextCli
     fn static_solver_holder() -> &'static OnceInit<TextClickSolverRaw> {
         &TEXT_CLICK_SOLVER
     }
+    // TODO: 需要验证
+    /// \[{"x":82,"y":114},{"x":286,"y":68},{"x":154,"y":90}\] <br/>
+    /// x, y 为图标相对 origin_image 右上角的位置。
     fn result_to_string(result: TriplePoint<u32>) -> String {
         IconClickImage::result_to_string(result)
     }
@@ -283,6 +288,9 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
     fn static_solver_holder() -> &'static OnceInit<ObstacleSolverRaw> {
         &OBSTACLE_SOLVER
     }
+    // TODO: 需要验证
+    /// \[{"x":82,"y":114},{"x":286,"y":68},{"x":154,"y":90}\] <br/>
+    /// x, y 为图标相对 origin_image 右上角的位置。
     fn result_to_string(result: Point<u32>) -> String {
         let data = click_captcha_helper::Point::from(result);
         debug!("本地滑块结果：{data}");
@@ -307,10 +315,10 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
     fn static_solver_holder() -> &'static OnceInit<RotateSolverRaw> {
         &ROTATE_SOLVER
     }
-    /// \[{"x":82,"y":114},{"x":286,"y":68},{"x":154,"y":90}\] <br/>
-    /// x, y 为图标相对 origin_image 右上角的位置。
+    /// result 为度数，取值为 0-360.
     fn result_to_string(result: u32) -> String {
         debug!("本地旋转结果：{result}");
+        let result = (result as f32 / 360.0 * 280.0).round().to_string();
         format!("%5B%7B%22x%22%3A{}%7D%5D", result)
     }
 }
