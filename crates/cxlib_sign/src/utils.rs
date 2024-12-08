@@ -1,10 +1,9 @@
 use crate::{protocol, PreSignResult, SignResult, SignTrait};
 use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
-use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Dioption, LocationWithRange};
 use cxlib_user::Session;
-use log::{debug, trace, warn};
+use log::{debug, trace};
 use std::ops::{Deref, DerefMut};
 use ureq::{Agent, Response};
 

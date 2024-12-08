@@ -5,6 +5,7 @@ version.workspace = true
 authors.workspace = true
 
 [dependencies]
+chrono.workspace = true
 cxlib_error = { path = "../cxlib_error" }
 cxlib_protocol = { path = "../cxlib_protocol" }
 cxlib_user = { path = "../cxlib_user" }

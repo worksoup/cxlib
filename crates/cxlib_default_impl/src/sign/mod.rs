@@ -15,8 +15,9 @@ pub use qrcode::*;
 pub use signcode::*;
 
 use cxlib_activity::RawSign;
-use cxlib_sign::{PreSignResult, SignDetail, SignResult, SignTrait};
-use cxlib_types::{Location, LocationWithRange};
+use cxlib_error::UnwrapOrLogPanic;
+use cxlib_sign::{PreSignResult, SignDetail, SignTrait};
+use cxlib_types::LocationWithRange;
 use cxlib_user::Session;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -60,7 +61,7 @@ impl Sign {
             is_photo_sign,
             is_refresh_qrcode,
             sign_code,
-        } = r.into_json().unwrap();
+        } = r.into_json().unwrap_or_log_panic();
         Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
     }
     pub fn from_raw(raw: RawSign, session: &Session) -> Self {

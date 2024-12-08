@@ -1,7 +1,7 @@
 use crate::{CaptchaType, IconClickImage, ObstacleImage, RotateImages, SlideImages, TextClickInfo};
 use cxlib_error::{CxlibResult, Error};
-use cxlib_utils::time_it_and_print_result;
-use cxlib_utils::{find_sub_image, Point};
+use cxlib_imageproc::{find_sub_image, image_from_bytes, Point};
+use cxlib_utils::{time_it_and_print_result, ureq_get_bytes};
 use image::DynamicImage;
 use log::debug;
 use onceinit::{OnceInit, OnceInitError};
@@ -18,8 +18,8 @@ mod click_captcha_helper {
             write!(f, "%7B%22x%22%3A{}%2C%22y%22%3A{}%7D", self.0, self.1)
         }
     }
-    impl<T> From<cxlib_utils::Point<T>> for Point<T> {
-        fn from(value: cxlib_utils::Point<T>) -> Self {
+    impl<T> From<cxlib_imageproc::Point<T>> for Point<T> {
+        fn from(value: cxlib_imageproc::Point<T>) -> Self {
             Self(value.x, value.y)
         }
     }
@@ -37,16 +37,16 @@ mod click_captcha_helper {
     }
     impl<T>
         From<(
-            cxlib_utils::Point<T>,
-            cxlib_utils::Point<T>,
-            cxlib_utils::Point<T>,
+            cxlib_imageproc::Point<T>,
+            cxlib_imageproc::Point<T>,
+            cxlib_imageproc::Point<T>,
         )> for Point3<T>
     {
         fn from(
             value: (
-                cxlib_utils::Point<T>,
-                cxlib_utils::Point<T>,
-                cxlib_utils::Point<T>,
+                cxlib_imageproc::Point<T>,
+                cxlib_imageproc::Point<T>,
+                cxlib_imageproc::Point<T>,
             ),
         ) -> Self {
             Self(value.0.into(), value.1.into(), value.2.into())
@@ -201,6 +201,13 @@ static ICON_CLICK_SOLVER: OnceInit<IconClickSolverRaw> = OnceInit::new();
 static TEXT_CLICK_SOLVER: OnceInit<TextClickSolverRaw> = OnceInit::new();
 static ROTATE_SOLVER: OnceInit<RotateSolverRaw> = OnceInit::new();
 static OBSTACLE_SOLVER: OnceInit<ObstacleSolverRaw> = OnceInit::new();
+fn download_image(
+    agent: &Agent,
+    image_url: &str,
+    referer: &str,
+) -> Result<DynamicImage, Box<ureq::Error>> {
+    Ok(image_from_bytes(ureq_get_bytes(agent, image_url, referer)?))
+}
 
 impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     fn prepare_data(
@@ -210,8 +217,8 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     ) -> Result<(DynamicImage, DynamicImage), cxlib_error::Error> {
         debug!("small_image_url：{}", self.small_img_url());
         debug!("big_image_url：{}", self.big_img_url());
-        let small_img = cxlib_utils::download_image(agent, self.small_img_url(), referer)?;
-        let big_img = cxlib_utils::download_image(agent, self.big_img_url(), referer)?;
+        let small_img = download_image(agent, self.small_img_url(), referer)?;
+        let big_img = download_image(agent, self.big_img_url(), referer)?;
         Ok((big_img, small_img))
     }
     fn default_solver(
@@ -221,7 +228,7 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
             Ok(find_sub_image(
                 &big_image,
                 &small_image,
-                cxlib_utils::slide_solvers::find_min_sum_of_squared_errors,
+                cxlib_imageproc::slide_solvers::find_min_sum_of_squared_errors,
             ))
         })
     }
@@ -239,7 +246,7 @@ impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
         agent: &Agent,
         referer: &str,
     ) -> Result<DynamicImage, cxlib_error::Error> {
-        let img = cxlib_utils::download_image(agent, self.image_url(), referer)?;
+        let img = download_image(agent, self.image_url(), referer)?;
         Ok(img)
     }
     fn static_solver_holder() -> &'static OnceInit<IconClickSolverRaw> {
@@ -260,7 +267,7 @@ impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextCli
     ) -> Result<(String, DynamicImage), cxlib_error::Error> {
         debug!("点选文字：{}", self.hanzi());
         debug!("图片 url：{}", self.img_url());
-        let img = cxlib_utils::download_image(agent, self.img_url(), referer)?;
+        let img = download_image(agent, self.img_url(), referer)?;
         Ok((self.hanzi().clone(), img))
     }
     fn static_solver_holder() -> &'static OnceInit<TextClickSolverRaw> {
@@ -277,7 +284,7 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
         referer: &str,
     ) -> Result<DynamicImage, cxlib_error::Error> {
         debug!("图片 url：{}", self.img_url());
-        let img = cxlib_utils::download_image(agent, self.img_url(), referer)?;
+        let img = download_image(agent, self.img_url(), referer)?;
         Ok(img)
     }
     fn static_solver_holder() -> &'static OnceInit<ObstacleSolverRaw> {
@@ -300,8 +307,8 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
             self.fixed_img_url(),
             self.rotatable_img_url()
         );
-        let rotatable_img = cxlib_utils::download_image(agent, self.rotatable_img_url(), referer)?;
-        let fixed_img = cxlib_utils::download_image(agent, self.fixed_img_url(), referer)?;
+        let rotatable_img = download_image(agent, self.rotatable_img_url(), referer)?;
+        let fixed_img = download_image(agent, self.fixed_img_url(), referer)?;
         Ok((fixed_img, rotatable_img))
     }
     fn static_solver_holder() -> &'static OnceInit<RotateSolverRaw> {

@@ -7,9 +7,10 @@ authors.workspace = true
 [dependencies]
 cxlib_activity = { path = "../cxlib_activity" }
 cxlib_error = { path = "../cxlib_error" }
-cxlib_store = { path = "../cxlib_store" }
+cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_protocol = { path = "../cxlib_protocol" }
 cxlib_sign = { path = "../cxlib_sign" }
+cxlib_store = { path = "../cxlib_store" }
 cxlib_types = { path = "../cxlib_types" }
 cxlib_user = { path = "../cxlib_user" }
 cxlib_utils = { path = "../cxlib_utils" }

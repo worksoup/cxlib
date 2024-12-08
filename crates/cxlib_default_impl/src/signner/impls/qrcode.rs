@@ -1,9 +1,10 @@
 use crate::{sign::QrCodeSign, signner::LocationInfoGetterTrait};
 use cxlib_error::Error;
+use cxlib_imageproc::Point;
 use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
 use cxlib_types::Location;
 use cxlib_user::Session;
-use cxlib_utils::{cut_picture, inquire_confirm, scan_file, scan_qrcode, Point};
+use cxlib_utils::inquire_confirm;
 use log::warn;
 use std::{
     collections::HashMap,
@@ -148,7 +149,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
     pub fn capture_screen_for_enc(is_refresh: bool, precise: bool) -> Option<String> {
         fn get_rect_contains_vertex(vertex: &[rxing::Point]) -> (Point<u32>, Point<u32>) {
             let (lt, rb) =
-                cxlib_utils::get_rect_contains_vertex(vertex.iter().map(|vertex| Point {
+                cxlib_imageproc::get_rect_contains_vertex(vertex.iter().map(|vertex| Point {
                     x: vertex.x as _,
                     y: vertex.y as _,
                 }));
@@ -175,7 +176,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
             });
             info!("已截屏。");
             // 如果成功识别到二维码。
-            let results = scan_qrcode(image::DynamicImage::from(pic), &mut HashMap::new());
+            let results = Self::scan_qrcode(image::DynamicImage::from(pic), &mut HashMap::new());
             let results = if let Ok(results) = results {
                 results
             } else {
@@ -197,8 +198,8 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
                     let pic = screen
                         .capture_image()
                         .unwrap_or_else(|e| panic!("{e:?}"));
-                    let cut_pic = cut_picture(&pic, qrcode_pos_on_screen.0, qrcode_pos_on_screen.1);
-                    let r = scan_qrcode(cut_pic.to_image().into(), &mut HashMap::new()).unwrap_or_else(|e| panic!("{e:?}"));
+                    let cut_pic =cxlib_imageproc::cut_picture(&pic, qrcode_pos_on_screen.0, qrcode_pos_on_screen.1);
+                    let r = Self::scan_qrcode(cut_pic.to_image().into(), &mut HashMap::new()).unwrap_or_else(|e| panic!("{e:?}"));
                     Self::find_qrcode_sign_enc_in_url(r[0].getText())
                 } else {
                     // 如果不是精确截取的二维码，则不需要提示。
@@ -242,7 +243,28 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
         r
     }
     pub fn pic_path_to_qrcode_result(pic_path: &str) -> Option<String> {
-        let r = scan_file(pic_path).ok()?;
+        let r = Self::scan_file(pic_path).ok()?;
         Self::find_qrcode_sign_enc_in_url(r.first()?.getText())
+    }
+    pub fn scan_qrcode(
+        image: image::DynamicImage,
+        hints: &mut rxing::DecodingHintDictionary,
+    ) -> rxing::common::Result<Vec<rxing::RXingResult>> {
+        hints
+            .entry(rxing::DecodeHintType::TRY_HARDER)
+            .or_insert(rxing::DecodeHintValue::TryHarder(true));
+        let reader = rxing::MultiFormatReader::default();
+        let mut scanner = rxing::multi::GenericMultipleBarcodeReader::new(reader);
+        rxing::multi::MultipleBarcodeReader::decode_multiple_with_hints(
+            &mut scanner,
+            &mut rxing::BinaryBitmap::new(rxing::common::HybridBinarizer::new(
+                rxing::BufferedImageLuminanceSource::new(image),
+            )),
+            hints,
+        )
+    }
+
+    pub fn scan_file(pic_path: &str) -> rxing::common::Result<Vec<rxing::RXingResult>> {
+        rxing::helpers::detect_multiple_in_file(pic_path)
     }
 }

@@ -1,6 +1,14 @@
 use proc_macro::TokenStream;
 use quote::quote;
+use std::io::Read;
 
+fn zlib_decode<R: Read>(r: R) -> String {
+    let mut decoder = ZlibDecoder::new(r);
+    use flate2::read::ZlibDecoder;
+    let mut decompressed_data = String::new();
+    decoder.read_to_string(&mut decompressed_data).unwrap();
+    decompressed_data
+}
 const _10: [u32; 64] = [
     0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
     0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
@@ -82,7 +90,6 @@ fn f0() -> String {
 }
 #[proc_macro]
 pub fn __define(_input: TokenStream) -> TokenStream {
-    use cxlib_utils::zlib_decode;
     let r = zlib_decode(&_00[..]) + &f0() + &zlib_decode(&_01[..]);
     let mut tokens = proc_macro2::TokenStream::new();
     let token: proc_macro2::TokenStream = r.parse().unwrap();
@@ -91,6 +98,7 @@ pub fn __define(_input: TokenStream) -> TokenStream {
 }
 #[cfg(test)]
 mod tests {
+
     static _10: [u8; 653] = [
         120, 156, 181, 148, 93, 107, 219, 48, 20, 134, 239, 251, 43, 212, 148, 5, 105, 85, 141,
         243, 217, 52, 142, 61, 58, 24, 99, 55, 187, 232, 197, 96, 24, 87, 200, 138, 156, 10, 108,
@@ -126,4 +134,17 @@ mod tests {
         142, 138, 53, 255, 212, 116, 214, 188, 67, 69, 218, 115, 0, 51, 174, 121, 168, 34, 155, 5,
         49, 244, 212, 78, 136, 215, 52, 188, 121, 7, 160, 57, 8, 108, 251, 13, 30, 117, 255, 144,
     ];
+    fn zlib_encode(text: &str) -> Vec<u8> {
+        use flate2::write::ZlibEncoder;
+        use flate2::Compression;
+        use std::io::prelude::*;
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(text.as_bytes()).unwrap();
+        encoder.finish().unwrap()
+    }
+
+    #[test]
+    fn test_encode() {
+        zlib_encode("hello");
+    }
 }

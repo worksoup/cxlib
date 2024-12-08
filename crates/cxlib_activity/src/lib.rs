@@ -9,7 +9,14 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
 
+fn time_delta_from_mills(mills: u64) -> chrono::TimeDelta {
+    let start_time = std::time::UNIX_EPOCH + Duration::from_millis(mills);
+    let now = SystemTime::now();
+    let duration = now.duration_since(start_time).unwrap();
+    chrono::TimeDelta::from_std(duration).unwrap()
+}
 /// # Activity
 ///
 /// 活动类型，是一个枚举，可能是一个[暂未被分类的课程签到](RawSign)，也可能是[其他活动](OtherActivity)，如通知、作业等。
@@ -48,7 +55,7 @@ impl Activity {
         let mut dont_exclude = false;
         for activity in &activities {
             if let Self::RawSign(sign) = activity {
-                if cxlib_utils::time_delta_since_to_now(sign.start_time_mills).num_days() < 160 {
+                if time_delta_from_mills(sign.start_time_mills).num_days() < 160 {
                     dont_exclude = true;
                 }
             }
@@ -114,9 +121,7 @@ impl Activity {
                         for activity in &activities {
                             if let Self::RawSign(sign) = activity {
                                 if set_excludes
-                                    && cxlib_utils::time_delta_since_to_now(sign.start_time_mills)
-                                        .num_days()
-                                        < 160
+                                    && time_delta_from_mills(sign.start_time_mills).num_days() < 160
                                 {
                                     dont_exclude = true;
                                 }

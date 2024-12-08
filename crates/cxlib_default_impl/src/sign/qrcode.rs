@@ -1,4 +1,4 @@
-use crate::sign::{LocationSign, PreSignResult, RawSign, SignResult, SignTrait};
+use crate::sign::{LocationSign, PreSignResult, RawSign, SignTrait};
 use cxlib_sign::utils::PPTSignHelper;
 use cxlib_types::Location;
 use cxlib_user::Session;
