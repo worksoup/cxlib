@@ -111,6 +111,7 @@ pub trait SignTrait: Ord {
     fn sign(
         &self,
         session: &Session,
+        pre_sign_url: &str,
         pre_sign_result_data: &Dioption<CaptchaId, LocationWithRange>,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
@@ -118,7 +119,12 @@ pub trait SignTrait: Ord {
         match self.pre_check_data(session, data)? {
             Ok(_) => {
                 let url = self.sign_url(session, pre_sign_data, data);
-                try_secondary_verification::<Self>(session, url, pre_sign_result_data.first())
+                try_secondary_verification::<Self>(
+                    session,
+                    url,
+                    pre_sign_result_data.first(),
+                    pre_sign_url,
+                )
             }
             Err(msg) => Ok(msg),
         }
@@ -133,9 +139,10 @@ pub trait SignTrait: Ord {
         let r = self.pre_sign(session, pre_sign_data)?;
         match r {
             PreSignResult::Susses => Ok(SignResult::Susses),
-            PreSignResult::Data(pre_sign_result_data) => {
-                self.sign(session, &pre_sign_result_data, pre_sign_data, data)
-            }
+            PreSignResult::Data {
+                ref url,
+                data: ref pre_sign_result_data,
+            } => self.sign(session, url, pre_sign_result_data, pre_sign_data, data),
         }
     }
 }
@@ -165,19 +172,22 @@ impl SignTrait for RawSign {
 /// 预签到结果，可能包含了一些签到时需要的信息。
 pub enum PreSignResult {
     Susses,
-    Data(Dioption<CaptchaId, LocationWithRange>),
+    Data {
+        url: String,
+        data: Dioption<CaptchaId, LocationWithRange>,
+    },
 }
 impl PreSignResult {
     pub fn is_susses(&self) -> bool {
         match self {
             PreSignResult::Susses => true,
-            PreSignResult::Data(_) => false,
+            PreSignResult::Data { .. } => false,
         }
     }
     pub fn to_result(self) -> SignResult {
         match self {
             PreSignResult::Susses => SignResult::Susses,
-            PreSignResult::Data(_) => unreachable!(),
+            PreSignResult::Data { .. } => unreachable!(),
         }
     }
 }

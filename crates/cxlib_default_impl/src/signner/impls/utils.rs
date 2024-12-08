@@ -40,11 +40,15 @@ pub(crate) fn sign_single_retry<
     let r = sign.pre_sign(session, pre_sign_data)?;
     match r {
         PreSignResult::Susses => Ok(SignResult::Susses),
-        PreSignResult::Data(pre_sign_result_data) => {
+        PreSignResult::Data {
+            ref url,
+            data: ref pre_sign_result_data,
+        } => {
             for location in locations {
                 match sign.sign(
                     session,
-                    &pre_sign_result_data,
+                    url,
+                    pre_sign_result_data,
                     pre_sign_data,
                     Sign::data_helper(location).borrow(),
                 )? {

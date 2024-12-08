@@ -29,6 +29,9 @@ pub fn get_captcha(
     time_stamp_mills: impl Display + Copy,
     referer: &str,
 ) -> Result<ureq::Response, Box<ureq::Error>> {
+    let referer =
+        percent_encoding::utf8_percent_encode(referer, percent_encoding::NON_ALPHANUMERIC)
+            .to_string();
     let url = format!(
         "{}?{callback}&{id}&{key}&{token}&{iv}&{type_}&{version}&{referer_}&_={time_stamp_mills}",
         ProtocolItem::GetCaptcha,
@@ -39,13 +42,9 @@ pub fn get_captcha(
         iv = format_args!("iv={}", iv),
         type_ = format_args!("type={}", captcha_type),
         version = VERSION_PARAM,
-        referer_ = format_args!(
-            "referer={}",
-            percent_encoding::utf8_percent_encode(referer, percent_encoding::NON_ALPHANUMERIC)
-                .to_string()
-        ),
+        referer_ = format_args!("referer={}", referer),
     );
-    Ok(agent.get(&url).set("Referer", referer).call()?)
+    Ok(agent.get(&url).set("Referer", &referer).call()?)
 }
 
 // 滑块验证。

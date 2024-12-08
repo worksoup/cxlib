@@ -14,6 +14,7 @@ pub fn analysis_after_presign(
     session: &Session,
     response_of_presign: Response,
 ) -> Result<PreSignResult, SignError> {
+    let presign_url = response_of_presign.get_url().to_string();
     let html = response_of_presign
         .into_string()
         .unwrap_or_else(cxlib_error::log_panic);
@@ -51,7 +52,10 @@ pub fn analysis_after_presign(
     );
     // 防止行为检测导致失败。
     std::thread::sleep(std::time::Duration::from_millis(500));
-    Ok(PreSignResult::Data(captcha_id_and_location))
+    Ok(PreSignResult::Data {
+        url: presign_url,
+        data: captcha_id_and_location,
+    })
 }
 pub struct PPTSignHelper {
     url: String,
@@ -105,6 +109,7 @@ pub fn secondary_verification(
     agent: &Agent,
     url: PPTSignHelper,
     captcha_id: Option<&CaptchaId>,
+    referer: &str,
 ) -> Result<SignResult, SignError> {
     let captcha_id = if let Some(captcha_id) = captcha_id {
         captcha_id
@@ -112,7 +117,7 @@ pub fn secondary_verification(
         warn!("未找到 CaptchaId, 使用内建值。");
         &ProtocolItem::CaptchaId.get()
     };
-    let url_param = DEFAULT_CAPTCHA_TYPE.solve_captcha(agent, captcha_id, url.url())?;
+    let url_param = DEFAULT_CAPTCHA_TYPE.solve_captcha(agent, captcha_id, referer)?;
     let r = {
         let url = url.with_validate(&url_param);
         let r = url.get(agent)?;
@@ -124,6 +129,7 @@ pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
     agent: &Agent,
     url: PPTSignHelper,
     captcha_id: Option<&CaptchaId>,
+    referer: &str,
 ) -> Result<SignResult, SignError> {
     let r = url.get(agent)?;
     match Sign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic)) {
@@ -131,7 +137,7 @@ pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。
                 let url = url.path_enc_by_pre_sign_result_msg(msg);
-                secondary_verification(agent, url, captcha_id)
+                secondary_verification(agent, url, captcha_id, referer)
             } else {
                 Ok(SignResult::Fail { msg })
             }
