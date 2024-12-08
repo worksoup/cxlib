@@ -8,53 +8,29 @@ use cxlib_types::Location;
 pub use impls::*;
 
 pub trait LocationInfoGetterTrait {
-    fn location_str_to_location(&self, location_str: &str) -> Option<Location>;
+    fn get_location_by_location_str(&self, location_str: &str) -> Option<Location>;
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location>;
-    fn get_location_or_else<GetPresetLocation: FnOnce() -> Option<Location>>(
-        &self,
-        location_str: &Option<String>,
-        get_preset_location: GetPresetLocation,
-    ) -> Option<Location> {
-        location_str.as_ref().and_then(|location_str| {
-            self.location_str_to_location(location_str).or_else(|| {
-                get_preset_location().map(|mut l| {
-                    if location_str.is_empty() {
-                        l
-                    } else {
-                        l.set_addr(location_str);
-                        l
-                    }
-                })
-            })
-        })
-    }
-    fn get_preset_location(&self, sign: &LocationSign) -> Option<Location> {
-        sign.get_preset_location()
-    }
-    fn get_location_or(
-        &self,
-        location_str: &Option<String>,
-        preset_location: Option<Location>,
-    ) -> Option<Location> {
-        self.get_location_or_else(location_str, || preset_location)
-    }
     fn get_locations(&self, sign: &LocationSign, location_str: &Option<String>) -> Vec<Location> {
         let mut locations = Vec::new();
-        let l1 = location_str
-            .as_ref()
-            .and_then(|location_str| self.location_str_to_location(location_str));
-        if let Some(l1) = l1 {
-            locations.push(l1);
-        }
         // 该位置保证能够签到成功。
-        let l2 = self.get_preset_location(sign);
-        if let Some(l2) = l2 {
-            locations.push(l2);
-        } else {
-            let l3 = self.get_fallback_location(sign);
-            if let Some(l3) = l3 {
-                locations.push(l3);
+        let l2 = sign.get_preset_location();
+        if let Some(location_str) = location_str {
+            let location_str = location_str.trim();
+            let l1 = location_str.parse::<Location>().ok();
+            if let Some(l1) = l1 {
+                locations.push(l1);
+            } else if let Some(mut l2) = l2 {
+                l2.set_addr(location_str);
+                locations.push(l2);
+                return locations;
             }
+        } else if let Some(l2) = l2 {
+            locations.push(l2);
+            return locations;
+        }
+        let l3 = self.get_fallback_location(sign);
+        if let Some(l3) = l3 {
+            locations.push(l3);
         }
         locations
     }
@@ -73,26 +49,21 @@ impl<'a> From<&'a DataBase> for DefaultLocationInfoGetter<'a> {
 }
 
 impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
-    fn location_str_to_location(&self, location_str: &str) -> Option<Location> {
-        let location_str = location_str.trim();
-        location_str
-            .parse()
-            .ok()
-            .or_else(|| LocationTable::get_location_by_alias(self.0, location_str))
-            .or_else(|| {
-                location_str
-                    .parse()
-                    .map(|location_id| {
-                        if LocationTable::has_location(self.0, location_id) {
-                            let (_, location) = LocationTable::get_location(self.0, location_id);
-                            Some(location)
-                        } else {
-                            None
-                        }
-                    })
-                    .ok()
-                    .flatten()
-            })
+    fn get_location_by_location_str(&self, trimmed_location_str: &str) -> Option<Location> {
+        LocationTable::get_location_by_alias(self.0, trimmed_location_str).or_else(|| {
+            trimmed_location_str
+                .parse()
+                .map(|location_id| {
+                    if LocationTable::has_location(self.0, location_id) {
+                        let (_, location) = LocationTable::get_location(self.0, location_id);
+                        Some(location)
+                    } else {
+                        None
+                    }
+                })
+                .ok()
+                .flatten()
+        })
     }
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location> {
         LocationTable::get_location_list_by_course(self.0, sign.as_inner().course.get_id()).pop()
