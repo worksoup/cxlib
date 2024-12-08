@@ -8,8 +8,12 @@ pub enum LoginError {
     AgentError(#[from] Box<ureq::Error>),
     #[error("登录失败，密码不符合规范：`{0}`.")]
     BadPassword(String),
+    #[error(transparent)]
+    CaptchaError(#[from] CaptchaError),
     #[error("Cookies 持久化失败：`{0}`.")]
     CookiesStoreError(Box<dyn std::error::Error + Send + Sync>),
+    #[error("加解密错误：`{0}`.")]
+    CryptoError(String),
     #[error(transparent)]
     IoError(#[from] std::io::Error),
     #[error("登录过期：`{0}`.")]
