@@ -142,18 +142,6 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
         }
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    pub fn enc_gen(path: &Option<PathBuf>, enc: &Option<String>) -> Result<String, Error> {
-        let enc = if let Some(enc) = enc {
-            enc.clone()
-        } else if let Some(pic) = path {
-            pic_to_enc(pic)?
-        } else {
-            return Err(Error::EncError("未获取到 `enc` 参数！".to_owned()));
-        };
-        Ok(enc)
-    }
-
     pub fn is_enc_qrcode_url(url: &str) -> bool {
         url.contains(&*cxlib_protocol::ProtocolItem::QrcodePat.to_string()) && url.contains("&enc=")
     }
@@ -221,6 +209,20 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
         }
         None
     }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    pub fn enc_gen(path: &Option<PathBuf>, enc: &Option<String>) -> Result<String, SignError> {
+        let enc = if let Some(enc) = enc {
+            enc.clone()
+        } else if let Some(pic) = path {
+            Self::pic_to_enc(pic)?
+        } else {
+            return Err(SignError::SignDataNotFound(
+                "未获取到 `enc` 参数！".to_owned(),
+            ));
+        };
+        Ok(enc)
+    }
+
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     pub fn enc_gen(
         sign: &QrCodeSign,
