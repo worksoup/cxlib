@@ -1,5 +1,6 @@
 mod table;
 
+use std::collections::HashSet;
 pub use table::*;
 
 use cxlib_activity::CourseExcludeInfoTrait;
@@ -81,7 +82,7 @@ impl CourseExcludeInfoTrait for DataBase {
         ExcludeTable::has_exclude(self, id)
     }
 
-    fn get_excludes(&self) -> Vec<i64> {
+    fn get_excludes(&self) -> HashSet<i64> {
         ExcludeTable::get_excludes(self)
     }
 
@@ -89,11 +90,11 @@ impl CourseExcludeInfoTrait for DataBase {
         ExcludeTable::add_exclude(self, id)
     }
 
-    fn disable_exclude(&self, id: i64) {
+    fn cancel_exclude(&self, id: i64) {
         ExcludeTable::delete_exclude(self, id)
     }
 
-    fn update_excludes(&self, excludes: &[i64]) {
+    fn update_excludes<'a, I: IntoIterator<Item = &'a i64>>(&self, excludes: I) {
         ExcludeTable::update_excludes(self, excludes)
     }
 }
