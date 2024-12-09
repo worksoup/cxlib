@@ -1,6 +1,8 @@
 pub mod collect;
 mod default_impl;
+#[cfg(feature = "multipart")]
 mod multipart;
+#[cfg(feature = "ureq")]
 pub mod utils;
 
 pub use default_impl::*;

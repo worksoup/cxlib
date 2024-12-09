@@ -1,4 +1,4 @@
-use cxlib_error::{CourseError, LoginError, UnwrapOrLogPanic};
+use cxlib_error::{CourseError, LoginError, MaybeFatalError, UnwrapOrLogPanic};
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::Session;
 use log::{info, warn};
@@ -32,16 +32,23 @@ impl Display for Course {
 impl Course {
     pub fn get_courses<'a, Sessions: Iterator<Item = &'a Session>>(
         sessions: Sessions,
-    ) -> HashMap<Course, Vec<Session>> {
+    ) -> Result<HashMap<Course, Vec<Session>>, CourseError> {
         let mut courses = HashMap::<_, Vec<_>>::new();
         for session in sessions {
-            let courses_ = Course::get_session_courses(session).unwrap_or_else(|e| {
-                warn!(
-                    "未能获取用户[{}]的课程，错误信息：{e}.",
-                    session.get_stu_name()
-                );
-                Default::default()
-            });
+            let courses_ = match Course::get_session_courses(session) {
+                Ok(c) => c,
+                Err(e) => {
+                    if e.is_fatal() {
+                        return Err(e);
+                    } else {
+                        warn!(
+                            "未能获取用户[{}]的课程，错误信息：{e}.",
+                            session.get_stu_name()
+                        );
+                        Default::default()
+                    }
+                }
+            };
             for course in courses_ {
                 let entry = courses.entry(course);
                 match entry {
@@ -54,7 +61,7 @@ impl Course {
                 }
             }
         }
-        courses
+        Ok(courses)
     }
     pub fn get_session_courses(session: &Session) -> Result<Vec<Course>, CourseError> {
         let r = protocol::back_clazz_data(session.deref())?;

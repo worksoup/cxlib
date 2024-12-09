@@ -43,7 +43,10 @@
 
 use crate::CaptchaId;
 use cxlib_error::{AgentError, UnwrapOrLogPanic};
+use cxlib_imageproc::image_from_bytes;
 use cxlib_protocol::collect::captcha as protocol;
+use cxlib_utils::ureq_get_bytes;
+use image::DynamicImage;
 use log::debug;
 use serde::Deserialize;
 use std::fmt::Display;
@@ -83,16 +86,21 @@ pub fn find_captcha(client: &Agent, presign_html: &str) -> Option<CaptchaId> {
         debug!("captcha_id: {id}");
         Some(id.to_string())
     } else {
-        protocol::my_sign_captcha_utils(client)
-            .ok()
-            .and_then(|r| {
-                let js = r.into_string().unwrap();
-                js.find("captchaId: '").map(|start_of_captcha_id| {
-                    debug!("start_of_captcha_id: {start_of_captcha_id}");
-                    let id = &js[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
-                    debug!("captcha_id: {id}");
-                    id.to_string()
-                })
+        protocol::my_sign_captcha_utils(client).ok().and_then(|r| {
+            let js = r.into_string().unwrap();
+            js.find("captchaId: '").map(|start_of_captcha_id| {
+                debug!("start_of_captcha_id: {start_of_captcha_id}");
+                let id = &js[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
+                debug!("captcha_id: {id}");
+                id.to_string()
             })
+        })
     }
+}
+pub fn download_image(
+    agent: &Agent,
+    image_url: &str,
+    referer: &str,
+) -> Result<DynamicImage, AgentError> {
+    Ok(image_from_bytes(ureq_get_bytes(agent, image_url, referer)?))
 }

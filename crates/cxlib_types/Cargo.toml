@@ -8,10 +8,9 @@ edition = "2021"
 
 [dependencies]
 cxlib_error = { path = "../cxlib_error" }
-cxlib_protocol = { path = "../cxlib_protocol" }
+cxlib_protocol = { path = "../cxlib_protocol", features = ["types"] }
 cxlib_user = { path = "../cxlib_user" }
 log.workspace = true
-mime_guess.workspace = true
 onceinit.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"] }

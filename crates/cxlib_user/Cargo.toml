@@ -8,7 +8,7 @@ authors.workspace = true
 cookie_store.workspace = true
 cxlib_store = { path = "../cxlib_store" }
 cxlib_error = { path = "../cxlib_error" }
-cxlib_protocol = { path = "../cxlib_protocol" }
+cxlib_protocol = { path = "../cxlib_protocol", features = ["user"] }
 cxlib_utils = { path = "../cxlib_utils" }
 des.workspace = true
 hex.workspace = true

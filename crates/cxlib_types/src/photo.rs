@@ -1,3 +1,4 @@
+use cxlib_error::AgentError;
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::Session;
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ pub struct Photo {
 }
 
 impl Photo {
-    pub fn get_pan_token(session: &Session) -> Result<String, Box<ureq::Error>> {
+    pub fn get_pan_token(session: &Session) -> Result<String, AgentError> {
         let r = protocol::pan_token(session)?;
         #[derive(Deserialize)]
         struct Tmp {
@@ -22,7 +23,7 @@ impl Photo {
         Ok(r.token)
     }
 
-    pub fn new(session: &Session, file: &File, file_name: &str) -> Result<Self, Box<ureq::Error>> {
+    pub fn new(session: &Session, file: &File, file_name: &str) -> Result<Self, AgentError> {
         let token = Self::get_pan_token(session)?;
         let r = protocol::pan_upload(session, file, session.get_uid(), &token, file_name)?;
         #[derive(Deserialize)]
@@ -44,7 +45,7 @@ impl Photo {
     pub fn find_in_cxpan(
         session: &Session,
         p: impl Fn(&str) -> bool,
-    ) -> Result<Option<Self>, Box<ureq::Error>> {
+    ) -> Result<Option<Self>, AgentError> {
         let r = protocol::pan_chaoxing(session)?;
         let r_text = r.into_string().unwrap();
         let start_of_enc = r_text.find("enc =\"").unwrap() + 6;

@@ -3,15 +3,24 @@ name = "cxlib_protocol"
 edition = "2021"
 version.workspace = true
 authors.workspace = true
-
+[features]
+default = []
+activity = ["ureq"]
+captcha = ["ureq", "percent-encoding"]
+default_impl = ["ureq"]
+sign = ["ureq"]
+types = ["ureq", "multipart", "mime_guess"]
+unused = ["ureq"]
+user = ["ureq", "rand"]
+multipart = ["rand"]
 [dependencies]
 cxlib_store = { path = "../cxlib_store" }
 cxlib_error = { path = "../cxlib_error" }
 onceinit.workspace = true
 log.workspace = true
-mime_guess.workspace = true
-rand.workspace = true
+mime_guess = { workspace = true, optional = true }
+percent-encoding = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 toml.workspace = true
-ureq.workspace = true
-percent-encoding.workspace = true
+ureq = { workspace = true, optional = true }

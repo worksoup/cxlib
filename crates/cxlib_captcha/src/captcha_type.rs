@@ -3,7 +3,7 @@ use crate::{
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
     TopSolver, DEFAULT_CAPTCHA_TYPE,
 };
-use cxlib_error::{AgentError, CaptchaError, UnwrapOrLogPanic};
+use cxlib_error::{AgentError, CaptchaError, MaybeFatalError, UnwrapOrLogPanic};
 use cxlib_protocol::collect::captcha as protocol;
 use log::{debug, warn};
 use onceinit::{OnceInitError, StaticDefault};
@@ -223,12 +223,13 @@ impl CaptchaType {
                 r @ Ok(_) => {
                     return r;
                 }
-                Err(e) => match e {
-                    r @ CaptchaError::Canceled(_) => {
-                        return Err(r);
+                Err(e) => {
+                    if e.is_fatal() {
+                        return Err(e);
+                    } else {
+                        warn!("滑块验证失败：{e}，即将重试。");
                     }
-                    _ => warn!("滑块验证失败：{e}，即将重试。"),
-                },
+                }
             }
         }
         Err(CaptchaError::VerifyFailed)

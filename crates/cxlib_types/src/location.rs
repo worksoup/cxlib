@@ -1,4 +1,5 @@
 use crate::Course;
+use cxlib_error::AgentError;
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::Session;
 use onceinit::{OnceInit, OnceInitError, StaticDefault};
@@ -174,7 +175,7 @@ impl LocationWithRange {
     pub fn from_log(
         session: &Session,
         course: &Course,
-    ) -> Result<HashMap<String, Self>, Box<ureq::Error>> {
+    ) -> Result<HashMap<String, Self>, AgentError> {
         #[derive(Debug, Clone, Deserialize, Serialize)]
         struct LocationWithRangeAndActiveId {
             #[serde(rename = "activeid")]

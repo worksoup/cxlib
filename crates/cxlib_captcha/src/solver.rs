@@ -1,7 +1,10 @@
-use crate::{CaptchaType, IconClickImage, ObstacleImage, RotateImages, SlideImages, TextClickInfo};
-use cxlib_error::{AgentError, CaptchaError};
-use cxlib_imageproc::{find_sub_image, image_from_bytes, Point};
-use cxlib_utils::{time_it_and_print_result, ureq_get_bytes};
+use crate::{
+    utils::download_image, CaptchaType, IconClickImage, ObstacleImage, RotateImages, SlideImages,
+    TextClickInfo,
+};
+use cxlib_error::CaptchaError;
+use cxlib_imageproc::{find_sub_image, Point};
+use cxlib_utils::time_it_and_print_result;
 use image::DynamicImage;
 use log::debug;
 use onceinit::{OnceInit, OnceInitError};
@@ -244,14 +247,6 @@ static ICON_CLICK_SOLVER: OnceInit<IconClickSolverRaw> = OnceInit::new();
 static TEXT_CLICK_SOLVER: OnceInit<TextClickSolverRaw> = OnceInit::new();
 static ROTATE_SOLVER: OnceInit<RotateSolverRaw> = OnceInit::new();
 static OBSTACLE_SOLVER: OnceInit<ObstacleSolverRaw> = OnceInit::new();
-fn download_image(
-    agent: &Agent,
-    image_url: &str,
-    referer: &str,
-) -> Result<DynamicImage, AgentError> {
-    Ok(image_from_bytes(ureq_get_bytes(agent, image_url, referer)?))
-}
-
 impl VerificationInfoTrait<(DynamicImage, DynamicImage), f32> for SlideImages {
     fn prepare_data(
         self,

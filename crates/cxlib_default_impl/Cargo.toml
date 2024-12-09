@@ -8,7 +8,7 @@ authors.workspace = true
 cxlib_activity = { path = "../cxlib_activity" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
-cxlib_protocol = { path = "../cxlib_protocol" }
+cxlib_protocol = { path = "../cxlib_protocol", features = ["default_impl"] }
 cxlib_sign = { path = "../cxlib_sign" }
 cxlib_store = { path = "../cxlib_store" }
 cxlib_types = { path = "../cxlib_types" }
@@ -19,6 +19,5 @@ log.workspace = true
 rxing.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sqlite.workspace = true
-ureq = { workspace = true, features = ["cookies", "json"] }
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 xcap.workspace = true
