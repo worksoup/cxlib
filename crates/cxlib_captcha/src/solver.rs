@@ -237,7 +237,7 @@ pub type SolverRaw<I, O> = dyn Fn(I) -> Result<O, CaptchaError> + Sync;
 type SlideSolverRaw = SolverRaw<(DynamicImage, DynamicImage), u32>;
 type IconClickSolverRaw = SolverRaw<DynamicImage, TriplePoint<u32>>;
 type TextClickSolverRaw = SolverRaw<(String, DynamicImage), TriplePoint<u32>>;
-type RotateSolverRaw = SolverRaw<(DynamicImage, DynamicImage), u32>;
+type RotateSolverRaw = SolverRaw<(DynamicImage, DynamicImage), f32>;
 type ObstacleSolverRaw = SolverRaw<DynamicImage, Point<u32>>;
 static SLIDE_SOLVER: OnceInit<SlideSolverRaw> = OnceInit::new();
 static ICON_CLICK_SOLVER: OnceInit<IconClickSolverRaw> = OnceInit::new();
@@ -339,7 +339,7 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
         format!("%5B{}%5D", data)
     }
 }
-impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
+impl VerificationInfoTrait<(DynamicImage, DynamicImage), f32> for RotateImages {
     fn prepare_data(
         self,
         agent: &Agent,
@@ -358,9 +358,9 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
         &ROTATE_SOLVER
     }
     /// result 为度数，取值为 0-504.
-    fn result_to_string(result: u32) -> String {
+    fn result_to_string(result: f32) -> String {
         debug!("本地旋转结果：{result}");
-        let result = ((result as f32 / 504.0 * 280.0).round() as u32).to_string();
+        let result = ((result / 504.0 * 280.0).round() as u32).to_string();
         format!("%5B%7B%22x%22%3A{}%7D%5D", result)
     }
 }
