@@ -17,3 +17,4 @@ cxlib_types = { path = "../cxlib_types" }
 #cxlib_unused = { path = "../cxlib_unused" }
 cxlib_user = { path = "../cxlib_user" }
 cxlib_utils = { path = "../cxlib_utils" }
+thiserror.workspace = true

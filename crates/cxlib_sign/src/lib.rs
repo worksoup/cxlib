@@ -4,7 +4,7 @@ use crate::{
 };
 use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
-use cxlib_error::{Error, SignError, UnwrapOrLogPanic};
+use cxlib_error::{SignError, UnwrapOrLogPanic};
 use cxlib_types::{Course, Dioption, LocationWithRange};
 use cxlib_user::Session;
 use log::info;
@@ -306,7 +306,7 @@ pub trait GestureOrSigncodeSignTrait: Ord {
         session: &Session,
         active_id: &str,
         signcode: &str,
-    ) -> Result<Result<(), SignResult>, Error> {
+    ) -> Result<Result<(), SignResult>, SignError> {
         #[derive(Deserialize)]
         struct CheckR {
             #[allow(unused)]

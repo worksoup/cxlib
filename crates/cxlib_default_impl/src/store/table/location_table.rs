@@ -14,7 +14,7 @@ pub struct LocationAndAliasesPair {
     pub aliases: Vec<String>,
 }
 impl FromStr for LocationAndAliasesPair {
-    type Err = cxlib_error::Error;
+    type Err = StoreError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let data: Vec<&str> = s.split('$').collect();
@@ -228,7 +228,7 @@ impl DataBaseTableTrait for LocationTable {
     const TABLE_NAME: &'static str = "location";
 
     fn import(db: &DataBase, data: &str) {
-        let data = crate::utils::parse::<cxlib_error::Error, LocationAndAliasesPair>(data);
+        let data = crate::utils::parse::<_, LocationAndAliasesPair>(data);
         for LocationAndAliasesPair {
             course,
             location,

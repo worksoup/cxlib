@@ -54,7 +54,7 @@ impl Display for AccountData {
     }
 }
 impl FromStr for AccountData {
-    type Err = cxlib_error::Error;
+    type Err = StoreError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s
@@ -273,7 +273,7 @@ impl AccountTable {
         );
         Ok(session)
     }
-    pub fn relogin(db: &DataBase, uid: String) -> Result<Session, cxlib_error::Error> {
+    pub fn relogin(db: &DataBase, uid: String) -> Result<Session, StoreError> {
         if let Some(AccountData {
             uid,
             uname,
@@ -316,7 +316,7 @@ impl DataBaseTableTrait for AccountTable {
 
     fn import(db: &DataBase, data: &str) {
         db.add_table::<Self>();
-        let data = crate::utils::parse::<cxlib_error::Error, AccountData>(data);
+        let data = crate::utils::parse::<_, AccountData>(data);
         for account in data {
             match Session::relogin(account.uname(), account.enc_pwd(), &DefaultLoginSolver) {
                 Ok(session) => {

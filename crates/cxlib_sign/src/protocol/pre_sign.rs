@@ -1,3 +1,4 @@
+use cxlib_error::AgentError;
 use cxlib_protocol::ProtocolItem;
 use cxlib_types::Course;
 use ureq::{Agent, Response};
@@ -8,7 +9,7 @@ pub fn pre_sign(
     course: Course,
     active_id: &str,
     uid: &str,
-) -> Result<Response, Box<ureq::Error>> {
+) -> Result<Response, AgentError> {
     let course_id = course.get_id();
     let class_id = course.get_class_id();
     let url = ProtocolItem::PreSign;
@@ -23,7 +24,7 @@ pub fn pre_sign_for_qrcode_sign(
     uid: &str,
     c: &str,
     enc: &str,
-) -> Result<Response, Box<ureq::Error>> {
+) -> Result<Response, AgentError> {
     let course_id = course.get_id();
     let class_id = course.get_class_id();
     let url =

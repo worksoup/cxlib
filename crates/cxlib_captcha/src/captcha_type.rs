@@ -4,12 +4,12 @@ use crate::{
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
     TopSolver, DEFAULT_CAPTCHA_TYPE,
 };
-use cxlib_error::{CaptchaError, UnwrapOrLogPanic};
+use cxlib_error::{AgentError, CaptchaError, UnwrapOrLogPanic};
 use log::{debug, warn};
 use onceinit::{OnceInitError, StaticDefault};
 use serde::Deserialize;
 use std::fmt::{Display, Formatter};
-use ureq::{serde_json, Agent, Error};
+use ureq::{serde_json, Agent};
 
 #[derive(Debug)]
 pub struct GetCaptchaResult {
@@ -151,7 +151,7 @@ impl CaptchaType {
         captcha_id: &str,
         server_time_mills: u128,
         referer: &str,
-    ) -> Result<GetCaptchaResult, Box<Error>> {
+    ) -> Result<GetCaptchaResult, AgentError> {
         let (captcha_key, tmp_token) = self.generate_secrets(captcha_id, server_time_mills);
         let iv = self.generate_iv(captcha_id);
         let r = get_captcha(

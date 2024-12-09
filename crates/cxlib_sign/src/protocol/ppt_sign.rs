@@ -1,4 +1,5 @@
 use crate::utils::PPTSignHelper;
+use cxlib_error::AgentError;
 use cxlib_protocol::ProtocolItem;
 use cxlib_types::Location;
 use cxlib_user::Session;
@@ -78,7 +79,7 @@ pub fn signcode_sign_url(session: &Session, active_id: &str, signcode: &str) -> 
     format!("{}?activeId={active_id}&uid={uid}&clientip=&latitude=-1&longitude=-1&appType=15&fid={fid}&name={stu_name}&signCode={signcode}", ProtocolItem::PptSign).into()
 }
 
-pub fn general_sign(session: &Session, active_id: &str) -> Result<Response, Box<ureq::Error>> {
+pub fn general_sign(session: &Session, active_id: &str) -> Result<Response, AgentError> {
     general_sign_url(session, active_id).get(session)
 }
 
@@ -86,7 +87,7 @@ pub fn photo_sign(
     session: &Session,
     active_id: &str,
     object_id: &str,
-) -> Result<Response, Box<ureq::Error>> {
+) -> Result<Response, AgentError> {
     photo_sign_url(session, active_id, object_id).get(session)
 }
 pub fn qrcode_sign(
@@ -94,7 +95,7 @@ pub fn qrcode_sign(
     enc: &str,
     active_id: &str,
     location: Option<&Location>,
-) -> Result<Response, Box<ureq::Error>> {
+) -> Result<Response, AgentError> {
     qrcode_sign_url(session, enc, active_id, location).get(session)
 }
 pub fn location_sign(
@@ -102,13 +103,13 @@ pub fn location_sign(
     location: &Location,
     active_id: &str,
     is_auto_location: bool,
-) -> Result<Response, Box<ureq::Error>> {
+) -> Result<Response, AgentError> {
     location_sign_url(session, location, active_id, is_auto_location).get(session)
 }
 pub fn signcode_sign(
     session: &Session,
     active_id: &str,
     signcode: &str,
-) -> Result<Response, Box<ureq::Error>> {
+) -> Result<Response, AgentError> {
     signcode_sign_url(session, active_id, signcode).get(session)
 }

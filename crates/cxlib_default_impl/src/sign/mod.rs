@@ -15,7 +15,7 @@ pub use qrcode::*;
 pub use signcode::*;
 
 use cxlib_activity::RawSign;
-use cxlib_error::UnwrapOrLogPanic;
+use cxlib_error::{SignError, UnwrapOrLogPanic};
 use cxlib_sign::{PreSignResult, SignDetail, SignTrait};
 use cxlib_types::LocationWithRange;
 use cxlib_user::Session;
@@ -43,10 +43,7 @@ pub enum Sign {
     Unknown(RawSign),
 }
 impl Sign {
-    pub fn get_sign_detail(
-        active_id: &str,
-        session: &Session,
-    ) -> Result<SignDetail, cxlib_error::Error> {
+    pub fn get_sign_detail(active_id: &str, session: &Session) -> Result<SignDetail, SignError> {
         #[derive(Deserialize)]
         struct GetSignDetailR {
             #[serde(rename = "ifPhoto")]

@@ -1,7 +1,7 @@
 use crate::{protocol, PreSignResult, SignResult, SignTrait};
 use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
-use cxlib_error::SignError;
+use cxlib_error::{AgentError, SignError};
 use cxlib_protocol::{ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Dioption, LocationWithRange};
 use cxlib_user::Session;
@@ -64,7 +64,7 @@ impl PPTSignHelper {
     pub fn url(&self) -> &str {
         &self.url
     }
-    pub fn get(&self, agent: &Agent) -> Result<Response, Box<ureq::Error>> {
+    pub fn get(&self, agent: &Agent) -> Result<Response, AgentError> {
         Ok(agent.get(self.url()).call()?)
     }
     pub fn with_enc2(mut self, enc2: &str) -> Self {

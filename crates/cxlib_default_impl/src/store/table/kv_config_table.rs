@@ -23,7 +23,7 @@ impl Display for KVPair {
     }
 }
 impl FromStr for KVPair {
-    type Err = cxlib_error::Error;
+    type Err = StoreError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s
@@ -200,7 +200,7 @@ impl DataBaseTableTrait for KVConfigTable {
 
     fn import(db: &DataBase, data: &str) {
         db.add_table::<Self>();
-        let data = crate::utils::parse::<cxlib_error::Error, KVPair>(data);
+        let data = crate::utils::parse::<_, KVPair>(data);
         for KVPair { key, value } in data {
             Self::insert_or(db, &key, &value, Self::update)
         }

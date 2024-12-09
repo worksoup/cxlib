@@ -1,11 +1,17 @@
 use thiserror::Error;
 
-pub type CxlibResult<T> = Result<T, crate::Error>;
-
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub struct AgentError(#[from] Box<ureq::Error>);
+impl From<ureq::Error> for AgentError {
+    fn from(value: ureq::Error) -> Self {
+        Self(Box::new(value))
+    }
+}
 #[derive(Error, Debug)]
 pub enum LoginError {
     #[error(transparent)]
-    AgentError(#[from] Box<ureq::Error>),
+    AgentError(#[from] AgentError),
     #[error("登录失败，密码不符合规范：`{0}`.")]
     BadPassword(String),
     #[error(transparent)]
@@ -23,15 +29,10 @@ pub enum LoginError {
     #[error("登录失败，不支持的登录协议。")]
     UnsupportedProtocol,
 }
-impl From<ureq::Error> for LoginError {
-    fn from(value: ureq::Error) -> Self {
-        Self::AgentError(Box::new(value))
-    }
-}
 #[derive(Error, Debug)]
 pub enum CaptchaError {
     #[error(transparent)]
-    AgentError(#[from] Box<ureq::Error>),
+    AgentError(#[from] AgentError),
     #[error("验证失败。")]
     VerifyFailed,
     #[error("不支持该类型的验证码。")]
@@ -39,15 +40,10 @@ pub enum CaptchaError {
     #[error("操作被主动取消：`{0}`.")]
     Canceled(String),
 }
-impl From<ureq::Error> for CaptchaError {
-    fn from(value: ureq::Error) -> Self {
-        Self::AgentError(Box::new(value))
-    }
-}
 #[derive(Error, Debug)]
 pub enum SignError {
     #[error(transparent)]
-    AgentError(#[from] Box<ureq::Error>),
+    AgentError(#[from] AgentError),
     #[error(transparent)]
     CaptchaError(#[from] CaptchaError),
     #[error(transparent)]
@@ -56,11 +52,6 @@ pub enum SignError {
     LocationError(String),
     #[error("签到失败，所需信息未找到：`{0}`")]
     SignDataNotFound(String),
-}
-impl From<ureq::Error> for SignError {
-    fn from(value: ureq::Error) -> Self {
-        Self::AgentError(Box::new(value))
-    }
 }
 #[derive(Error, Debug)]
 pub enum ProtocolError {
@@ -75,25 +66,28 @@ pub enum ProtocolError {
 pub enum StoreError {
     #[error("数据解析失败：`{0}`.")]
     ParseError(String),
-}
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error(transparent)]
-    AgentError(#[from] Box<ureq::Error>),
     #[error(transparent)]
     LoginError(#[from] LoginError),
-    #[error(transparent)]
-    ProtocolError(#[from] ProtocolError),
-    #[error(transparent)]
-    SignError(#[from] SignError),
-    #[error(transparent)]
-    StoreError(#[from] StoreError),
 }
-impl From<ureq::Error> for Error {
-    fn from(value: ureq::Error) -> Self {
-        Self::AgentError(Box::new(value))
-    }
+#[derive(Error, Debug)]
+pub enum CourseError {
+    #[error(transparent)]
+    AgentError(#[from] AgentError),
+    #[error(transparent)]
+    LoginError(#[from] LoginError),
 }
+#[derive(Error, Debug)]
+pub enum ActivityError {
+    // #[error(transparent)]
+    // AgentError(#[from] AgentError),
+    // #[error(transparent)]
+    // LoginError(#[from] LoginError),
+}
+// impl From<ureq::Error> for ActivityError {
+//     fn from(value: ureq::Error) -> Self {
+//         Self::AgentError(Box::new(value))
+//     }
+// }
 pub fn log_panic<T>(e: impl std::error::Error) -> T {
     log::error!("{}", e);
     panic!();

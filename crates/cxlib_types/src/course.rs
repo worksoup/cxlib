@@ -1,5 +1,5 @@
 use crate::protocol;
-use cxlib_error::{LoginError, UnwrapOrLogPanic};
+use cxlib_error::{CourseError, LoginError, UnwrapOrLogPanic};
 use cxlib_user::Session;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ impl Display for Course {
 impl Course {
     pub fn get_courses<'a, Sessions: Iterator<Item = &'a Session>>(
         sessions: Sessions,
-    ) -> Result<HashMap<Course, Vec<Session>>, cxlib_error::Error> {
+    ) -> HashMap<Course, Vec<Session>> {
         let mut courses = HashMap::<_, Vec<_>>::new();
         for session in sessions {
             let courses_ = Course::get_session_courses(session).unwrap_or_else(|e| {
@@ -54,15 +54,15 @@ impl Course {
                 }
             }
         }
-        Ok(courses)
+        courses
     }
-    pub fn get_session_courses(session: &Session) -> Result<Vec<Course>, cxlib_error::Error> {
+    pub fn get_session_courses(session: &Session) -> Result<Vec<Course>, CourseError> {
         let r = protocol::back_clazz_data(session.deref())?;
         let courses = Course::get_list_from_response(r)?;
         info!("用户[{}]已获取课程列表。", session.get_stu_name());
         Ok(courses)
     }
-    fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, cxlib_error::Error> {
+    fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, CourseError> {
         let r: GetCoursesR = r.into_json().unwrap_or_log_panic();
         let mut arr = Vec::new();
         if let Some(channel_list) = r.channel_list {

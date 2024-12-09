@@ -42,11 +42,11 @@
 //!    请求参数有刚返回的 `token`, 其他可以在网络请求里看到。当然也包含刚刚计算的 iv.
 
 use crate::CaptchaId;
-use cxlib_error::UnwrapOrLogPanic;
+use cxlib_error::{AgentError, UnwrapOrLogPanic};
 use log::debug;
 use serde::Deserialize;
 use std::fmt::Display;
-use ureq::{serde_json, Agent, Error};
+use ureq::{serde_json, Agent};
 
 pub fn get_now_timestamp_mills() -> u128 {
     std::time::SystemTime::now()
@@ -58,7 +58,7 @@ pub fn get_server_time(
     agent: &Agent,
     captcha_id: &str,
     time_stamp_mills: impl Display + Copy,
-) -> Result<u128, Box<Error>> {
+) -> Result<u128, AgentError> {
     let r = crate::protocol::get_server_time(agent, captcha_id, time_stamp_mills)?;
     #[derive(Deserialize)]
     struct Tmp {

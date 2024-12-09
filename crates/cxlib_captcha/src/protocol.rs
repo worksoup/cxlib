@@ -1,4 +1,5 @@
 use crate::CaptchaType;
+use cxlib_error::AgentError;
 use cxlib_protocol::ProtocolItem;
 use log::debug;
 use std::fmt::Display;
@@ -11,7 +12,7 @@ pub fn get_server_time(
     agent: &Agent,
     captcha_id: &str,
     time_stamp_mills: impl Display + Copy,
-) -> Result<ureq::Response, Box<ureq::Error>> {
+) -> Result<ureq::Response, AgentError> {
     let url = format!(
         "{}?callback={CALLBACK_NAME}&captchaId={captcha_id}&_={time_stamp_mills}",
         ProtocolItem::GetServerTime,
@@ -28,7 +29,7 @@ pub fn get_captcha(
     iv: &str,
     time_stamp_mills: impl Display + Copy,
     referer: &str,
-) -> Result<ureq::Response, Box<ureq::Error>> {
+) -> Result<ureq::Response, AgentError> {
     let referer =
         percent_encoding::utf8_percent_encode(referer, percent_encoding::NON_ALPHANUMERIC)
             .to_string();
@@ -56,7 +57,7 @@ pub fn check_captcha(
     token: &str,
     iv: &str,
     time_stamp_mills: impl Display + Copy,
-) -> Result<ureq::Response, Box<ureq::Error>> {
+) -> Result<ureq::Response, AgentError> {
     let url = format!(
         "{}?{}&{}&{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
         ProtocolItem::CheckCaptcha,
@@ -80,7 +81,7 @@ pub fn check_captcha(
     Ok(get.call()?)
 }
 
-pub fn my_sign_captcha_utils(client: &Agent) -> Result<ureq::Response, Box<ureq::Error>> {
+pub fn my_sign_captcha_utils(client: &Agent) -> Result<ureq::Response, AgentError> {
     let url = ProtocolItem::MySignCaptchaUtils;
     debug!("{url}");
     Ok(client.get(&url.to_string()).call()?)

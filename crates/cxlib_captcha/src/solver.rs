@@ -1,5 +1,5 @@
 use crate::{CaptchaType, IconClickImage, ObstacleImage, RotateImages, SlideImages, TextClickInfo};
-use cxlib_error::CaptchaError;
+use cxlib_error::{AgentError, CaptchaError};
 use cxlib_imageproc::{find_sub_image, image_from_bytes, Point};
 use cxlib_utils::{time_it_and_print_result, ureq_get_bytes};
 use image::DynamicImage;
@@ -248,7 +248,7 @@ fn download_image(
     agent: &Agent,
     image_url: &str,
     referer: &str,
-) -> Result<DynamicImage, Box<ureq::Error>> {
+) -> Result<DynamicImage, AgentError> {
     Ok(image_from_bytes(ureq_get_bytes(agent, image_url, referer)?))
 }
 

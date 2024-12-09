@@ -3,6 +3,7 @@ mod raw;
 
 pub use raw::*;
 
+use cxlib_error::ActivityError;
 use cxlib_types::Course;
 use cxlib_user::Session;
 use log::debug;
@@ -109,7 +110,7 @@ impl Activity {
         table: &impl CourseExcludeInfoTrait,
         set_excludes: bool,
         courses: HashMap<Course, Vec<Session>>,
-    ) -> Result<HashMap<Activity, Vec<Session>>, cxlib_error::Error> {
+    ) -> HashMap<Activity, Vec<Session>> {
         let excludes = table.get_excludes();
         let set_excludes = set_excludes || excludes.is_empty();
         let course_sessions_map = courses;
@@ -163,7 +164,7 @@ impl Activity {
         if set_excludes {
             table.update_excludes(&Arc::into_inner(excludes).unwrap().into_inner().unwrap());
         }
-        Ok(valid_signs)
+        valid_signs
     }
     /// 获取所有的活动。
     ///
@@ -178,8 +179,8 @@ impl Activity {
         table: &impl CourseExcludeInfoTrait,
         sessions: Sessions,
         set_excludes: bool,
-    ) -> Result<HashMap<Activity, Vec<Session>>, cxlib_error::Error> {
-        let courses = Course::get_courses(sessions)?;
+    ) -> HashMap<Activity, Vec<Session>> {
+        let courses = Course::get_courses(sessions);
         Self::get_activities(table, set_excludes, courses)
     }
     pub fn get_list_from_course(
