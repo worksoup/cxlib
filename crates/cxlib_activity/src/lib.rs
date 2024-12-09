@@ -1,9 +1,9 @@
-pub mod protocol;
 mod raw;
 
 pub use raw::*;
 
 use cxlib_error::ActivityError;
+use cxlib_protocol::collect::activity as protocol;
 use cxlib_types::Course;
 use cxlib_user::Session;
 use log::debug;
@@ -84,7 +84,7 @@ impl Activity {
         course: &Course,
         set_excludes: bool,
     ) -> Result<Vec<Activity>, Box<ureq::Error>> {
-        let activities = Self::get_list_from_course(session, course).unwrap_or_default();
+        let activities = Self::get_list_from_course(session, course)?;
         if set_excludes {
             let id = course.get_id();
             let dont_exclude = table.if_should_exclude(&activities);
@@ -187,7 +187,7 @@ impl Activity {
         session: &Session,
         c: &Course,
     ) -> Result<Vec<Self>, Box<ureq::Error>> {
-        let r = crate::protocol::active_list(session, c.clone())?;
+        let r = protocol::active_list(session, (c.get_id(), c.get_class_id()))?;
         let r: GetActivityR = r.into_json().unwrap();
         let activities = Arc::new(Mutex::new(Vec::new()));
         if let Some(data) = r.data {

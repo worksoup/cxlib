@@ -1,5 +1,5 @@
-use crate::protocol;
 use cxlib_error::{CourseError, LoginError, UnwrapOrLogPanic};
+use cxlib_protocol::collect::types as protocol;
 use cxlib_user::Session;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};

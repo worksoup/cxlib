@@ -1,10 +1,10 @@
-use std::{collections::HashMap, f64::consts::PI, ops::Deref, str::FromStr};
-
 use crate::Course;
+use cxlib_protocol::collect::types as protocol;
 use cxlib_user::Session;
 use onceinit::{OnceInit, OnceInitError, StaticDefault};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, f64::consts::PI, ops::Deref, str::FromStr};
 
 pub trait LocationPreprocessorTrait: Send + Sync {
     fn do_preprocess(&self, location: Location) -> Location;
@@ -203,7 +203,7 @@ impl LocationWithRange {
             #[serde(rename = "data")]
             data: Vec<LocationWithRangeAndActiveId>,
         }
-        let r = crate::protocol::get_location_log(session, course)?;
+        let r = protocol::get_location_log(session, (course.get_id(), course.get_class_id()))?;
         let data: Data = r.into_json().unwrap();
         let mut map = HashMap::new();
         for l in data.data {

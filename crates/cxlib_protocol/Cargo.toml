@@ -9,5 +9,9 @@ cxlib_store = { path = "../cxlib_store" }
 cxlib_error = { path = "../cxlib_error" }
 onceinit.workspace = true
 log.workspace = true
+mime_guess.workspace = true
+rand.workspace = true
 serde = { workspace = true, features = ["derive"] }
 toml.workspace = true
+ureq.workspace = true
+percent-encoding.workspace = true

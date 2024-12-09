@@ -1,6 +1,7 @@
 use crate::sign::{LocationSign, PreSignResult, RawSign, SignTrait};
 use cxlib_error::SignError;
-use cxlib_sign::utils::PPTSignHelper;
+use cxlib_protocol::collect::sign as protocol;
+use cxlib_protocol::utils::PPTSignHelper;
 use cxlib_types::Location;
 use cxlib_user::Session;
 use log::info;
@@ -28,11 +29,13 @@ impl SignTrait for QrCodeSign {
     type Data = Option<Location>;
 
     fn sign_url(&self, session: &Session, enc: &str, location: &Option<Location>) -> PPTSignHelper {
-        cxlib_sign::protocol::qrcode_sign_url(
-            session,
+        protocol::qrcode_sign_url(
+            (session.get_uid(), session.get_fid(), session.get_stu_name()),
             enc,
             self.as_inner().active_id.as_str(),
-            location.as_ref(),
+            location
+                .as_ref()
+                .map(|l| (l.get_addr(), l.get_lat(), l.get_lon(), l.get_alt())),
         )
     }
 
@@ -43,9 +46,9 @@ impl SignTrait for QrCodeSign {
         let raw = self.as_inner();
         let active_id = raw.active_id.as_str();
         let uid = session.get_uid();
-        let response_of_presign = cxlib_sign::protocol::pre_sign_for_qrcode_sign(
+        let response_of_presign = protocol::pre_sign_for_qrcode_sign(
             session,
-            raw.course.clone(),
+            (raw.course.get_id(), raw.course.get_class_id()),
             active_id,
             uid,
             &self.c,

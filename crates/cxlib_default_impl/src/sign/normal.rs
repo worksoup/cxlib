@@ -1,5 +1,5 @@
 use crate::sign::{RawSign, SignTrait};
-use cxlib_sign::utils::PPTSignHelper;
+use cxlib_protocol::utils::PPTSignHelper;
 use cxlib_user::Session;
 use serde::{Deserialize, Serialize};
 

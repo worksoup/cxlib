@@ -1,10 +1,12 @@
-use cxlib_protocol::ProtocolItem;
-use cxlib_types::Course;
+use crate::ProtocolItem;
 use log::debug;
 use ureq::{Agent, Response};
 
 /// 查询课程活动。
-pub fn active_list(client: &Agent, course: Course) -> Result<Response, Box<ureq::Error>> {
+pub fn active_list(
+    client: &Agent,
+    (course_id, class_id): (i64, i64),
+) -> Result<Response, Box<ureq::Error>> {
     let time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -13,8 +15,8 @@ pub fn active_list(client: &Agent, course: Course) -> Result<Response, Box<ureq:
     let url = format!(
         "{}?fid=0&courseId={}&classId={}&showNotStartedActive=0&_={time}",
         ProtocolItem::ActiveList,
-        course.get_id(),
-        course.get_class_id(),
+        course_id,
+        class_id,
     );
     debug!("{url}");
     Ok(client.get(&url).call()?)

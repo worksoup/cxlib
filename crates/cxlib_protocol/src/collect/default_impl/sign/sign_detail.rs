@@ -1,5 +1,5 @@
+use crate::ProtocolItem;
 use cxlib_error::AgentError;
-use cxlib_protocol::ProtocolItem;
 use log::debug;
 use ureq::{Agent, Response};
 

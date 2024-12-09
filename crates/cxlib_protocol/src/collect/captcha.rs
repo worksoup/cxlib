@@ -1,12 +1,11 @@
-use crate::CaptchaType;
+use crate::ProtocolItem;
 use cxlib_error::AgentError;
-use cxlib_protocol::ProtocolItem;
 use log::debug;
 use std::fmt::Display;
 use ureq::Agent;
 
 // Doesn't matter.
-pub(crate) static CALLBACK_NAME: &str = "cx_captcha_function";
+pub static CALLBACK_NAME: &str = "cx_captcha_function";
 // 获取服务器时间。
 pub fn get_server_time(
     agent: &Agent,
@@ -23,7 +22,7 @@ static VERSION_PARAM: &str = "version=1.1.20";
 // 获取滑块。
 pub fn get_captcha(
     agent: &Agent,
-    captcha_type: &CaptchaType,
+    captcha_type: &impl Display,
     captcha_id: &str,
     (captcha_key, tmp_token): (&str, &str),
     iv: &str,
@@ -51,7 +50,7 @@ pub fn get_captcha(
 // 滑块验证。
 pub fn check_captcha(
     agent: &Agent,
-    captcha_type: &CaptchaType,
+    captcha_type: &impl Display,
     captcha_id: &str,
     text_click_arr: impl Display,
     token: &str,

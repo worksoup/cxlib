@@ -1,6 +1,5 @@
-use crate::protocol;
-use cxlib_error::LoginError;
-use cxlib_protocol::ProtocolItem;
+use cxlib_error::{LoginError, UnwrapOrLogPanic};
+use cxlib_protocol::{collect::user as protocol, ProtocolItem};
 use cxlib_utils::pkcs7_pad;
 use log::{trace, warn};
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
@@ -22,7 +21,7 @@ impl DefaultLoginSolver {
     pub fn find_stu_name_in_html(agent: &Agent) -> Result<String, LoginError> {
         let login_expired_err = || LoginError::LoginExpired("无法获取姓名！".to_string());
         let r = protocol::account_manage(agent)?;
-        let html_content = r.into_string().unwrap();
+        let html_content = r.into_string().unwrap_or_log_panic();
         trace!("{html_content}");
         let e = html_content
             .find("colorBlue")

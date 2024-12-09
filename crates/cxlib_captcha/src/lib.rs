@@ -2,7 +2,6 @@ use onceinit::OnceInit;
 
 mod captcha_type;
 mod hash;
-pub mod protocol;
 mod solver;
 pub mod utils;
 mod verification_info;

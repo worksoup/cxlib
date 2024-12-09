@@ -2,9 +2,7 @@ mod course;
 mod dioption;
 mod location;
 mod photo;
-pub mod protocol;
 mod triple;
-pub mod multipart;
 
 pub use course::*;
 pub use dioption::*;

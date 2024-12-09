@@ -1,8 +1,8 @@
 use crate::multipart::{Field, PreparedFields};
-use cxlib_protocol::ProtocolItem;
 use std::fs::File;
 use std::path::Path;
 use ureq::{Agent, Response};
+use crate::ProtocolItem;
 
 // 超星网盘页
 pub fn pan_chaoxing(client: &Agent) -> Result<Response, Box<ureq::Error>> {

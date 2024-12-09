@@ -2,7 +2,6 @@ mod gesture;
 mod location;
 mod normal;
 mod photo;
-pub mod protocol;
 mod qrcode;
 mod signcode;
 
@@ -16,6 +15,7 @@ pub use signcode::*;
 
 use cxlib_activity::RawSign;
 use cxlib_error::{SignError, UnwrapOrLogPanic};
+use cxlib_protocol::collect::default_impl as protocol;
 use cxlib_sign::{PreSignResult, SignDetail, SignTrait};
 use cxlib_types::LocationWithRange;
 use cxlib_user::Session;

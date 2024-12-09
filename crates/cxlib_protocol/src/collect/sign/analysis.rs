@@ -1,6 +1,6 @@
 use cxlib_error::AgentError;
-use cxlib_protocol::ProtocolItem;
 use ureq::{Agent, Response};
+use crate::ProtocolItem;
 
 // analysis
 pub fn analysis(client: &Agent, active_id: &str) -> Result<Response, AgentError> {

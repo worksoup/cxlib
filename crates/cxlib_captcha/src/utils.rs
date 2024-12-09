@@ -43,6 +43,7 @@
 
 use crate::CaptchaId;
 use cxlib_error::{AgentError, UnwrapOrLogPanic};
+use cxlib_protocol::collect::captcha as protocol;
 use log::debug;
 use serde::Deserialize;
 use std::fmt::Display;
@@ -59,7 +60,7 @@ pub fn get_server_time(
     captcha_id: &str,
     time_stamp_mills: impl Display + Copy,
 ) -> Result<u128, AgentError> {
-    let r = crate::protocol::get_server_time(agent, captcha_id, time_stamp_mills)?;
+    let r = protocol::get_server_time(agent, captcha_id, time_stamp_mills)?;
     #[derive(Deserialize)]
     struct Tmp {
         t: u128,
@@ -72,7 +73,7 @@ pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, serde_json::Erro
 where
     T: serde::de::Deserialize<'a>,
 {
-    let s = &text[crate::protocol::CALLBACK_NAME.len() + 1..text.len() - 1];
+    let s = &text[protocol::CALLBACK_NAME.len() + 1..text.len() - 1];
     debug!("{s}");
     serde_json::from_str(s)
 }
@@ -82,7 +83,7 @@ pub fn find_captcha(client: &Agent, presign_html: &str) -> Option<CaptchaId> {
         debug!("captcha_id: {id}");
         Some(id.to_string())
     } else {
-        crate::protocol::my_sign_captcha_utils(client)
+        protocol::my_sign_captcha_utils(client)
             .ok()
             .and_then(|r| {
                 let js = r.into_string().unwrap();

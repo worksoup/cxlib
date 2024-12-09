@@ -1,6 +1,6 @@
-use cxlib_protocol::ProtocolItem;
 use ureq::{Agent, Response};
 use cxlib_error::AgentError;
+use crate::ProtocolItem;
 
 // 签到码检查
 pub fn check_signcode(

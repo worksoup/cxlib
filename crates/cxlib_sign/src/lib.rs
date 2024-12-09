@@ -1,7 +1,4 @@
-use crate::{
-    protocol::{general_sign_url, signcode_sign_url},
-    utils::{try_secondary_verification, PPTSignHelper},
-};
+use crate::utils::try_secondary_verification;
 use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
 use cxlib_error::{SignError, UnwrapOrLogPanic};
@@ -11,7 +8,9 @@ use log::info;
 use serde::Deserialize;
 use std::{collections::HashMap, ops::Add};
 
-pub mod protocol;
+use cxlib_protocol::collect::sign as protocol;
+use cxlib_protocol::utils::PPTSignHelper;
+
 pub mod utils;
 
 /// # [`SignTrait`]
@@ -152,7 +151,10 @@ impl SignTrait for RawSign {
     type Data = ();
 
     fn sign_url(&self, session: &Session, _: &(), _: &()) -> PPTSignHelper {
-        general_sign_url(session, &self.active_id)
+        protocol::general_sign_url(
+            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            &self.active_id,
+        )
     }
 
     fn as_inner(&self) -> &RawSign {
@@ -161,8 +163,12 @@ impl SignTrait for RawSign {
     fn pre_sign(&self, session: &Session, _: &()) -> Result<PreSignResult, SignError> {
         let active_id = self.active_id.as_str();
         let uid = session.get_uid();
-        let response_of_pre_sign =
-            protocol::pre_sign(session, self.course.clone(), active_id, uid)?;
+        let response_of_pre_sign = protocol::pre_sign(
+            session,
+            (self.course.get_id(), self.course.get_class_id()),
+            active_id,
+            uid,
+        )?;
         info!("用户[{}]预签到已请求。", session.get_stu_name());
         utils::analysis_after_presign(active_id, session, response_of_pre_sign)
     }
@@ -334,7 +340,11 @@ impl<T: GestureOrSigncodeSignTrait> SignTrait for T {
         _: &Self::PreSignData,
         data: &Self::Data,
     ) -> PPTSignHelper {
-        signcode_sign_url(session, &self.as_inner().active_id, data)
+        protocol::signcode_sign_url(
+            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            &self.as_inner().active_id,
+            data,
+        )
     }
 
     fn as_inner(&self) -> &RawSign {

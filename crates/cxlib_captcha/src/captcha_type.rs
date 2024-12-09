@@ -1,10 +1,10 @@
 use crate::{
     hash::{encode, hash, uuid},
-    protocol::{check_captcha, get_captcha},
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
     TopSolver, DEFAULT_CAPTCHA_TYPE,
 };
 use cxlib_error::{AgentError, CaptchaError, UnwrapOrLogPanic};
+use cxlib_protocol::collect::captcha as protocol;
 use log::{debug, warn};
 use onceinit::{OnceInitError, StaticDefault};
 use serde::Deserialize;
@@ -154,7 +154,7 @@ impl CaptchaType {
     ) -> Result<GetCaptchaResult, AgentError> {
         let (captcha_key, tmp_token) = self.generate_secrets(captcha_id, server_time_mills);
         let iv = self.generate_iv(captcha_id);
-        let r = get_captcha(
+        let r = protocol::get_captcha(
             agent,
             self,
             captcha_id,
@@ -177,7 +177,7 @@ impl CaptchaType {
         text_click_arr: &str,
         server_time_mills: u128,
     ) -> Result<String, CaptchaError> {
-        let r = check_captcha(
+        let r = protocol::check_captcha(
             agent,
             self,
             captcha_id,

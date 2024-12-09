@@ -1,5 +1,6 @@
 use crate::sign::{RawSign, SignTrait};
-use cxlib_sign::utils::PPTSignHelper;
+use cxlib_protocol::collect::sign as protocol;
+use cxlib_protocol::utils::PPTSignHelper;
 use cxlib_types::{Location, LocationWithRange};
 use cxlib_user::Session;
 use serde::{Deserialize, Serialize};
@@ -24,9 +25,9 @@ impl SignTrait for LocationSign {
     type Data = Location;
 
     fn sign_url(&self, session: &Session, _: &(), data: &Location) -> PPTSignHelper {
-        cxlib_sign::protocol::location_sign_url(
-            session,
-            data,
+        protocol::location_sign_url(
+            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (data.get_addr(), data.get_lat(), data.get_lon()),
             self.raw_sign.active_id.as_str(),
             self.preset_location.is_some(),
         )
