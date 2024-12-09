@@ -234,7 +234,7 @@ pub trait VerificationInfoTrait<I, O>: Sized {
 pub type TriplePoint<T> = (Point<T>, Point<T>, Point<T>);
 /// 类型别名，本质上是一个 `dyn Fn` 类型。
 pub type SolverRaw<I, O> = dyn Fn(I) -> Result<O, CaptchaError> + Sync;
-type SlideSolverRaw = SolverRaw<(DynamicImage, DynamicImage), u32>;
+type SlideSolverRaw = SolverRaw<(DynamicImage, DynamicImage), f32>;
 type IconClickSolverRaw = SolverRaw<DynamicImage, TriplePoint<u32>>;
 type TextClickSolverRaw = SolverRaw<(String, DynamicImage), TriplePoint<u32>>;
 type RotateSolverRaw = SolverRaw<(DynamicImage, DynamicImage), f32>;
@@ -252,7 +252,7 @@ fn download_image(
     Ok(image_from_bytes(ureq_get_bytes(agent, image_url, referer)?))
 }
 
-impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
+impl VerificationInfoTrait<(DynamicImage, DynamicImage), f32> for SlideImages {
     fn prepare_data(
         self,
         agent: &Agent,
@@ -266,21 +266,21 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     }
     fn default_solver(
         (big_image, small_image): (DynamicImage, DynamicImage),
-    ) -> Result<u32, CaptchaError> {
+    ) -> Result<f32, CaptchaError> {
         time_it_and_print_result(move || {
             Ok(find_sub_image(
                 &big_image,
                 &small_image,
                 cxlib_imageproc::slide_solvers::find_min_sum_of_squared_errors,
-            ))
+            ) as f32)
         })
     }
     fn static_solver_holder() -> &'static OnceInit<SlideSolverRaw> {
         &SLIDE_SOLVER
     }
-    fn result_to_string(result: u32) -> String {
+    fn result_to_string(result: f32) -> String {
         debug!("本地滑块结果：{result}");
-        format!("%5B%7B%22x%22%3A{}%7D%5D", result)
+        format!("%5B%7B%22x%22%3A{}%7D%5D", result.abs().round() as u32)
     }
 }
 impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
