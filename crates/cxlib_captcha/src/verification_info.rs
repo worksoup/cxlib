@@ -79,7 +79,7 @@ pub struct ObstacleImage {
 #[getset(get = "pub")]
 pub struct RotateImages {
     #[serde(rename = "shadeImage")]
-    fixed_img_url: String,
-    #[serde(rename = "cutoutImage")]
     rotatable_img_url: String,
+    #[serde(rename = "cutoutImage")]
+    fixed_img_url: String,
 }

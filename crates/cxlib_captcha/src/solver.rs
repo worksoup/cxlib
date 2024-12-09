@@ -350,8 +350,8 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), f32> for RotateImages {
             self.fixed_img_url(),
             self.rotatable_img_url()
         );
-        let rotatable_img = download_image(agent, self.rotatable_img_url(), referer)?;
         let fixed_img = download_image(agent, self.fixed_img_url(), referer)?;
+        let rotatable_img = download_image(agent, self.rotatable_img_url(), referer)?;
         Ok((fixed_img, rotatable_img))
     }
     fn static_solver_holder() -> &'static OnceInit<RotateSolverRaw> {
