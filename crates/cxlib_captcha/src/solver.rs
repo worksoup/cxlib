@@ -2,7 +2,7 @@ use crate::{
     utils::download_image, CaptchaType, IconClickImage, ObstacleImage, RotateImages, SlideImages,
     TextClickInfo,
 };
-use cxlib_error::CaptchaError;
+use cxlib_error::{CaptchaError, InitError};
 use image::DynamicImage;
 use log::debug;
 use onceinit::{OnceInit, OnceInitError};
@@ -117,9 +117,7 @@ impl TopSolver {
     /// 该函数可以替换验证码枚举对应的验证信息类型为自定义实现。
     ///
     /// 需要 `T` 实现 [`VerificationInfoTrait`] 和 [`DeserializeOwned`]\(即可从 json 构造\), 且不能为临时类型。
-    pub fn set_verification_info_type<T, I, O>(
-        captcha_type: &CaptchaType,
-    ) -> Result<(), OnceInitError>
+    pub fn set_verification_info_type<T, I, O>(captcha_type: &CaptchaType) -> Result<(), InitError>
     where
         T: VerificationInfoTrait<I, O> + DeserializeOwned + 'static,
         SolverRaw<I, O>: 'static,
@@ -129,7 +127,7 @@ impl TopSolver {
                 Ok(map) => {
                     let mut map = map.write().unwrap();
                     if map.contains_key(r#type) {
-                        Err(OnceInitError::DataInitialized)
+                        Err(OnceInitError::DataInitialized)?
                     } else {
                         map.insert(r#type, Box::new(Self::solver_generic::<_, _, T>));
                         Ok(())
@@ -139,11 +137,11 @@ impl TopSolver {
                     let mut map = HashMap::<&'static str, Box<CustomSolverGlobalInner>>::new();
                     map.insert(r#type, Box::new(Self::solver_generic::<_, _, T>));
                     let map = Arc::new(RwLock::new(map));
-                    CUSTOM_SOLVER.set_boxed_data(Box::new(map))
+                    Ok(CUSTOM_SOLVER.set_boxed_data(Box::new(map))?)
                 }
             },
-            t => TOP_SOLVER[Self::type_to_index(t)]
-                .set_boxed_data(Box::new(Self::solver_generic::<_, _, T>)),
+            t => Ok(TOP_SOLVER[Self::type_to_index(t)]
+                .set_boxed_data(Box::new(Self::solver_generic::<_, _, T>))?),
         }
     }
     pub fn solver(
@@ -206,26 +204,26 @@ pub trait VerificationInfoTrait<I, O>: Sized {
     /// 另见 [`VerificationInfoTrait::init_owned_solver`].
     fn init_solver<F: Fn(I) -> Result<O, CaptchaError> + Sync>(
         solver: &'static F,
-    ) -> Result<(), OnceInitError>
+    ) -> Result<(), InitError>
     where
         I: 'static,
         O: 'static,
     {
-        Self::static_solver_holder().set_data(solver)
+        Ok(Self::static_solver_holder().set_data(solver)?)
     }
     /// 初始化 `Solver`.
     ///
     /// 另见 [`VerificationInfoTrait::init_solver`].
     fn init_owned_solver<F: Fn(I) -> Result<O, CaptchaError> + Sync + 'static>(
         solver: F,
-    ) -> Result<(), OnceInitError>
+    ) -> Result<(), InitError>
     where
         I: 'static,
         O: 'static,
         Self: VerificationInfoTrait<I, O>,
     {
         let solver: Box<dyn Fn(_) -> _ + Sync + 'static> = Box::new(solver);
-        Self::static_solver_holder().set_boxed_data(solver)
+        Ok(Self::static_solver_holder().set_boxed_data(solver)?)
     }
     fn solver(self, agent: &Agent, referer: &str) -> Result<String, CaptchaError>
     where

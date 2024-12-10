@@ -8,3 +8,4 @@ authors.workspace = true
 log.workspace = true
 thiserror.workspace = true
 ureq.workspace = true
+onceinit.workspace = true
