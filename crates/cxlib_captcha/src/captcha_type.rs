@@ -9,6 +9,7 @@ use log::{debug, warn};
 use onceinit::StaticDefault;
 use serde::Deserialize;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use ureq::{serde_json, Agent};
 
 #[derive(Debug)]
@@ -50,13 +51,14 @@ impl ValidateResult {
 /// 如需自行支持，请为该类型 [实现 `Solver`](crate::solver::VerificationInfoTrait::init_solver).
 ///
 /// 若需自行处理图片下载等步骤，参见 [`TopSolver::set_verification_info_type`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum CaptchaType {
     /// ## 滑块验证码
     /// 拖动滑块至合适位置，完成验证。
     ///
     /// 对应的验证信息类型为 [`SlideImages`],
     /// 如需自定义 `Solver`, 请参考其文档。
+    #[default]
     Slide,
     /// ## 文字点选验证码
     /// 按照提示依次点击三个汉字，完成验证。
@@ -88,6 +90,24 @@ pub enum CaptchaType {
 unsafe impl StaticDefault for CaptchaType {
     fn static_default() -> &'static Self {
         &CaptchaType::Slide
+    }
+}
+impl FromStr for CaptchaType {
+    type Err = CaptchaError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "slide" | "Slide" | "SLIDE" => CaptchaType::Slide,
+            "iconclick" | "IconClick" | "ICONCLICK" | "icon_click" | "ICON_CLICK" => {
+                CaptchaType::IconClick
+            }
+            "textclick" | "TextClick" | "TEXTCLICK" | "text_click" | "TEXT_CLICK" => {
+                CaptchaType::TextClick
+            }
+            "obstacle" | "Obstacle" | "OBSTACLE" => CaptchaType::Obstacle,
+            "rotate" | "Rotate" | "ROTATE" => CaptchaType::Rotate,
+            _ => Err(CaptchaError::UnsupportedType)?,
+        })
     }
 }
 impl Display for CaptchaType {
