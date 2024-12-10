@@ -3,8 +3,6 @@ use crate::{
     TextClickInfo,
 };
 use cxlib_error::CaptchaError;
-use cxlib_imageproc::{find_sub_image, Point};
-use cxlib_utils::time_it_and_print_result;
 use image::DynamicImage;
 use log::debug;
 use onceinit::{OnceInit, OnceInitError};
@@ -14,12 +12,15 @@ use std::{
     sync::{Arc, RwLock},
 };
 use ureq::{serde_json, Agent};
+use yapt::point_2d::{Point, Point2D};
 
 mod click_captcha_helper {
     use std::fmt::{Display, Formatter};
+    use yapt::impl_point2d;
 
     #[derive(Debug)]
     pub struct Point<T>(T, T);
+    impl_point2d!(Point<T>, t, t);
     impl<T: Display> Display for Point<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             write!(f, "%7B%22x%22%3A{}%2C%22y%22%3A{}%7D", self.0, self.1)
@@ -44,19 +45,23 @@ mod click_captcha_helper {
     }
     impl<T>
         From<(
-            cxlib_imageproc::Point<T>,
-            cxlib_imageproc::Point<T>,
-            cxlib_imageproc::Point<T>,
+            yapt::point_2d::Point<T>,
+            yapt::point_2d::Point<T>,
+            yapt::point_2d::Point<T>,
         )> for Point3<T>
     {
         fn from(
             value: (
-                cxlib_imageproc::Point<T>,
-                cxlib_imageproc::Point<T>,
-                cxlib_imageproc::Point<T>,
+                yapt::point_2d::Point<T>,
+                yapt::point_2d::Point<T>,
+                yapt::point_2d::Point<T>,
             ),
         ) -> Self {
-            Self(value.0.into(), value.1.into(), value.2.into())
+            Self(
+                value.0.into_point_2d(),
+                value.1.into_point_2d(),
+                value.2.into_point_2d(),
+            )
         }
     }
     #[cfg(test)]
@@ -233,6 +238,14 @@ pub trait VerificationInfoTrait<I, O>: Sized {
         Ok(r)
     }
 }
+#[cfg(feature = "ui_solver")]
+#[allow(dead_code)]
+fn convert_captcha_error(a: captcha_dataset_marker::CaptchaError) -> CaptchaError {
+    match a {
+        captcha_dataset_marker::CaptchaError::VerifyFailed => CaptchaError::VerifyFailed,
+        captcha_dataset_marker::CaptchaError::Canceled(s) => CaptchaError::Canceled(s),
+    }
+}
 /// 类型别名，三个一组的 [`Point`] 类型。
 pub type TriplePoint<T> = (Point<T>, Point<T>, Point<T>);
 /// 类型别名，本质上是一个 `dyn Fn` 类型。
@@ -259,9 +272,12 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
         let big_img = download_image(agent, self.big_img_url(), referer)?;
         Ok((big_img, small_img))
     }
+    #[cfg(not(feature = "slide_ui_solver"))]
     fn default_solver(
         (big_image, small_image): (DynamicImage, DynamicImage),
     ) -> Result<u32, CaptchaError> {
+        use cxlib_imageproc::find_sub_image;
+        use cxlib_utils::time_it_and_print_result;
         time_it_and_print_result(move || {
             Ok(find_sub_image(
                 &big_image,
@@ -269,6 +285,11 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
                 cxlib_imageproc::slide_solvers::find_min_sum_of_squared_errors,
             ))
         })
+    }
+    #[cfg(feature = "slide_ui_solver")]
+    fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
+        use captcha_dataset_marker::solvers::Marker;
+        captcha_dataset_marker::solvers::MSlide::ui_solver(input).map_err(convert_captcha_error)
     }
     fn static_solver_holder() -> &'static OnceInit<SlideSolverRaw> {
         &SLIDE_SOLVER
@@ -282,6 +303,11 @@ impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
     fn prepare_data(self, agent: &Agent, referer: &str) -> Result<DynamicImage, CaptchaError> {
         let img = download_image(agent, self.image_url(), referer)?;
         Ok(img)
+    }
+    #[cfg(feature = "icon_click_ui_solver")]
+    fn default_solver(input: DynamicImage) -> Result<TriplePoint<u32>, CaptchaError> {
+        use captcha_dataset_marker::solvers::Marker;
+        captcha_dataset_marker::solvers::MIconClick::ui_solver(input).map_err(convert_captcha_error)
     }
     fn static_solver_holder() -> &'static OnceInit<IconClickSolverRaw> {
         &ICON_CLICK_SOLVER
@@ -306,6 +332,11 @@ impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextCli
         let img = download_image(agent, self.img_url(), referer)?;
         Ok((self.hanzi().clone(), img))
     }
+    #[cfg(feature = "text_click_ui_solver")]
+    fn default_solver(input: (String, DynamicImage)) -> Result<TriplePoint<u32>, CaptchaError> {
+        use captcha_dataset_marker::solvers::Marker;
+        captcha_dataset_marker::solvers::MTextClick::ui_solver(input).map_err(convert_captcha_error)
+    }
     fn static_solver_holder() -> &'static OnceInit<TextClickSolverRaw> {
         &TEXT_CLICK_SOLVER
     }
@@ -322,6 +353,11 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
         let img = download_image(agent, self.img_url(), referer)?;
         Ok(img)
     }
+    #[cfg(feature = "obstacle_ui_solver")]
+    fn default_solver(input: DynamicImage) -> Result<Point<u32>, CaptchaError> {
+        use captcha_dataset_marker::solvers::Marker;
+        captcha_dataset_marker::solvers::MObstacle::ui_solver(input).map_err(convert_captcha_error)
+    }
     fn static_solver_holder() -> &'static OnceInit<ObstacleSolverRaw> {
         &OBSTACLE_SOLVER
     }
@@ -329,7 +365,7 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
     /// \[{"x":82,"y":114},{"x":286,"y":68},{"x":154,"y":90}\] <br/>
     /// x, y 为图标相对 origin_image 右上角的位置。
     fn result_to_string(result: Point<u32>) -> String {
-        let data = click_captcha_helper::Point::from(result);
+        let data = click_captcha_helper::Point::from_point(result);
         debug!("本地滑块结果：{data}");
         format!("%5B{}%5D", data)
     }
@@ -348,6 +384,11 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
         let fixed_img = download_image(agent, self.fixed_img_url(), referer)?;
         let rotatable_img = download_image(agent, self.rotatable_img_url(), referer)?;
         Ok((fixed_img, rotatable_img))
+    }
+    #[cfg(feature = "rotate_ui_solver")]
+    fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
+        use captcha_dataset_marker::solvers::Marker;
+        captcha_dataset_marker::solvers::MRotate::ui_solver(input).map_err(convert_captcha_error)
     }
     fn static_solver_holder() -> &'static OnceInit<RotateSolverRaw> {
         &ROTATE_SOLVER

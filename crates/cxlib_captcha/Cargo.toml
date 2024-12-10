@@ -4,7 +4,16 @@ edition = "2021"
 version.workspace = true
 authors.workspace = true
 
+[features]
+slide_ui_solver = ["ui_solver"]
+rotate_ui_solver = ["ui_solver"]
+obstacle_ui_solver = ["ui_solver"]
+icon_click_ui_solver = ["ui_solver"]
+text_click_ui_solver = ["ui_solver"]
+ui_solver = ["captcha_dataset_marker"]
+
 [dependencies]
+yapt = { git = "https://github.com/worksoup/yapt.git" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_obfuscate = { path = "../cxlib_obfuscate" }
@@ -18,3 +27,6 @@ onceinit.workspace = true
 rand.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }
 serde = { workspace = true, features = ["derive"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
+captcha_dataset_marker = { git = "https://github.com/worksoup/captcha_dataset_marker.git", optional = true }
