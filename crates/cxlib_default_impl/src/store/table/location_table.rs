@@ -1,11 +1,8 @@
-use crate::store::{AliasTable, DataBase, DataBaseTableTrait};
-use cxlib_error::StoreError;
+use crate::store::{AliasTable, DataBase, DataBaseTableTrait, StoreError};
 use cxlib_store::StorageTableCommandTrait;
 use cxlib_types::Location;
 use log::{debug, warn};
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::str::FromStr;
+use std::{collections::HashMap, fmt::Display, str::FromStr};
 
 pub struct LocationTable;
 pub struct LocationAndAliasesPair {

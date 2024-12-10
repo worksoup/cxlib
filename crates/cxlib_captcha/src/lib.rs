@@ -7,6 +7,7 @@ pub mod utils;
 mod verification_info;
 
 pub use captcha_type::*;
+pub use cxlib_error::CaptchaError;
 pub use solver::*;
 pub use verification_info::*;
 

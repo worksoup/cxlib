@@ -1,7 +1,6 @@
 use crate::{sign::QrCodeSign, signner::LocationInfoGetterTrait};
-use cxlib_error::SignError;
 use cxlib_imageproc::Point;
-use cxlib_sign::{SignResult, SignTrait, SignnerTrait};
+use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::Location;
 use cxlib_user::Session;
 use cxlib_utils::inquire_confirm;

@@ -1,4 +1,4 @@
-use cxlib_error::SignError;
+use cxlib_sign::SignError;
 use std::path::PathBuf;
 
 pub fn find_latest_pic(pic_dir: &PathBuf) -> Result<PathBuf, SignError> {

@@ -1,14 +1,13 @@
 mod table;
 
-use std::collections::HashSet;
+pub use cxlib_error::StoreError;
 pub use table::*;
 
 use cxlib_activity::CourseExcludeInfoTrait;
 use cxlib_store::{Dir, StorageTableCommandTrait, StorageTrait};
 use log::info;
 use sqlite::Connection;
-use std::fs::File;
-use std::ops::Deref;
+use std::{collections::HashSet, fs::File, ops::Deref};
 
 pub trait DataBaseTableTrait: StorageTableCommandTrait<DataBase> {
     const TABLE_ARGS: &'static str;

@@ -1,6 +1,5 @@
 use crate::{sign::LocationSign, signner::LocationInfoGetterTrait};
-use cxlib_error::SignError;
-use cxlib_sign::{SignResult, SignnerTrait};
+use cxlib_sign::{SignError, SignResult, SignnerTrait};
 use cxlib_types::Location;
 use cxlib_user::Session;
 use std::collections::HashMap;

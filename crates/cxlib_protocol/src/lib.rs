@@ -7,8 +7,10 @@ pub mod utils;
 
 pub use default_impl::*;
 
-use cxlib_error::{InitError, ProtocolError};
+use cxlib_error::InitError;
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
+
+pub use cxlib_error::ProtocolError;
 
 pub trait ProtocolItemTrait: Sized + 'static {
     type ProtocolData;

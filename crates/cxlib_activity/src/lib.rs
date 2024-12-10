@@ -1,8 +1,9 @@
 mod raw;
 
+pub use cxlib_error::ActivityError;
 pub use raw::*;
 
-use cxlib_error::{ActivityError, MaybeFatalError};
+use cxlib_error::MaybeFatalError;
 use cxlib_protocol::collect::activity as protocol;
 use cxlib_types::Course;
 use cxlib_user::Session;

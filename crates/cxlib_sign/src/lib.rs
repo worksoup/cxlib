@@ -1,12 +1,14 @@
 use crate::utils::try_secondary_verification;
 use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
-use cxlib_error::{SignError, UnwrapOrLogPanic};
+use cxlib_error::UnwrapOrLogPanic;
 use cxlib_types::{Course, Dioption, LocationWithRange};
 use cxlib_user::Session;
 use log::info;
 use serde::Deserialize;
 use std::{collections::HashMap, ops::Add};
+
+pub use cxlib_error::SignError;
 
 use cxlib_protocol::collect::sign as protocol;
 use cxlib_protocol::utils::PPTSignHelper;

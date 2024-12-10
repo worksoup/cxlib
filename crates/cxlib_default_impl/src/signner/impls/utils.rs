@@ -1,8 +1,7 @@
 //! 写了 8 行导入语句、3 行辅助特型、8 行特型实现，只为复用 40 行的代码。
 //! 好，还有 2 行调侃。
 use crate::sign::{LocationSign, QrCodeSign};
-use cxlib_error::SignError;
-use cxlib_sign::{PreSignResult, SignResult, SignTrait};
+use cxlib_sign::{PreSignResult, SignError, SignResult, SignTrait};
 use cxlib_types::Location;
 use cxlib_user::Session;
 use log::warn;
