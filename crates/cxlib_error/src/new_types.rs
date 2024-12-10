@@ -24,7 +24,8 @@ impl MaybeFatalError for AgentError {
                     ErrorKind::InvalidUrl => true,
                     // 说明可能是程序 Bug, 故视为致命错误。
                     ErrorKind::UnknownScheme => true,
-                    ErrorKind::Dns => true,
+                    //　有时会暂时性地解析失败。所以不视为致命错误。
+                    ErrorKind::Dns => false,
                     ErrorKind::InsecureRequestHttpsOnly => true,
                     ErrorKind::ConnectionFailed => true,
                     ErrorKind::TooManyRedirects => false,
@@ -37,7 +38,7 @@ impl MaybeFatalError for AgentError {
                     ErrorKind::ProxyUnauthorized => true,
                     ErrorKind::HTTP => {
                         //TODO
-                        true
+                        false
                     }
                 }
             }
