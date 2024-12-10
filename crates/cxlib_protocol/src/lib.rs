@@ -7,21 +7,21 @@ pub mod utils;
 
 pub use default_impl::*;
 
-use cxlib_error::ProtocolError;
-use onceinit::{OnceInit, OnceInitError, OnceInitState, StaticDefault};
+use cxlib_error::{InitError, ProtocolError};
+use onceinit::{OnceInit, OnceInitState, StaticDefault};
 
 pub trait ProtocolItemTrait: Sized + 'static {
     type ProtocolData;
     fn config_file_name() -> &'static str;
     fn get_protocol_() -> &'static OnceInit<dyn ProtocolTrait<Self>>;
     fn get_protocol() -> &'static dyn ProtocolTrait<Self>;
-    fn set_protocol(protocol: &'static impl ProtocolTrait<Self>) -> Result<(), OnceInitError> {
-        Self::get_protocol_().set_data(protocol)
+    fn set_protocol(protocol: &'static impl ProtocolTrait<Self>) -> Result<(), InitError> {
+        Ok(Self::get_protocol_().set_data(protocol)?)
     }
     fn set_boxed_protocol(
         protocol: Box<impl ProtocolTrait<Self> + 'static>,
-    ) -> Result<(), OnceInitError> {
-        Self::get_protocol_().set_boxed_data(protocol)
+    ) -> Result<(), InitError> {
+        Ok(Self::get_protocol_().set_boxed_data(protocol)?)
     }
     fn get(&self) -> String {
         Self::get_protocol().get(self)

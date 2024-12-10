@@ -1,4 +1,5 @@
 use crate::MaybeFatalError;
+use onceinit::OnceInitError;
 use thiserror::Error;
 use ureq::{Error, ErrorKind};
 
@@ -10,7 +11,6 @@ impl From<ureq::Error> for AgentError {
         Self(Box::new(value))
     }
 }
-
 impl MaybeFatalError for AgentError {
     fn is_fatal(&self) -> bool {
         match &*self.0 {
@@ -42,5 +42,14 @@ impl MaybeFatalError for AgentError {
                 }
             }
         }
+    }
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub struct InitError(#[from] OnceInitError);
+impl MaybeFatalError for InitError {
+    fn is_fatal(&self) -> bool {
+        false
     }
 }

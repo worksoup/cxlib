@@ -19,13 +19,13 @@ static PROTOCOL: OnceInit<dyn ProtocolTrait<ProtocolList>> = OnceInit::new();
 
 pub fn set_protocol(
     protocol: &'static impl ProtocolTrait<DefaultProtocolList>,
-) -> Result<(), OnceInitError> {
+) -> Result<(), InitError> {
     PROTOCOL.set_data(protocol)
 }
 
 pub fn set_boxed_protocol(
     protocol: Box<impl ProtocolTrait<DefaultProtocolList> + 'static>,
-) -> Result<(), OnceInitError> {
+) -> Result<(), InitError> {
     PROTOCOL.set_boxed_data(protocol)
 }
 ```

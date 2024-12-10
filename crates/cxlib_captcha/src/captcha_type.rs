@@ -3,10 +3,10 @@ use crate::{
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
     TopSolver, DEFAULT_CAPTCHA_TYPE,
 };
-use cxlib_error::{AgentError, CaptchaError, MaybeFatalError, UnwrapOrLogPanic};
+use cxlib_error::{AgentError, CaptchaError, InitError, MaybeFatalError, UnwrapOrLogPanic};
 use cxlib_protocol::collect::captcha as protocol;
 use log::{debug, warn};
-use onceinit::{OnceInitError, StaticDefault};
+use onceinit::StaticDefault;
 use serde::Deserialize;
 use std::fmt::{Display, Formatter};
 use ureq::{serde_json, Agent};
@@ -111,13 +111,13 @@ impl CaptchaType {
     /// 将当前验证码类型设为全局默认。
     ///
     /// 注意，默认类型仅可设置一次。
-    pub fn as_global_default(&self) -> Result<(), OnceInitError> {
-        DEFAULT_CAPTCHA_TYPE.set_boxed_data(Box::new(self.clone()))
+    pub fn as_global_default(&self) -> Result<(), InitError> {
+        Ok(DEFAULT_CAPTCHA_TYPE.set_boxed_data(Box::new(self.clone()))?)
     }
     /// 将设置全局默认的验证码类型。
     ///
     /// 注意，默认类型仅可设置一次。
-    pub fn set_global_default(self_: &CaptchaType) -> Result<(), OnceInitError> {
+    pub fn set_global_default(self_: &CaptchaType) -> Result<(), InitError> {
         self_.as_global_default()
     }
     pub fn generate_secrets(
