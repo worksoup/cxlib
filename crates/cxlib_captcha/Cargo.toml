@@ -10,7 +10,7 @@ rotate_ui_solver = ["ui_solver"]
 obstacle_ui_solver = ["ui_solver"]
 icon_click_ui_solver = ["ui_solver"]
 text_click_ui_solver = ["ui_solver"]
-ui_solver = ["captcha_dataset_marker"]
+ui_solver = ["captcha_solver_ui"]
 
 [dependencies]
 yapt = { git = "https://github.com/worksoup/yapt.git" }
@@ -29,4 +29,4 @@ ureq = { workspace = true, features = ["cookies", "json"] }
 serde = { workspace = true, features = ["derive"] }
 
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
-captcha_dataset_marker = { git = "https://github.com/worksoup/captcha_dataset_marker.git", optional = true }
+captcha_solver_ui = { git = "https://github.com/worksoup/captcha_solver_ui.git", optional = true }

@@ -238,10 +238,10 @@ pub trait VerificationInfoTrait<I, O>: Sized {
 }
 #[cfg(feature = "ui_solver")]
 #[allow(dead_code)]
-fn convert_captcha_error(a: captcha_dataset_marker::CaptchaError) -> CaptchaError {
+fn convert_captcha_error(a: captcha_solver_ui::CaptchaError) -> CaptchaError {
     match a {
-        captcha_dataset_marker::CaptchaError::VerifyFailed => CaptchaError::VerifyFailed,
-        captcha_dataset_marker::CaptchaError::Canceled(s) => CaptchaError::Canceled(s),
+        captcha_solver_ui::CaptchaError::VerifyFailed => CaptchaError::VerifyFailed,
+        captcha_solver_ui::CaptchaError::Canceled(s) => CaptchaError::Canceled(s),
     }
 }
 /// 类型别名，三个一组的 [`Point`] 类型。
@@ -286,8 +286,8 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     }
     #[cfg(feature = "slide_ui_solver")]
     fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
-        use captcha_dataset_marker::solvers::Marker;
-        captcha_dataset_marker::solvers::MSlide::ui_solver(input).map_err(convert_captcha_error)
+        use captcha_solver_ui::solvers::Marker;
+        captcha_solver_ui::solvers::MSlide::ui_solver(input).map_err(convert_captcha_error)
     }
     fn static_solver_holder() -> &'static OnceInit<SlideSolverRaw> {
         &SLIDE_SOLVER
@@ -304,8 +304,8 @@ impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
     }
     #[cfg(feature = "icon_click_ui_solver")]
     fn default_solver(input: DynamicImage) -> Result<TriplePoint<u32>, CaptchaError> {
-        use captcha_dataset_marker::solvers::Marker;
-        captcha_dataset_marker::solvers::MIconClick::ui_solver(input).map_err(convert_captcha_error)
+        use captcha_solver_ui::solvers::Marker;
+        captcha_solver_ui::solvers::MIconClick::ui_solver(input).map_err(convert_captcha_error)
     }
     fn static_solver_holder() -> &'static OnceInit<IconClickSolverRaw> {
         &ICON_CLICK_SOLVER
@@ -332,8 +332,8 @@ impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextCli
     }
     #[cfg(feature = "text_click_ui_solver")]
     fn default_solver(input: (String, DynamicImage)) -> Result<TriplePoint<u32>, CaptchaError> {
-        use captcha_dataset_marker::solvers::Marker;
-        captcha_dataset_marker::solvers::MTextClick::ui_solver(input).map_err(convert_captcha_error)
+        use captcha_solver_ui::solvers::Marker;
+        captcha_solver_ui::solvers::MTextClick::ui_solver(input).map_err(convert_captcha_error)
     }
     fn static_solver_holder() -> &'static OnceInit<TextClickSolverRaw> {
         &TEXT_CLICK_SOLVER
@@ -353,8 +353,8 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
     }
     #[cfg(feature = "obstacle_ui_solver")]
     fn default_solver(input: DynamicImage) -> Result<Point<u32>, CaptchaError> {
-        use captcha_dataset_marker::solvers::Marker;
-        captcha_dataset_marker::solvers::MObstacle::ui_solver(input).map_err(convert_captcha_error)
+        use captcha_solver_ui::solvers::Marker;
+        captcha_solver_ui::solvers::MObstacle::ui_solver(input).map_err(convert_captcha_error)
     }
     fn static_solver_holder() -> &'static OnceInit<ObstacleSolverRaw> {
         &OBSTACLE_SOLVER
@@ -385,8 +385,8 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
     }
     #[cfg(feature = "rotate_ui_solver")]
     fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
-        use captcha_dataset_marker::solvers::Marker;
-        captcha_dataset_marker::solvers::MRotate::ui_solver(input).map_err(convert_captcha_error)
+        use captcha_solver_ui::solvers::Marker;
+        captcha_solver_ui::solvers::MRotate::ui_solver(input).map_err(convert_captcha_error)
     }
     fn static_solver_holder() -> &'static OnceInit<RotateSolverRaw> {
         &ROTATE_SOLVER
