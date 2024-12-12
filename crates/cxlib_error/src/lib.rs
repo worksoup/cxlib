@@ -24,11 +24,26 @@ pub fn log_panic<T>(e: impl std::error::Error) -> T {
     panic!();
 }
 
-pub trait UnwrapOrLogPanic<T> {
-    fn unwrap_or_log_panic(self) -> T;
+pub fn log_default<T: Default>(e: impl std::error::Error) -> T {
+    log::warn!("{}", e);
+    T::default()
 }
-impl<T, E: std::error::Error> UnwrapOrLogPanic<T> for Result<T, E> {
-    fn unwrap_or_log_panic(self) -> T {
+
+pub trait CxlibResultUtils<T> {
+    fn log_unwrap(self) -> T;
+    fn unwrap_or_log_default(self) -> T
+    where
+        T: Default;
+}
+impl<T, E: std::error::Error> CxlibResultUtils<T> for Result<T, E> {
+    fn log_unwrap(self) -> T {
         self.unwrap_or_else(log_panic)
+    }
+
+    fn unwrap_or_log_default(self) -> T
+    where
+        T: Default,
+    {
+        self.unwrap_or_else(log_default)
     }
 }

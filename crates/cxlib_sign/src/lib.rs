@@ -1,7 +1,8 @@
 use crate::utils::try_secondary_verification;
 use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
-use cxlib_error::UnwrapOrLogPanic;
+use cxlib_error::CxlibResultUtils;
+use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
 use cxlib_types::{Course, Dioption, LocationWithRange};
 use cxlib_user::Session;
 use log::info;
@@ -9,9 +10,6 @@ use serde::Deserialize;
 use std::{collections::HashMap, ops::Add};
 
 pub use cxlib_error::SignError;
-
-use cxlib_protocol::collect::sign as protocol;
-use cxlib_protocol::utils::PPTSignHelper;
 
 pub mod utils;
 
@@ -67,7 +65,7 @@ pub trait SignTrait: Ord {
         }
         let Data {
             data: Status { status },
-        } = r.into_json().unwrap_or_else(cxlib_error::log_panic);
+        } = r.into_json().log_unwrap();
         Ok(status.into())
     }
     /// 通过签到结果的字符串判断签到结果如何。
@@ -322,7 +320,7 @@ pub trait GestureOrSigncodeSignTrait: Ord {
         }
         let CheckR { result } = protocol::check_signcode(session, active_id, signcode)?
             .into_json()
-            .unwrap_or_log_panic();
+            .log_unwrap();
         if result == 1 {
             Ok(Ok(()))
         } else {

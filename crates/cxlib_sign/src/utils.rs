@@ -1,7 +1,7 @@
 use crate::{protocol, PreSignResult, SignResult, SignTrait};
 use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
-use cxlib_error::SignError;
+use cxlib_error::{CxlibResultUtils, SignError};
 use cxlib_protocol::{utils::PPTSignHelper, ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Dioption, LocationWithRange};
 use cxlib_user::Session;
@@ -14,9 +14,7 @@ pub fn analysis_after_presign(
     response_of_presign: Response,
 ) -> Result<PreSignResult, SignError> {
     let presign_url = response_of_presign.get_url().to_string();
-    let html = response_of_presign
-        .into_string()
-        .unwrap_or_else(cxlib_error::log_panic);
+    let html = response_of_presign.into_string().log_unwrap();
     trace!("预签到请求结果：{html}");
     if let Some(start_of_statuscontent_h1) = html.find("id=\"statuscontent\"") {
         let html = &html[start_of_statuscontent_h1 + 19..];
@@ -72,7 +70,7 @@ pub fn secondary_verification(
     let r = {
         let url = url.with_validate(&url_param);
         let r = url.get(agent)?;
-        RawSign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic))
+        RawSign::guess_sign_result_by_text(&r.into_string().log_unwrap())
     };
     Ok(r)
 }
@@ -83,7 +81,7 @@ pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
     referer: &str,
 ) -> Result<SignResult, SignError> {
     let r = url.get(agent)?;
-    match Sign::guess_sign_result_by_text(&r.into_string().unwrap_or_else(cxlib_error::log_panic)) {
+    match Sign::guess_sign_result_by_text(&r.into_string().log_unwrap()) {
         SignResult::Fail { msg } => {
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。

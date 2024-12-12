@@ -42,7 +42,7 @@
 //!    请求参数有刚返回的 `token`, 其他可以在网络请求里看到。当然也包含刚刚计算的 iv.
 
 use crate::CaptchaId;
-use cxlib_error::{AgentError, UnwrapOrLogPanic};
+use cxlib_error::{AgentError, CxlibResultUtils};
 use cxlib_imageproc::image_from_bytes;
 use cxlib_protocol::collect::captcha as protocol;
 use cxlib_utils::ureq_get_bytes;
@@ -69,7 +69,7 @@ pub fn get_server_time(
         t: u128,
     }
     let Tmp { t } =
-        trim_response_to_json(r.into_string().unwrap_or_log_panic().as_str()).unwrap_or_log_panic();
+        trim_response_to_json(r.into_string().log_unwrap().as_str()).log_unwrap();
     Ok(t)
 }
 pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, serde_json::Error>

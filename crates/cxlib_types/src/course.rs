@@ -1,4 +1,4 @@
-use cxlib_error::{MaybeFatalError, UnwrapOrLogPanic};
+use cxlib_error::{MaybeFatalError, CxlibResultUtils};
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::LoginError;
 use cxlib_user::Session;
@@ -73,7 +73,7 @@ impl Course {
         Ok(courses)
     }
     fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, CourseError> {
-        let r: GetCoursesR = r.into_json().unwrap_or_log_panic();
+        let r: GetCoursesR = r.into_json().log_unwrap();
         let mut arr = Vec::new();
         if let Some(channel_list) = r.channel_list {
             for c in channel_list {

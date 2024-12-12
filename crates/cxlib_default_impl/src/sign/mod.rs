@@ -14,7 +14,7 @@ pub use qrcode::*;
 pub use signcode::*;
 
 use cxlib_activity::RawSign;
-use cxlib_error::UnwrapOrLogPanic;
+use cxlib_error::CxlibResultUtils;
 use cxlib_protocol::collect::default_impl as protocol;
 use cxlib_sign::{PreSignResult, SignDetail, SignError, SignTrait};
 use cxlib_types::LocationWithRange;
@@ -58,7 +58,7 @@ impl Sign {
             is_photo_sign,
             is_refresh_qrcode,
             sign_code,
-        } = r.into_json().unwrap_or_log_panic();
+        } = r.into_json().log_unwrap();
         Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
     }
     pub fn from_raw(raw: RawSign, session: &Session) -> Self {
