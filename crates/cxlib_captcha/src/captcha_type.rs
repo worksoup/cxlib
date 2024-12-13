@@ -1,15 +1,19 @@
 use crate::{
     hash::{encode, hash, uuid},
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
-    TopSolver, DEFAULT_CAPTCHA_TYPE,
+    IconClickImage, ObstacleImage, RotateImages, SlideImages, SolverRaw, TextClickInfo,
+    VerificationInfoTrait, DEFAULT_CAPTCHA_TYPE,
 };
-use cxlib_error::{AgentError, CaptchaError, InitError, MaybeFatalError, CxlibResultUtils};
+use cxlib_error::{AgentError, CaptchaError, CxlibResultUtils, InitError, MaybeFatalError};
 use cxlib_protocol::collect::captcha as protocol;
 use log::{debug, warn};
-use onceinit::StaticDefault;
+use onceinit::{OnceInit, OnceInitError, StaticDefault};
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+use std::sync::{Arc, RwLock};
 use ureq::{serde_json, Agent};
 
 #[derive(Debug)]
@@ -48,9 +52,10 @@ impl ValidateResult {
 }
 /// # [`CaptchaType`]
 /// 验证码类型，目前只有 [`CaptchaType::Slide`] 类型支持良好，无需初始化 `Solver`.
-/// 如需自行支持，请为该类型 [实现 `Solver`](crate::solver::VerificationInfoTrait::init_solver).
+/// 如需自行支持，请为该类型 [实现 `Solver`](CaptchaType::init_solver).
 ///
-/// 若需自行处理图片下载等步骤，参见 [`TopSolver::set_verification_info_type`].
+/// 若需自行处理图片下载等步骤，参见 [`CaptchaType::set_verification_info_type`].
+/// 该函数可以替换掉默认的验证信息类型。
 #[derive(Debug, Clone, Default)]
 pub enum CaptchaType {
     /// ## 滑块验证码
@@ -127,12 +132,132 @@ impl AsRef<str> for CaptchaType {
         }
     }
 }
+type TopSolverGlobalInner = fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError>;
+type TopSolverGlobal = [OnceInit<TopSolverGlobalInner>; 6];
+type CustomSolverGlobalInner = fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError>;
+type CustomSolverGlobal =
+    OnceInit<Arc<RwLock<HashMap<&'static str, Box<CustomSolverGlobalInner>>>>>;
+static TOP_SOLVER: TopSolverGlobal = [const { OnceInit::uninit() }; 6];
+static CUSTOM_SOLVER: CustomSolverGlobal = OnceInit::uninit();
+impl CaptchaType {
+    fn solver_generic<I, O, T>(
+        agent: &Agent,
+        image: serde_json::Value,
+        referer: &str,
+    ) -> Result<String, CaptchaError>
+    where
+        T: VerificationInfoTrait<I, O> + DeserializeOwned + 'static,
+        SolverRaw<I, O>: 'static,
+    {
+        let self_: T = serde_json::from_value(image).unwrap();
+        self_.solver(agent, referer)
+    }
+    const fn type_to_index(captcha_type: &CaptchaType) -> usize {
+        match captcha_type {
+            CaptchaType::Slide => 0,
+            CaptchaType::TextClick => 1,
+            CaptchaType::Rotate => 2,
+            CaptchaType::IconClick => 3,
+            CaptchaType::Obstacle => 4,
+            CaptchaType::Custom(_) => unreachable!(),
+        }
+    }
+    fn default_solver_impl(
+        captcha_type: &CaptchaType,
+    ) -> fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError> {
+        match captcha_type {
+            CaptchaType::Slide => Self::solver_generic::<_, _, SlideImages>,
+            CaptchaType::TextClick => Self::solver_generic::<_, _, TextClickInfo>,
+            CaptchaType::Rotate => Self::solver_generic::<_, _, RotateImages>,
+            CaptchaType::IconClick => Self::solver_generic::<_, _, IconClickImage>,
+            CaptchaType::Obstacle => Self::solver_generic::<_, _, ObstacleImage>,
+            CaptchaType::Custom(_) => unreachable!(),
+        }
+    }
+    /// 该函数可以替换验证码枚举对应的验证信息类型为自定义实现。
+    ///
+    /// 需要 `T` 实现 [`VerificationInfoTrait`] 和 [`DeserializeOwned`]\(即可从 json 构造\), 且不能为临时类型。
+    pub fn set_verification_info_type<T, I, O>(captcha_type: &CaptchaType) -> Result<(), InitError>
+    where
+        T: VerificationInfoTrait<I, O> + DeserializeOwned + 'static,
+        SolverRaw<I, O>: 'static,
+    {
+        match captcha_type {
+            CaptchaType::Custom(r#type) => match CUSTOM_SOLVER.get() {
+                Ok(map) => {
+                    let mut map = map.write().unwrap();
+                    if map.contains_key(r#type) {
+                        Err(OnceInitError::DataInitialized)?
+                    } else {
+                        map.insert(r#type, Box::new(Self::solver_generic::<_, _, T>));
+                        Ok(())
+                    }
+                }
+                Err(_) => {
+                    let mut map = HashMap::<&'static str, Box<CustomSolverGlobalInner>>::new();
+                    map.insert(r#type, Box::new(Self::solver_generic::<_, _, T>));
+                    let map = Arc::new(RwLock::new(map));
+                    Ok(CUSTOM_SOLVER.init_boxed(Box::new(map))?)
+                }
+            },
+            t => Ok(TOP_SOLVER[Self::type_to_index(t)]
+                .init_boxed(Box::new(Self::solver_generic::<_, _, T>))?),
+        }
+    }
+    /// 初始化 `Solver`.
+    ///
+    /// 另见 [`VerificationInfoTrait::init_solver`].
+    pub fn init_solver<T: VerificationInfoTrait<I, O>, I, O>(
+        solver: &'static (impl Fn(I) -> Result<O, CaptchaError> + Sync),
+    ) -> Result<(), InitError>
+    where
+        I: 'static,
+        O: 'static,
+    {
+        T::init_solver(solver)
+    }
+    /// 初始化 `Solver`.
+    ///
+    /// 另见 [`VerificationInfoTrait::init_owned_solver`].
+    pub fn init_owned_solver<T: VerificationInfoTrait<I, O>, I, O>(
+        solver: impl Fn(I) -> Result<O, CaptchaError> + Sync + 'static,
+    ) -> Result<(), InitError>
+    where
+        I: 'static,
+        O: 'static,
+    {
+        T::init_owned_solver(solver)
+    }
+    pub fn solver(
+        agent: &Agent,
+        captcha_type: &CaptchaType,
+        image: serde_json::Value,
+        referer: &str,
+    ) -> Result<String, CaptchaError> {
+        match captcha_type {
+            CaptchaType::Custom(r#type) => CUSTOM_SOLVER
+                .get()
+                .ok()
+                .and_then(|map| {
+                    map.read()
+                        .unwrap()
+                        .get(r#type)
+                        .map(|a| a(agent, image, referer))
+                })
+                .ok_or_else(|| CaptchaError::UnsupportedType)?,
+            t => match TOP_SOLVER[Self::type_to_index(t)].get() {
+                Err(_) => Self::default_solver_impl(t)(agent, image, referer),
+                Ok(solver_) => solver_(agent, image, referer),
+            },
+        }
+    }
+}
 impl CaptchaType {
     /// 将当前验证码类型设为全局默认。
     ///
     /// 注意，默认类型仅可设置一次。
     pub fn as_global_default(&self) -> Result<(), InitError> {
-        Ok(DEFAULT_CAPTCHA_TYPE.set_boxed_data(Box::new(self.clone()))?)
+        Ok(DEFAULT_CAPTCHA_TYPE.init_boxed(Box::new(self.clone()))?)
     }
     /// 将设置全局默认的验证码类型。
     ///
@@ -206,8 +331,7 @@ impl CaptchaType {
             iv,
             server_time_mills + 2,
         )?;
-        let v: ValidateResult =
-            trim_response_to_json(&r.into_string().log_unwrap()).unwrap();
+        let v: ValidateResult = trim_response_to_json(&r.into_string().log_unwrap()).log_unwrap();
         debug!("验证结果：{v:?}");
         v.get_validate_info()
     }
@@ -229,7 +353,7 @@ impl CaptchaType {
                          iv,
                          data: VerificationDataWithToken { token, data },
                      }| {
-                        TopSolver::solver(agent, self, data, referer).and_then(|text_click_arr| {
+                        CaptchaType::solver(agent, self, data, referer).and_then(|text_click_arr| {
                             Self::check_captcha(
                                 self,
                                 agent,

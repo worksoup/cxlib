@@ -23,7 +23,7 @@ unsafe impl StaticDefault for dyn LocationPreprocessorTrait {
     }
 }
 
-static LOCATION_PREPROCESSOR: OnceInit<dyn LocationPreprocessorTrait> = OnceInit::new();
+static LOCATION_PREPROCESSOR: OnceInit<dyn LocationPreprocessorTrait> = OnceInit::uninit();
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct Location {
     addr: String,
@@ -42,12 +42,12 @@ impl Location {
     pub fn set_location_preprocessor(
         preprocessor: &'static dyn LocationPreprocessorTrait,
     ) -> Result<(), InitError> {
-        Ok(LOCATION_PREPROCESSOR.set_data(preprocessor)?)
+        Ok(LOCATION_PREPROCESSOR.init(preprocessor)?)
     }
     pub fn set_boxed_location_preprocessor(
         preprocessor: Box<dyn LocationPreprocessorTrait>,
     ) -> Result<(), InitError> {
-        Ok(LOCATION_PREPROCESSOR.set_boxed_data(preprocessor)?)
+        Ok(LOCATION_PREPROCESSOR.init_boxed(preprocessor)?)
     }
     pub fn to_owned_fields(self) -> [String; 4] {
         let Location {

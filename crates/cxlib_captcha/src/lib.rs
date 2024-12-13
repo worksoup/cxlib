@@ -13,4 +13,4 @@ pub use verification_info::*;
 
 pub type CaptchaId = String;
 
-pub static DEFAULT_CAPTCHA_TYPE: OnceInit<CaptchaType> = OnceInit::new();
+pub static DEFAULT_CAPTCHA_TYPE: OnceInit<CaptchaType> = OnceInit::uninit();

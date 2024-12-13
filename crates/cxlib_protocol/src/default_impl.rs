@@ -1,6 +1,7 @@
 use crate::{ProtocolDataTrait, ProtocolItemTrait, ProtocolTrait, PROTOCOL};
+use cxlib_error::ProtocolError;
 use log::warn;
-use onceinit::OnceInit;
+use onceinit::{OnceInit, UninitGlobal};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -10,7 +11,6 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex, RwLock},
 };
-use cxlib_error::ProtocolError;
 
 pub enum ProtocolItem {
     ActiveList,
@@ -94,15 +94,16 @@ impl ProtocolItem {
     pub const ACCOUNT_MANAGE: &'static str = "https://passport2.chaoxing.com/mooc/accountManage";
     pub const USER_AGENT: &'static str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_5.3.1_android_phone_5000_83";
 }
+impl UninitGlobal<dyn ProtocolTrait<Self>, OnceInit<dyn ProtocolTrait<Self>>> for ProtocolItem {
+    fn holder() -> &'static OnceInit<dyn ProtocolTrait<Self>> {
+        &PROTOCOL
+    }
+}
 impl ProtocolItemTrait for ProtocolItem {
     type ProtocolData = ProtocolData;
 
     fn config_file_name() -> &'static str {
         "protocol.toml"
-    }
-
-    fn get_protocol_() -> &'static OnceInit<dyn ProtocolTrait<Self>> {
-        &PROTOCOL
     }
     fn get_protocol() -> &'static (dyn ProtocolTrait<ProtocolItem> + 'static) {
         PROTOCOL.deref()

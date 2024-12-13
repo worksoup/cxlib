@@ -3,21 +3,23 @@ mod raw;
 pub use cxlib_error::ActivityError;
 pub use raw::*;
 
-use cxlib_error::MaybeFatalError;
+use cxlib_error::{CxlibResultUtils, MaybeFatalError};
 use cxlib_protocol::collect::activity as protocol;
 use cxlib_types::Course;
 use cxlib_user::Session;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+    time::{Duration, SystemTime},
+};
 
 fn time_delta_from_mills(mills: u64) -> chrono::TimeDelta {
     let start_time = std::time::UNIX_EPOCH + Duration::from_millis(mills);
     let now = SystemTime::now();
-    let duration = now.duration_since(start_time).unwrap();
-    chrono::TimeDelta::from_std(duration).unwrap()
+    let duration = now.duration_since(start_time).log_unwrap();
+    chrono::TimeDelta::from_std(duration).log_unwrap()
 }
 /// # Activity
 ///

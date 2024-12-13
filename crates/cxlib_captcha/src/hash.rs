@@ -56,6 +56,7 @@ pub(crate) fn hash(a: &str) -> [u8; 16] {
 pub(crate) fn encode(a: [u8; 16]) -> String {
     hex::encode(a)
 }
+#[inline]
 pub(crate) fn uuid() -> String {
     let mut v = [0; 0x24];
     let hex: [u8; 16] = *b"0123456789abcdef";

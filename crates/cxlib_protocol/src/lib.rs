@@ -8,22 +8,23 @@ pub mod utils;
 pub use default_impl::*;
 
 use cxlib_error::InitError;
-use onceinit::{OnceInit, OnceInitState, StaticDefault};
+use onceinit::{OnceInit, OnceInitState, StaticDefault, UninitGlobal};
 
 pub use cxlib_error::ProtocolError;
 
-pub trait ProtocolItemTrait: Sized + 'static {
+pub trait ProtocolItemTrait:
+    Sized + 'static + UninitGlobal<dyn ProtocolTrait<Self>, OnceInit<dyn ProtocolTrait<Self>>>
+{
     type ProtocolData;
     fn config_file_name() -> &'static str;
-    fn get_protocol_() -> &'static OnceInit<dyn ProtocolTrait<Self>>;
     fn get_protocol() -> &'static dyn ProtocolTrait<Self>;
     fn set_protocol(protocol: &'static impl ProtocolTrait<Self>) -> Result<(), InitError> {
-        Ok(Self::get_protocol_().set_data(protocol)?)
+        Ok(Self::init(protocol)?)
     }
     fn set_boxed_protocol(
         protocol: Box<impl ProtocolTrait<Self> + 'static>,
     ) -> Result<(), InitError> {
-        Ok(Self::get_protocol_().set_boxed_data(protocol)?)
+        Ok(Self::init_boxed(protocol)?)
     }
     fn get(&self) -> String {
         Self::get_protocol().get(self)
@@ -70,7 +71,7 @@ pub trait ProtocolTrait<ProtocolItem>: Sync {
     fn update(&self, t: &ProtocolItem, value: &str) -> bool;
 }
 
-static PROTOCOL: OnceInit<dyn ProtocolTrait<ProtocolItem>> = OnceInit::new();
+static PROTOCOL: OnceInit<dyn ProtocolTrait<ProtocolItem>> = OnceInit::uninit();
 
 unsafe impl<ProtocolItem, ProtocolData> StaticDefault for dyn ProtocolTrait<ProtocolItem>
 where
@@ -84,7 +85,7 @@ where
         + ProtocolDataTrait<ProtocolItem = ProtocolItem>,
 {
     fn static_default() -> &'static Self {
-        if let OnceInitState::UNINITIALIZED = ProtocolItem::get_protocol_().get_state() {
+        if let OnceInitState::UNINITIALIZED = ProtocolItem::holder().state() {
             let _ = CXProtocol::<ProtocolData>::init();
         }
         ProtocolItem::get_protocol()

@@ -40,12 +40,12 @@ unsafe impl StaticDefault for AppInfo {
         &AppInfo::DEFAULT_CONFIG_DIR_INFO
     }
 }
-static APP_INFO: OnceInit<AppInfo> = OnceInit::new();
+static APP_INFO: OnceInit<AppInfo> = OnceInit::uninit();
 
-static CONFIG_DIR: OnceInit<Dir> = OnceInit::new();
+static CONFIG_DIR: OnceInit<Dir> = OnceInit::uninit();
 
 fn uninit() -> bool {
-    !matches!(CONFIG_DIR.get_state(), OnceInitState::INITIALIZED)
+    !matches!(CONFIG_DIR.state(), OnceInitState::INITIALIZED)
 }
 
 #[derive(Clone)]
@@ -74,7 +74,7 @@ impl Dir {
             organization,
             application,
         });
-        let _ = APP_INFO.set_boxed_data(data);
+        let _ = APP_INFO.init_boxed(data);
     }
     fn set_default_config_dir() {
         let AppInfo {
@@ -99,10 +99,10 @@ impl Dir {
         Self::set_config_dir(dir);
     }
     pub fn set_config_dir(dir: Box<Self>) {
-        let _ = CONFIG_DIR.set_boxed_data(dir);
+        let _ = CONFIG_DIR.init_boxed(dir);
     }
     unsafe fn get_dir_unchecked() -> &'static Dir {
-        CONFIG_DIR.get_data_unchecked()
+        CONFIG_DIR.get_unchecked()
     }
     pub fn get_config_dir() -> PathBuf {
         if uninit() {

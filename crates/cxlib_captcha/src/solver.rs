@@ -1,17 +1,11 @@
 use crate::{
-    utils::download_image, CaptchaType, IconClickImage, ObstacleImage, RotateImages, SlideImages,
-    TextClickInfo,
+    utils::download_image, IconClickImage, ObstacleImage, RotateImages, SlideImages, TextClickInfo,
 };
 use cxlib_error::{CaptchaError, InitError};
 use image::DynamicImage;
 use log::debug;
-use onceinit::{OnceInit, OnceInitError};
-use serde::de::DeserializeOwned;
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
-use ureq::{serde_json, Agent};
+use onceinit::{OnceInit, UninitGlobal};
+use ureq::Agent;
 use yapt::point_2d::{Point, Point2D};
 
 mod click_captcha_helper {
@@ -71,104 +65,12 @@ mod click_captcha_helper {
                    "%5B%7B%22x%22%3A61%2C%22y%22%3A77%7D%2C%7B%22x%22%3A128%2C%22y%22%3A94%7D%2C%7B%22x%22%3A210%2C%22y%22%3A74%7D%5D")
     }
 }
-pub struct TopSolver;
-type TopSolverGlobalInner = fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError>;
-type TopSolverGlobal = [OnceInit<TopSolverGlobalInner>; 6];
-type CustomSolverGlobalInner = fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError>;
-type CustomSolverGlobal =
-    OnceInit<Arc<RwLock<HashMap<&'static str, Box<CustomSolverGlobalInner>>>>>;
-static TOP_SOLVER: TopSolverGlobal = [const { OnceInit::new() }; 6];
-static CUSTOM_SOLVER: CustomSolverGlobal = OnceInit::new();
-impl TopSolver {
-    fn solver_generic<I, O, T>(
-        agent: &Agent,
-        image: serde_json::Value,
-        referer: &str,
-    ) -> Result<String, CaptchaError>
-    where
-        T: VerificationInfoTrait<I, O> + DeserializeOwned + 'static,
-        SolverRaw<I, O>: 'static,
-    {
-        let self_: T = serde_json::from_value(image).unwrap();
-        self_.solver(agent, referer)
-    }
-    const fn type_to_index(captcha_type: &CaptchaType) -> usize {
-        match captcha_type {
-            CaptchaType::Slide => 0,
-            CaptchaType::TextClick => 1,
-            CaptchaType::Rotate => 2,
-            CaptchaType::IconClick => 3,
-            CaptchaType::Obstacle => 4,
-            CaptchaType::Custom(_) => unreachable!(),
-        }
-    }
-    fn default_solver_impl(
-        captcha_type: &CaptchaType,
-    ) -> fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError> {
-        match captcha_type {
-            CaptchaType::Slide => Self::solver_generic::<_, _, SlideImages>,
-            CaptchaType::TextClick => Self::solver_generic::<_, _, TextClickInfo>,
-            CaptchaType::Rotate => Self::solver_generic::<_, _, RotateImages>,
-            CaptchaType::IconClick => Self::solver_generic::<_, _, IconClickImage>,
-            CaptchaType::Obstacle => Self::solver_generic::<_, _, ObstacleImage>,
-            CaptchaType::Custom(_) => unreachable!(),
-        }
-    }
-    /// 该函数可以替换验证码枚举对应的验证信息类型为自定义实现。
-    ///
-    /// 需要 `T` 实现 [`VerificationInfoTrait`] 和 [`DeserializeOwned`]\(即可从 json 构造\), 且不能为临时类型。
-    pub fn set_verification_info_type<T, I, O>(captcha_type: &CaptchaType) -> Result<(), InitError>
-    where
-        T: VerificationInfoTrait<I, O> + DeserializeOwned + 'static,
-        SolverRaw<I, O>: 'static,
-    {
-        match captcha_type {
-            CaptchaType::Custom(r#type) => match CUSTOM_SOLVER.get_data() {
-                Ok(map) => {
-                    let mut map = map.write().unwrap();
-                    if map.contains_key(r#type) {
-                        Err(OnceInitError::DataInitialized)?
-                    } else {
-                        map.insert(r#type, Box::new(Self::solver_generic::<_, _, T>));
-                        Ok(())
-                    }
-                }
-                Err(_) => {
-                    let mut map = HashMap::<&'static str, Box<CustomSolverGlobalInner>>::new();
-                    map.insert(r#type, Box::new(Self::solver_generic::<_, _, T>));
-                    let map = Arc::new(RwLock::new(map));
-                    Ok(CUSTOM_SOLVER.set_boxed_data(Box::new(map))?)
-                }
-            },
-            t => Ok(TOP_SOLVER[Self::type_to_index(t)]
-                .set_boxed_data(Box::new(Self::solver_generic::<_, _, T>))?),
-        }
-    }
-    pub fn solver(
-        agent: &Agent,
-        captcha_type: &CaptchaType,
-        image: serde_json::Value,
-        referer: &str,
-    ) -> Result<String, CaptchaError> {
-        match captcha_type {
-            CaptchaType::Custom(r#type) => CUSTOM_SOLVER
-                .get_data()
-                .ok()
-                .and_then(|map| {
-                    map.read()
-                        .unwrap()
-                        .get(r#type)
-                        .map(|a| a(agent, image, referer))
-                })
-                .ok_or_else(|| CaptchaError::UnsupportedType)?,
-            t => match TOP_SOLVER[Self::type_to_index(t)].get_data() {
-                Err(_) => Self::default_solver_impl(t)(agent, image, referer),
-                Ok(solver_) => solver_(agent, image, referer),
-            },
-        }
-    }
-}
-pub trait VerificationInfoTrait<I, O>: Sized {
+pub trait VerificationInfoTrait<I, O>:
+    Sized + UninitGlobal<SolverRaw<I, O>, OnceInit<SolverRaw<I, O>>>
+where
+    I: 'static,
+    O: 'static,
+{
     /// 以自身的引用构造类型 `I`,
     /// 如：
     ///
@@ -180,13 +82,13 @@ pub trait VerificationInfoTrait<I, O>: Sized {
         let _ = input;
         Err(CaptchaError::UnsupportedType)
     }
-    /// 设置全局过验证算法所需。
-    ///
-    /// 若输入输出类型（`I`, `O`）与默认类型如 [`SlideImages`] 等一致，实现该函数时，你可以直接调用默认类型的实现。
-    ///
-    /// 若不一致，你需要自定义一个 static 的 [`OnceInit<SolverRaw<I, O>>`](OnceInit) 数据。
-    /// 另见 [`SolverRaw`].
-    fn static_solver_holder() -> &'static OnceInit<SolverRaw<I, O>>;
+    // /// 设置全局过验证算法所需。
+    // ///
+    // /// 若输入输出类型（`I`, `O`）与默认类型如 [`SlideImages`] 等一致，实现该函数时，你可以直接调用默认类型的实现。
+    // ///
+    // /// 若不一致，你需要自定义一个 static 的 [`OnceInit<SolverRaw<I, O>>`](OnceInit) 数据。
+    // /// 另见 [`SolverRaw`].
+    // fn static_solver_holder() -> &'static OnceInit<SolverRaw<I, O>>;
     /// 将结果转为字符串类型，用来向网站发送请求。
     fn result_to_string(result: O) -> String;
     fn solve(input: I) -> Result<O, CaptchaError>
@@ -194,7 +96,7 @@ pub trait VerificationInfoTrait<I, O>: Sized {
         Self: VerificationInfoTrait<I, O> + 'static,
         SolverRaw<I, O>: 'static,
     {
-        match Self::static_solver_holder().get_data() {
+        match Self::holder().get() {
             Err(_) => Self::default_solver(input),
             Ok(s) => s(input),
         }
@@ -202,33 +104,23 @@ pub trait VerificationInfoTrait<I, O>: Sized {
     /// 初始化 `Solver`.
     ///
     /// 另见 [`VerificationInfoTrait::init_owned_solver`].
-    fn init_solver<F: Fn(I) -> Result<O, CaptchaError> + Sync>(
-        solver: &'static F,
-    ) -> Result<(), InitError>
-    where
-        I: 'static,
-        O: 'static,
-    {
-        Ok(Self::static_solver_holder().set_data(solver)?)
+    fn init_solver(
+        solver: &'static (impl Fn(I) -> Result<O, CaptchaError> + Sync),
+    ) -> Result<(), InitError> {
+        Ok(Self::init(solver)?)
     }
     /// 初始化 `Solver`.
     ///
     /// 另见 [`VerificationInfoTrait::init_solver`].
-    fn init_owned_solver<F: Fn(I) -> Result<O, CaptchaError> + Sync + 'static>(
-        solver: F,
-    ) -> Result<(), InitError>
-    where
-        I: 'static,
-        O: 'static,
-        Self: VerificationInfoTrait<I, O>,
-    {
+    fn init_owned_solver(
+        solver: impl Fn(I) -> Result<O, CaptchaError> + Sync + 'static,
+    ) -> Result<(), InitError> {
         let solver: Box<dyn Fn(_) -> _ + Sync + 'static> = Box::new(solver);
-        Ok(Self::static_solver_holder().set_boxed_data(solver)?)
+        Ok(Self::init_boxed(solver)?)
     }
     fn solver(self, agent: &Agent, referer: &str) -> Result<String, CaptchaError>
     where
         Self: 'static,
-        SolverRaw<I, O>: 'static,
     {
         let data = self.prepare_data(agent, referer)?;
         let output = Self::solve(data)?;
@@ -253,11 +145,21 @@ type IconClickSolverRaw = SolverRaw<DynamicImage, TriplePoint<u32>>;
 type TextClickSolverRaw = SolverRaw<(String, DynamicImage), TriplePoint<u32>>;
 type RotateSolverRaw = SolverRaw<(DynamicImage, DynamicImage), u32>;
 type ObstacleSolverRaw = SolverRaw<DynamicImage, Point<u32>>;
-static SLIDE_SOLVER: OnceInit<SlideSolverRaw> = OnceInit::new();
-static ICON_CLICK_SOLVER: OnceInit<IconClickSolverRaw> = OnceInit::new();
-static TEXT_CLICK_SOLVER: OnceInit<TextClickSolverRaw> = OnceInit::new();
-static ROTATE_SOLVER: OnceInit<RotateSolverRaw> = OnceInit::new();
-static OBSTACLE_SOLVER: OnceInit<ObstacleSolverRaw> = OnceInit::new();
+static SLIDE_SOLVER: OnceInit<SlideSolverRaw> = OnceInit::uninit();
+static ICON_CLICK_SOLVER: OnceInit<IconClickSolverRaw> = OnceInit::uninit();
+static TEXT_CLICK_SOLVER: OnceInit<TextClickSolverRaw> = OnceInit::uninit();
+static ROTATE_SOLVER: OnceInit<RotateSolverRaw> = OnceInit::uninit();
+static OBSTACLE_SOLVER: OnceInit<ObstacleSolverRaw> = OnceInit::uninit();
+impl
+    UninitGlobal<
+        SolverRaw<(DynamicImage, DynamicImage), u32>,
+        OnceInit<SolverRaw<(DynamicImage, DynamicImage), u32>>,
+    > for SlideImages
+{
+    fn holder() -> &'static OnceInit<SolverRaw<(DynamicImage, DynamicImage), u32>> {
+        &SLIDE_SOLVER
+    }
+}
 impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     fn prepare_data(
         self,
@@ -289,12 +191,19 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
         use captcha_solver_ui::solvers::Marker;
         captcha_solver_ui::solvers::MSlide::ui_solver(input).map_err(convert_captcha_error)
     }
-    fn static_solver_holder() -> &'static OnceInit<SlideSolverRaw> {
-        &SLIDE_SOLVER
-    }
     fn result_to_string(result: u32) -> String {
         debug!("本地滑块结果：{result}");
         format!("%5B%7B%22x%22%3A{}%7D%5D", result)
+    }
+}
+impl
+    UninitGlobal<
+        SolverRaw<DynamicImage, TriplePoint<u32>>,
+        OnceInit<SolverRaw<DynamicImage, TriplePoint<u32>>>,
+    > for IconClickImage
+{
+    fn holder() -> &'static OnceInit<SolverRaw<DynamicImage, TriplePoint<u32>>> {
+        &ICON_CLICK_SOLVER
     }
 }
 impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
@@ -307,9 +216,6 @@ impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
         use captcha_solver_ui::solvers::Marker;
         captcha_solver_ui::solvers::MIconClick::ui_solver(input).map_err(convert_captcha_error)
     }
-    fn static_solver_holder() -> &'static OnceInit<IconClickSolverRaw> {
-        &ICON_CLICK_SOLVER
-    }
     /// \[{"x":82,"y":114},{"x":286,"y":68},{"x":154,"y":90}\] <br/>
     /// x, y 为图标相对 origin_image 右上角的位置。
     fn result_to_string(result: TriplePoint<u32>) -> String {
@@ -319,6 +225,16 @@ impl VerificationInfoTrait<DynamicImage, TriplePoint<u32>> for IconClickImage {
     }
 }
 
+impl
+    UninitGlobal<
+        SolverRaw<(String, DynamicImage), TriplePoint<u32>>,
+        OnceInit<SolverRaw<(String, DynamicImage), TriplePoint<u32>>>,
+    > for TextClickInfo
+{
+    fn holder() -> &'static OnceInit<SolverRaw<(String, DynamicImage), TriplePoint<u32>>> {
+        &TEXT_CLICK_SOLVER
+    }
+}
 impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextClickInfo {
     fn prepare_data(
         self,
@@ -335,14 +251,18 @@ impl VerificationInfoTrait<(String, DynamicImage), TriplePoint<u32>> for TextCli
         use captcha_solver_ui::solvers::Marker;
         captcha_solver_ui::solvers::MTextClick::ui_solver(input).map_err(convert_captcha_error)
     }
-    fn static_solver_holder() -> &'static OnceInit<TextClickSolverRaw> {
-        &TEXT_CLICK_SOLVER
-    }
-    // TODO: 需要验证
     /// \[{"x":82,"y":114},{"x":286,"y":68},{"x":154,"y":90}\] <br/>
     /// x, y 为图标相对 origin_image 右上角的位置。
     fn result_to_string(result: TriplePoint<u32>) -> String {
         IconClickImage::result_to_string(result)
+    }
+}
+impl
+    UninitGlobal<SolverRaw<DynamicImage, Point<u32>>, OnceInit<SolverRaw<DynamicImage, Point<u32>>>>
+    for ObstacleImage
+{
+    fn holder() -> &'static OnceInit<SolverRaw<DynamicImage, Point<u32>>> {
+        &OBSTACLE_SOLVER
     }
 }
 impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
@@ -356,9 +276,6 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
         use captcha_solver_ui::solvers::Marker;
         captcha_solver_ui::solvers::MObstacle::ui_solver(input).map_err(convert_captcha_error)
     }
-    fn static_solver_holder() -> &'static OnceInit<ObstacleSolverRaw> {
-        &OBSTACLE_SOLVER
-    }
     // TODO: 需要验证
     /// \[{"x":82,"y":114},{"x":286,"y":68},{"x":154,"y":90}\] <br/>
     /// x, y 为图标相对 origin_image 右上角的位置。
@@ -366,6 +283,16 @@ impl VerificationInfoTrait<DynamicImage, Point<u32>> for ObstacleImage {
         let data = click_captcha_helper::Point::from_point(result);
         debug!("本地滑块结果：{data}");
         format!("%5B{}%5D", data)
+    }
+}
+impl
+    UninitGlobal<
+        SolverRaw<(DynamicImage, DynamicImage), u32>,
+        OnceInit<SolverRaw<(DynamicImage, DynamicImage), u32>>,
+    > for RotateImages
+{
+    fn holder() -> &'static OnceInit<SolverRaw<(DynamicImage, DynamicImage), u32>> {
+        &ROTATE_SOLVER
     }
 }
 impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
@@ -387,9 +314,6 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
     fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
         use captcha_solver_ui::solvers::Marker;
         captcha_solver_ui::solvers::MRotate::ui_solver(input).map_err(convert_captcha_error)
-    }
-    fn static_solver_holder() -> &'static OnceInit<RotateSolverRaw> {
-        &ROTATE_SOLVER
     }
     /// result 取值为 0-280.
     ///

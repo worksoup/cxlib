@@ -1,8 +1,9 @@
-use cxlib_error::{LoginError, CxlibResultUtils};
+use cxlib_error::{CxlibResultUtils, LoginError};
 use cxlib_protocol::{collect::user as protocol, ProtocolItem};
 use cxlib_utils::pkcs7_pad;
 use log::{trace, warn};
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
+use std::ops::Deref;
 use std::{
     collections::HashMap,
     ops::Index,
@@ -127,19 +128,17 @@ impl LoginSolvers {
         Ok(())
     }
 }
-static LOGIN_SOLVERS: OnceInit<LoginSolvers> = OnceInit::new();
+static LOGIN_SOLVERS: OnceInit<LoginSolvers> = OnceInit::uninit();
 unsafe impl StaticDefault for LoginSolvers {
     fn static_default() -> &'static Self {
-        if let OnceInitState::UNINITIALIZED = LOGIN_SOLVERS.get_state() {
+        if let OnceInitState::UNINITIALIZED = LOGIN_SOLVERS.state() {
             let mut map = HashMap::new();
             let solver: Box<dyn LoginSolverTrait> = Box::new(DefaultLoginSolver);
             map.insert(solver.login_type().to_owned(), solver);
             let login_solvers = LoginSolvers(Arc::new(RwLock::new(map)));
-            LOGIN_SOLVERS
-                .set_boxed_data(Box::new(login_solvers))
-                .unwrap();
+            LOGIN_SOLVERS.init_boxed(Box::new(login_solvers)).unwrap();
         }
-        LOGIN_SOLVERS.as_data()
+        LOGIN_SOLVERS.deref()
     }
 }
 /// # [`LoginSolverWrapper`]

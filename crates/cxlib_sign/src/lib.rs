@@ -49,7 +49,7 @@ pub trait SignTrait: Ord {
         self.as_inner().status_code == 1
             && std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH.add(time))
-                .unwrap()
+                .log_unwrap()
                 < two_hours
     }
     /// 获取签到后状态。参见返回类型 [`SignState`].
