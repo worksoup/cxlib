@@ -32,6 +32,7 @@ impl MaybeFatalError for LoginError {
                 CaptchaError::VerifyFailed => false,
                 CaptchaError::UnsupportedType => true,
                 CaptchaError::Canceled(_) => false,
+                CaptchaError::RequestRefresh => false,
             },
             LoginError::CookiesStoreError(_) => false,
             LoginError::CryptoError(_) => false,

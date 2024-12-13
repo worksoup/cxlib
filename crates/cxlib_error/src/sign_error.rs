@@ -23,6 +23,7 @@ impl MaybeFatalError for SignError {
                 CaptchaError::VerifyFailed => false,
                 CaptchaError::UnsupportedType => true,
                 CaptchaError::Canceled(_) => false,
+                CaptchaError::RequestRefresh => false,
             },
             SignError::IoError(_) => false,
             SignError::LocationError(_) => true,

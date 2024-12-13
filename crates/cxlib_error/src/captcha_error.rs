@@ -11,6 +11,8 @@ pub enum CaptchaError {
     UnsupportedType,
     #[error("操作被主动取消：`{0}`.")]
     Canceled(String),
+    #[error("需要刷新。")]
+    RequestRefresh,
 }
 /// 注意，此处的 Canceled 是用户取消，仅在重试循环中视为致命错误。
 impl MaybeFatalError for CaptchaError {
@@ -20,6 +22,7 @@ impl MaybeFatalError for CaptchaError {
             CaptchaError::VerifyFailed => false,
             CaptchaError::UnsupportedType => true,
             CaptchaError::Canceled(_) => true,
+            CaptchaError::RequestRefresh => false,
         }
     }
 }
