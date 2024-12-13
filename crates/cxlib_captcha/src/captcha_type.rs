@@ -152,8 +152,8 @@ impl CaptchaType {
         let self_: T = serde_json::from_value(image).unwrap();
         self_.solver(agent, referer)
     }
-    const fn type_to_index(captcha_type: &CaptchaType) -> usize {
-        match captcha_type {
+    const fn type_to_index(&self) -> usize {
+        match self {
             CaptchaType::Slide => 0,
             CaptchaType::TextClick => 1,
             CaptchaType::Rotate => 2,
@@ -163,9 +163,9 @@ impl CaptchaType {
         }
     }
     fn default_solver_impl(
-        captcha_type: &CaptchaType,
+        &self,
     ) -> fn(&Agent, serde_json::Value, &str) -> Result<String, CaptchaError> {
-        match captcha_type {
+        match self {
             CaptchaType::Slide => Self::solver_generic::<_, _, SlideImages>,
             CaptchaType::TextClick => Self::solver_generic::<_, _, TextClickInfo>,
             CaptchaType::Rotate => Self::solver_generic::<_, _, RotateImages>,
@@ -177,12 +177,12 @@ impl CaptchaType {
     /// 该函数可以替换验证码枚举对应的验证信息类型为自定义实现。
     ///
     /// 需要 `T` 实现 [`VerificationInfoTrait`] 和 [`DeserializeOwned`]\(即可从 json 构造\), 且不能为临时类型。
-    pub fn set_verification_info_type<T, I, O>(captcha_type: &CaptchaType) -> Result<(), InitError>
+    pub fn set_verification_info_type<T, I, O>(&self) -> Result<(), InitError>
     where
         T: VerificationInfoTrait<I, O> + DeserializeOwned + 'static,
         SolverRaw<I, O>: 'static,
     {
-        match captcha_type {
+        match self {
             CaptchaType::Custom(r#type) => match CUSTOM_SOLVER.get() {
                 Ok(map) => {
                     let mut map = map.write().unwrap();
@@ -229,12 +229,12 @@ impl CaptchaType {
         T::init_owned_solver(solver)
     }
     pub fn solver(
+        &self,
         agent: &Agent,
-        captcha_type: &CaptchaType,
         image: serde_json::Value,
         referer: &str,
     ) -> Result<String, CaptchaError> {
-        match captcha_type {
+        match self {
             CaptchaType::Custom(r#type) => CUSTOM_SOLVER
                 .get()
                 .ok()
@@ -353,15 +353,16 @@ impl CaptchaType {
                          iv,
                          data: VerificationDataWithToken { token, data },
                      }| {
-                        CaptchaType::solver(agent, self, data, referer).and_then(|text_click_arr| {
-                            Self::check_captcha(
-                                self,
-                                agent,
-                                (captcha_id, &iv, &token),
-                                &text_click_arr,
-                                server_time + i,
-                            )
-                        })
+                        self.solver(agent, data, referer)
+                            .and_then(|text_click_arr| {
+                                Self::check_captcha(
+                                    self,
+                                    agent,
+                                    (captcha_id, &iv, &token),
+                                    &text_click_arr,
+                                    server_time + i,
+                                )
+                            })
                     },
                 ) {
                 r @ Ok(_) => {
