@@ -56,14 +56,13 @@ impl ValidateResult {
 ///
 /// 若需自行处理图片下载等步骤，参见 [`CaptchaType::set_verification_info_type`].
 /// 该函数可以替换掉默认的验证信息类型。
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub enum CaptchaType {
     /// ## 滑块验证码
     /// 拖动滑块至合适位置，完成验证。
     ///
     /// 对应的验证信息类型为 [`SlideImages`],
     /// 如需自定义 `Solver`, 请参考其文档。
-    #[default]
     Slide,
     /// ## 文字点选验证码
     /// 按照提示依次点击三个汉字，完成验证。
@@ -92,9 +91,17 @@ pub enum CaptchaType {
     /// ## 自定义类型验证码
     Custom(&'static str),
 }
+impl CaptchaType {
+    const DEFAULT: CaptchaType = CaptchaType::Rotate;
+}
+impl Default for CaptchaType {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 unsafe impl StaticDefault for CaptchaType {
     fn static_default() -> &'static Self {
-        &CaptchaType::Slide
+        &CaptchaType::DEFAULT
     }
 }
 impl FromStr for CaptchaType {
@@ -392,8 +399,11 @@ mod tests {
     #[test]
     fn auto_solve_captcha_test() {
         let agent = ureq::Agent::new();
-        let r =
-            CaptchaType::Slide.solve_captcha(&agent, &ProtocolItem::CaptchaId.to_string(), REFERER);
+        let r = CaptchaType::Rotate.solve_captcha(
+            &agent,
+            &ProtocolItem::CaptchaId.to_string(),
+            REFERER,
+        );
         println!("{:?}", r);
     }
     #[test]
