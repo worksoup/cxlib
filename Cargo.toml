@@ -33,15 +33,16 @@ num-traits = "0.2"
 onceinit = "0.0.10"
 percent-encoding = "2.3"
 rand = "0.8"
+rayon = "1.10"
 rxing = "0.6"
 serde = "1.0"
-serde_json = "1.0"
 sqlite = "0.36"
 thiserror = "2.0"
 toml = "0.8"
 unicode-width = "0.2"
 ureq = "2.12"
 xcap = { version = "0.1.0" }
+yapt = { git = "https://github.com/worksoup/yapt.git" }
 
 [dependencies]
 cxlib_internal = { path = "crates/cxlib_internal" }

@@ -1,5 +1,4 @@
 use crate::{sign::QrCodeSign, signner::LocationInfoGetterTrait};
-use cxlib_imageproc::Point;
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::Location;
 use cxlib_user::Session;
@@ -10,6 +9,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
+use yapt::point_2d::Point;
 
 pub struct DefaultQrCodeSignner<'a, T: LocationInfoGetterTrait> {
     location_info_getter: T,

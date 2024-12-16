@@ -1,13 +1,17 @@
+pub mod map;
+
 use crate::map::map_colors;
+use image::buffer::ConvertBuffer;
 use image::{
     DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, ImageError, Luma, LumaA,
     Pixel, Primitive, Rgba, SubImage,
 };
 use imageproc::contours::find_contours;
-pub use imageproc::point::Point;
 use num_traits::ToPrimitive;
 use std::ops::Add;
 use std::path::Path;
+pub use yapt::point_2d::Point;
+use yapt::point_2d::Point2D;
 
 pub type Image<P> = ImageBuffer<P, Vec<<P as Pixel>::Subpixel>>;
 pub fn get_rect_contains_vertex<T: Primitive, V: Iterator<Item = Point<T>>>(
@@ -52,58 +56,6 @@ pub fn cut_picture<I: GenericImageView>(
     image::imageops::crop_imm(picture, top_left.x, top_left.y, wh.x, wh.y)
 }
 
-pub mod map {
-    use image::{GenericImage, GenericImageView, ImageBuffer, Pixel};
-    use imageproc::definitions::Image;
-    pub use imageproc::point::Point;
-    pub fn map_colors<I, P, Q, F>(image: &I, f: F) -> Image<Q>
-    where
-        I: GenericImageView<Pixel = P>,
-        P: Pixel,
-        Q: Pixel,
-        F: Fn(P) -> Q,
-    {
-        let (width, height) = image.dimensions();
-        let mut out: ImageBuffer<Q, Vec<Q::Subpixel>> = ImageBuffer::new(width, height);
-
-        for y in 0..height {
-            for x in 0..width {
-                unsafe {
-                    let pix = image.unsafe_get_pixel(x, y);
-                    out.unsafe_put_pixel(x, y, f(pix));
-                }
-            }
-        }
-
-        out
-    }
-    pub fn map_colors2<I, J, P, Q, R, F>(image1: &I, image2: &J, f: F) -> Image<R>
-    where
-        I: GenericImageView<Pixel = P>,
-        J: GenericImageView<Pixel = Q>,
-        P: Pixel,
-        Q: Pixel,
-        R: Pixel,
-        F: Fn(P, Q) -> R,
-    {
-        assert_eq!(image1.dimensions(), image2.dimensions());
-
-        let (width, height) = image1.dimensions();
-        let mut out: ImageBuffer<R, Vec<R::Subpixel>> = ImageBuffer::new(width, height);
-
-        for y in 0..height {
-            for x in 0..width {
-                unsafe {
-                    let p = image1.unsafe_get_pixel(x, y);
-                    let q = image2.unsafe_get_pixel(x, y);
-                    out.unsafe_put_pixel(x, y, f(p, q));
-                }
-            }
-        }
-
-        out
-    }
-}
 pub fn image_sum<Pixel: image::Pixel, Image: GenericImageView<Pixel = Pixel>>(
     image: &Image,
     mask: &[bool],
@@ -150,7 +102,7 @@ where
     Rgba<C>: Pixel<Subpixel = C>,
     C: Primitive,
 {
-    map_colors(image, |p| Luma([p[3]]))
+    map_colors(image, |_, _, p| Luma([p[3]]))
 }
 
 pub fn luma_alpha_channel<I, C>(image: &I) -> Image<Luma<C>>
@@ -159,7 +111,7 @@ where
     LumaA<C>: Pixel<Subpixel = C>,
     C: Primitive,
 {
-    map_colors(image, |p| Luma([p[1]]))
+    map_colors(image, |_, _, p| Luma([p[1]]))
 }
 
 pub fn image_from_bytes(bytes: Vec<u8>) -> DynamicImage {
@@ -173,117 +125,48 @@ pub fn image_from_bytes(bytes: Vec<u8>) -> DynamicImage {
 pub fn open_image<P: AsRef<Path>>(p: P) -> Result<DynamicImage, ImageError> {
     image::ImageReader::open(p)?.with_guessed_format()?.decode()
 }
-pub mod slide_solvers {
-    use crate::map::{map_colors, map_colors2};
-    use crate::{cut_picture, image_mean, image_sum, rgb_alpha_channel};
-    use image::{buffer::ConvertBuffer, DynamicImage, GrayImage, Luma, SubImage};
-    use imageproc::definitions::Image;
-    use imageproc::point::Point;
+pub mod match_template {
+    use image::GrayImage;
+    pub use imageproc::template_matching::MatchTemplateMethod;
     use imageproc::template_matching::{
-        find_extremes, match_template_with_mask_parallel, MatchTemplateMethod,
+        find_extremes, match_template_parallel, match_template_with_mask_parallel, Extremes,
     };
-    pub fn find_max_ncc(
-        big_image: SubImage<&DynamicImage>,
-        small_image: SubImage<&DynamicImage>,
-    ) -> u32 {
-        let mask = rgb_alpha_channel(&small_image.to_image());
-        let mask_mean = *image_mean(&mask, &[]).last().expect("No image mean");
-        let mask = mask
-            .iter()
-            .map(|p| (*p as f64) >= mask_mean)
-            .collect::<Vec<_>>();
-        let mean = image_mean(&*small_image, &mask);
-        let small_image: GrayImage = small_image.to_image().convert();
-        let small_image = map_colors(&small_image, |p| Luma([p[0] as f64 - mean[0]]));
-        let mut max_ncc = 0.0;
-        let mut max_x = 0;
-        let big_image: GrayImage = big_image.to_image().convert();
-        for x in 0..big_image.width() - small_image.width() {
-            let window = cut_picture(
-                &big_image,
-                Point { x, y: 0 },
-                Point {
-                    x: small_image.width(),
-                    y: small_image.height(),
-                },
-            );
-            let window_mean = image_mean(&*window, &mask);
-            let window = map_colors(&*window, |p| Luma([p[0] as f64 - window_mean[0]]));
-            let a = map_colors2(&window, &small_image, |w, t| Luma([w[0] * t[0]]));
-            let b = map_colors(&window, |w| Luma([w[0] * w[0]]));
-            let ncc = image_sum(&a, &mask).0[0] / image_sum(&b, &mask).0[0];
-            if ncc > max_ncc {
-                max_x = x;
-                max_ncc = ncc;
-            }
+    fn extremes_to_result(extremes: Extremes<f32>, method: MatchTemplateMethod) -> u32 {
+        match method {
+            MatchTemplateMethod::SumOfSquaredErrors
+            | MatchTemplateMethod::SumOfSquaredErrorsNormalized => extremes.min_value_location.0,
+            MatchTemplateMethod::CrossCorrelation
+            | MatchTemplateMethod::CrossCorrelationNormalized => extremes.max_value_location.0,
         }
-        max_x
     }
-    /// 目前的最优解。
-    pub fn find_min_sum_of_squared_errors(
-        big_image: SubImage<&DynamicImage>,
-        small_image: SubImage<&DynamicImage>,
-    ) -> u32 {
-        let image = imageproc_match(
-            big_image,
-            small_image,
-            MatchTemplateMethod::SumOfSquaredErrors,
-        );
-        find_extremes(&image).min_value_location.0
-    }
-    pub fn find_min_sum_of_squared_errors_normalized(
-        big_image: SubImage<&DynamicImage>,
-        small_image: SubImage<&DynamicImage>,
-    ) -> u32 {
-        let image = imageproc_match(
-            big_image,
-            small_image,
-            MatchTemplateMethod::SumOfSquaredErrorsNormalized,
-        );
-        find_extremes(&image).min_value_location.0
-    }
-    pub fn find_max_cross_correlation(
-        big_image: SubImage<&DynamicImage>,
-        small_image: SubImage<&DynamicImage>,
-    ) -> u32 {
-        let image = imageproc_match(
-            big_image,
-            small_image,
-            MatchTemplateMethod::CrossCorrelation,
-        );
-        find_extremes(&image).max_value_location.0
-    }
-    pub fn find_max_cross_correlation_normalized(
-        big_image: SubImage<&DynamicImage>,
-        small_image: SubImage<&DynamicImage>,
-    ) -> u32 {
-        let image = imageproc_match(
-            big_image,
-            small_image,
-            MatchTemplateMethod::CrossCorrelationNormalized,
-        );
-        find_extremes(&image).max_value_location.0
-    }
-    pub fn imageproc_match(
-        big_image: SubImage<&DynamicImage>,
-        small_image: SubImage<&DynamicImage>,
+    pub fn match_template_for_slide(
+        big_image: &GrayImage,
+        small_image: &GrayImage,
         method: MatchTemplateMethod,
-    ) -> Image<Luma<f32>> {
-        let big_image: GrayImage = big_image.to_image().convert();
-        let small_image = small_image.to_image();
-        let mask = rgb_alpha_channel(&small_image);
-        let template = small_image.convert();
-        match_template_with_mask_parallel(&big_image, &template, method, &mask)
+        mask: &GrayImage,
+    ) -> u32 {
+        let image = match_template_with_mask_parallel(big_image, small_image, method, mask);
+        let extremes = find_extremes(&image);
+        extremes_to_result(extremes, method)
+    }
+    pub fn match_template_for_rotate(
+        big_image: &GrayImage,
+        small_image: &GrayImage,
+        method: MatchTemplateMethod,
+    ) -> u32 {
+        let image = match_template_parallel(big_image, small_image, method);
+        let extremes = find_extremes(&image);
+        extremes_to_result(extremes, method)
     }
 }
 fn find_contour_rects<T: Primitive + Eq>(img: &GrayImage) -> Vec<(Point<T>, Point<T>)> {
     let contours = find_contours::<T>(img);
     contours
         .into_iter()
-        .map(|c| get_rect_contains_vertex(c.points.into_iter()))
+        .map(|c| get_rect_contains_vertex(c.points.into_iter().map(Point2D::into_point)))
         .collect()
 }
-pub fn find_sub_image<F: Fn(SubImage<&DynamicImage>, SubImage<&DynamicImage>) -> u32>(
+pub fn find_sub_image<F: Fn(&GrayImage, &GrayImage, &GrayImage) -> u32>(
     big_image: &DynamicImage,
     small_image: &DynamicImage,
     a: F,
@@ -302,18 +185,21 @@ pub fn find_sub_image<F: Fn(SubImage<&DynamicImage>, SubImage<&DynamicImage>) ->
             y: 0,
         } + (rb - lt),
     );
-    a(big_img, small_image)
+    let small_image = small_image.to_image();
+    let big_image = big_img.to_image().convert();
+    let mask = rgb_alpha_channel(&small_image);
+    a(&big_image, &small_image.convert(), &mask)
 }
 pub mod click_captcha_utils {
     use crate::cut_picture;
     use crate::map::map_colors;
     use image::{DynamicImage, GrayImage, Luma, Primitive};
-    use imageproc::point::Point;
+    use yapt::point_2d::Point2D;
 
     pub fn find_icon(image: &DynamicImage) -> GrayImage {
-        let image = cut_picture(image, Point::new(0, 0), Point::new(320, 160));
+        let image = cut_picture(image, (0, 0).into_point(), (320, 160).into_point());
         let image = image.to_image();
-        map_colors(&image, |p| {
+        map_colors(&image, |_, _, p| {
             let [r, g, b, _a] = p.0;
             fn sq<T: Primitive>(t: T) -> T {
                 t * t
@@ -333,5 +219,98 @@ pub mod click_captcha_utils {
                 Luma::from([127])
             }
         })
+    }
+}
+pub mod rotate_captcha_utils {
+    use crate::{map::map_colors2_parallel, rgb_alpha_channel};
+    use image::{
+        buffer::ConvertBuffer, DynamicImage, GenericImage, GenericImageView, GrayImage,
+        ImageBuffer, Luma, Rgba,
+    };
+    use std::f64::consts::PI;
+    use std::sync::{Arc, Mutex};
+    use yapt::point_2d::{Point, Point2D};
+    pub fn get_edge<const SPLIT_COUNT: u32>(
+        outer: &DynamicImage,
+        mask: &GrayImage,
+    ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let pixels = Arc::new(Mutex::new(vec![
+            (0u16, 0u16, 0u16, 0u16, 0u8);
+            SPLIT_COUNT as usize
+        ]));
+        let mask_wh = mask.dimensions().into_point();
+        let get_masked_image = |x, y, Luma([p]), Rgba([r, g, b, a])| {
+            if p > 0 {
+                let (ax, ay) = (x as i32, y as i32);
+                let Point { x: w, y: h } = mask_wh;
+                let (w, h) = (w as i32, h as i32);
+                let Point { x: ax, y: ay } = (ax, ay).into_point() - (w / 2, h / 2).into_point();
+                let angle = if ax == 0 {
+                    if ay > 0 {
+                        PI / 2.0
+                    } else {
+                        -PI / 2.0
+                    }
+                } else {
+                    let tg = (ay as f64) / (ax as f64);
+                    if ax > 0 {
+                        tg.atan()
+                    } else {
+                        tg.atan() + PI
+                    }
+                };
+                let s = angle / PI * SPLIT_COUNT as f64 / 2.0;
+                let s = (s as isize + SPLIT_COUNT as isize / 4) as usize;
+                let mut pixels = pixels.lock().unwrap();
+                pixels[s].0 += r as u16;
+                pixels[s].1 += g as u16;
+                pixels[s].2 += b as u16;
+                pixels[s].3 += a as u16;
+                pixels[s].4 += 1;
+                Luma([0u8])
+            } else {
+                Luma([0u8])
+            }
+        };
+        let flat_map = |(r, g, b, a, c): &(u16, u16, u16, u16, u8)| {
+            let (r, g, b, a) = (*r as f32, *g as f32, *b as f32, *a as f32);
+            let c = *c as f32;
+            let (r, g, b, a) = (r / c, g / c, b / c, a);
+            [r as u8, g as u8, b as u8, a as u8]
+        };
+        let _ = map_colors2_parallel(mask, outer, get_masked_image);
+        let pixels_outer = pixels
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(flat_map)
+            .collect::<Vec<_>>();
+        ImageBuffer::from_vec(1, SPLIT_COUNT, pixels_outer).unwrap()
+    }
+
+    pub fn match_angle<F: Fn(&GrayImage, &GrayImage) -> u32>(
+        outer: &DynamicImage,
+        inner: &DynamicImage,
+        matcher: F,
+    ) -> u32 {
+        let outer_mask = rgb_alpha_channel(outer);
+        let inner_mask = rgb_alpha_channel(inner);
+        let mask = map_colors2_parallel(&outer_mask, &inner_mask, |_, _, p, q| {
+            Luma([p.0[0] & q.0[0]])
+        });
+        const SPLIT_COUNT: u32 = 360;
+        let outer_edge = get_edge::<SPLIT_COUNT>(outer, &mask);
+        let inner_edge = get_edge::<SPLIT_COUNT>(inner, &mask);
+        let wh = inner_edge.height();
+        let mut inner = ImageBuffer::new(wh, wh);
+        for y in 0..wh {
+            for x in 0..wh {
+                unsafe {
+                    let pix = inner_edge.unsafe_get_pixel(0, (wh + y - x) % wh);
+                    inner.unsafe_put_pixel(x, y, pix);
+                }
+            }
+        }
+        matcher(&inner.convert(), &outer_edge.convert()) * 200 / SPLIT_COUNT
     }
 }

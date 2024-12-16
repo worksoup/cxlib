@@ -19,5 +19,6 @@ log.workspace = true
 rxing.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sqlite.workspace = true
+yapt.workspace = true
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 xcap.workspace = true

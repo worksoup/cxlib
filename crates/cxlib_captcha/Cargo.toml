@@ -13,7 +13,7 @@ text_click_ui_solver = ["ui_solver"]
 ui_solver = ["captcha_solver_ui"]
 
 [dependencies]
-yapt = { git = "https://github.com/worksoup/yapt.git" }
+yapt.workspace = true
 cxlib_error = { path = "../cxlib_error" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_obfuscate = { path = "../cxlib_obfuscate" }

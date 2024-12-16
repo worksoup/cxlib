@@ -20,11 +20,6 @@ mod click_captcha_helper {
             write!(f, "%7B%22x%22%3A{}%2C%22y%22%3A{}%7D", self.0, self.1)
         }
     }
-    impl<T> From<cxlib_imageproc::Point<T>> for Point<T> {
-        fn from(value: cxlib_imageproc::Point<T>) -> Self {
-            Self(value.x, value.y)
-        }
-    }
     #[derive(Debug)]
     pub struct Point3<T>(Point<T>, Point<T>, Point<T>);
     impl<T: Display> Display for Point3<T> {
@@ -176,14 +171,15 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for SlideImages {
     fn default_solver(
         (big_image, small_image): (DynamicImage, DynamicImage),
     ) -> Result<u32, CaptchaError> {
-        use cxlib_imageproc::find_sub_image;
+        use cxlib_imageproc::{
+            find_sub_image,
+            match_template::{match_template_for_slide, MatchTemplateMethod},
+        };
         use cxlib_utils::time_it_and_print_result;
         time_it_and_print_result(move || {
-            Ok(find_sub_image(
-                &big_image,
-                &small_image,
-                cxlib_imageproc::slide_solvers::find_min_sum_of_squared_errors,
-            ))
+            Ok(find_sub_image(&big_image, &small_image, |a, b, mask| {
+                match_template_for_slide(a, b, MatchTemplateMethod::SumOfSquaredErrors, mask)
+            }))
         })
     }
     #[cfg(feature = "slide_ui_solver")]
@@ -309,6 +305,19 @@ impl VerificationInfoTrait<(DynamicImage, DynamicImage), u32> for RotateImages {
         let fixed_img = download_image(agent, self.fixed_img_url(), referer)?;
         let rotatable_img = download_image(agent, self.rotatable_img_url(), referer)?;
         Ok((fixed_img, rotatable_img))
+    }
+    #[cfg(not(feature = "rotate_ui_solver"))]
+    fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
+        use cxlib_imageproc::{
+            match_template::{match_template_for_rotate, MatchTemplateMethod},
+            rotate_captcha_utils::match_angle,
+        };
+        use cxlib_utils::time_it_and_print_result;
+        time_it_and_print_result(move || {
+            Ok(match_angle(&input.0, &input.1, |a, b| {
+                match_template_for_rotate(a, b, MatchTemplateMethod::SumOfSquaredErrors)
+            }))
+        })
     }
     #[cfg(feature = "rotate_ui_solver")]
     fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
