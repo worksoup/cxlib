@@ -227,8 +227,10 @@ pub mod rotate_captcha_utils {
         buffer::ConvertBuffer, DynamicImage, GenericImage, GenericImageView, GrayImage,
         ImageBuffer, Luma, Rgba,
     };
-    use std::f64::consts::PI;
-    use std::sync::{Arc, Mutex};
+    use std::{
+        f64::consts::PI,
+        sync::{Arc, Mutex},
+    };
     use yapt::point_2d::{Point, Point2D};
     pub fn get_edge<const SPLIT_COUNT: u32>(
         outer: &DynamicImage,
@@ -278,11 +280,12 @@ pub mod rotate_captcha_utils {
             let (r, g, b, a) = (r / c, g / c, b / c, a);
             [r as u8, g as u8, b as u8, a as u8]
         };
+        use rayon::prelude::*;
         let _ = map_colors2_parallel(mask, outer, get_masked_image);
         let pixels_outer = pixels
             .lock()
             .unwrap()
-            .iter()
+            .par_iter()
             .flat_map(flat_map)
             .collect::<Vec<_>>();
         ImageBuffer::from_vec(1, SPLIT_COUNT, pixels_outer).unwrap()
@@ -302,15 +305,18 @@ pub mod rotate_captcha_utils {
         let outer_edge = get_edge::<SPLIT_COUNT>(outer, &mask);
         let inner_edge = get_edge::<SPLIT_COUNT>(inner, &mask);
         let wh = inner_edge.height();
-        let mut inner = ImageBuffer::new(wh, wh);
-        for y in 0..wh {
+        let inner: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(wh, wh);
+        use rayon::prelude::*;
+        (0..wh).into_par_iter().for_each(|y| {
+            let inner = &inner as *const _;
+            let inner: *mut ImageBuffer<Rgba<u8>, Vec<u8>> = unsafe { std::mem::transmute(inner) };
             for x in 0..wh {
                 unsafe {
                     let pix = inner_edge.unsafe_get_pixel(0, (wh + y - x) % wh);
-                    inner.unsafe_put_pixel(x, y, pix);
+                    (*inner).unsafe_put_pixel(x, y, pix);
                 }
             }
-        }
+        });
         matcher(&inner.convert(), &outer_edge.convert()) * 200 / SPLIT_COUNT
     }
 }
