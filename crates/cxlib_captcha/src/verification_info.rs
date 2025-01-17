@@ -1,4 +1,4 @@
-use getset2::Getters;
+use getset2::Getset2;
 use serde::Deserialize;
 
 /// # Solver 签名
@@ -9,8 +9,8 @@ use serde::Deserialize;
 /// )) -> Result<u32, cxlib_error::CaptchaError>;
 /// ```
 /// 调用 [`init_solver`](SlideImages::init_solver) 或 [`init_owned_solver`](SlideImages::init_owned_solver) 完成初始化。
-#[derive(Debug, Deserialize, Getters)]
-#[getset(get = "pub")]
+#[derive(Debug, Deserialize, Getset2)]
+#[getset2(get_ref(pub))]
 pub struct SlideImages {
     #[serde(rename = "shadeImage")]
     big_img_url: String,
@@ -24,8 +24,8 @@ pub struct SlideImages {
 /// type Solver = impl Fn(image::DynamicImage) -> Result<u32, cxlib_error::CaptchaError>;
 /// ```
 /// 调用 [`init_solver`](IconClickImage::init_solver) 或 [`init_owned_solver`](IconClickImage::init_owned_solver) 完成初始化。
-#[derive(Debug, Deserialize, Getters)]
-#[getset(get = "pub")]
+#[derive(Debug, Deserialize, Getset2)]
+#[getset2(get_ref(pub))]
 pub struct IconClickImage {
     // #[serde(rename = "type")]
     // _captcha_type: String,
@@ -44,8 +44,8 @@ pub struct IconClickImage {
 /// ), cxlib_error::CaptchaError>;
 /// ```
 /// 调用 [`init_solver`](TextClickInfo::init_solver) 或 [`init_owned_solver`](TextClickInfo::init_owned_solver) 完成初始化。
-#[derive(Debug, Deserialize, Getters)]
-#[getset(get = "pub")]
+#[derive(Debug, Deserialize, Getset2)]
+#[getset2(get_ref(pub))]
 pub struct TextClickInfo {
     // #[serde(rename = "type")]
     // _captcha_type: String,
@@ -59,8 +59,8 @@ pub struct TextClickInfo {
 /// type Solver = impl Fn(image::DynamicImage) -> Result<cxlib_imageproc::Point<u32>, cxlib_error::CaptchaError>;
 /// ```
 /// 调用 [`init_solver`](ObstacleImage::init_solver) 或 [`init_owned_solver`](ObstacleImage::init_owned_solver) 完成初始化。
-#[derive(Debug, Deserialize, Getters)]
-#[getset(get = "pub")]
+#[derive(Debug, Deserialize, Getset2)]
+#[getset2(get_ref(pub))]
 pub struct ObstacleImage {
     // #[serde(rename = "type")]
     // _captcha_type: String,
@@ -75,8 +75,8 @@ pub struct ObstacleImage {
 /// )) -> Result<u32, cxlib_error::CaptchaError>;
 /// ```
 /// 调用 [`init_solver`](RotateImages::init_solver) 或 [`init_owned_solver`](RotateImages::init_owned_solver) 完成初始化。
-#[derive(Debug, Deserialize, Getters)]
-#[getset(get = "pub")]
+#[derive(Debug, Deserialize, Getset2)]
+#[getset2(get_ref(pub))]
 pub struct RotateImages {
     #[serde(rename = "shadeImage")]
     rotatable_img_url: String,

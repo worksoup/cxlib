@@ -117,7 +117,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
     }
 }
 
-impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
+impl<T: LocationInfoGetterTrait> DefaultQrCodeSignner<'_, T> {
     fn pic_to_enc(pic: &PathBuf) -> Result<String, SignError> {
         if std::fs::metadata(pic).expect("图片路径出错。").is_dir() {
             loop {
@@ -175,7 +175,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
             });
             info!("已截屏。");
             // 如果成功识别到二维码。
-            let results = Self::scan_qrcode(image::DynamicImage::from(pic), &mut HashMap::new());
+            let results = Self::detect_qrcode_in_image(image::DynamicImage::from(pic));
             let results = if let Ok(results) = results {
                 results
             } else {
@@ -198,7 +198,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
                         .capture_image()
                         .unwrap_or_else(|e| panic!("{e:?}"));
                     let cut_pic =cxlib_imageproc::cut_picture(&pic, qrcode_pos_on_screen.0, qrcode_pos_on_screen.1);
-                    let r = Self::scan_qrcode(cut_pic.to_image().into(), &mut HashMap::new()).unwrap_or_else(|e| panic!("{e:?}"));
+                    let r = Self::detect_qrcode_in_image(cut_pic.to_image().into()).unwrap_or_else(|e| panic!("{e:?}"));
                     Self::find_qrcode_sign_enc_in_url(r[0].getText())
                 } else {
                     // 如果不是精确截取的二维码，则不需要提示。
@@ -261,15 +261,20 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
         let r = Self::scan_file(pic_path).ok()?;
         Self::find_qrcode_sign_enc_in_url(r.first()?.getText())
     }
-    pub fn scan_qrcode(
+    pub fn detect_qrcode_in_image(
         image: image::DynamicImage,
-        hints: &mut rxing::DecodingHintDictionary,
     ) -> rxing::common::Result<Vec<rxing::RXingResult>> {
-        hints
-            .entry(rxing::DecodeHintType::TRY_HARDER)
-            .or_insert(rxing::DecodeHintValue::TryHarder(true));
+        Self::detect_qrcode_in_image_with_hints(image, &mut rxing::DecodeHints::default())
+    }
+    pub fn detect_qrcode_in_image_with_hints(
+        image: image::DynamicImage,
+        hints: &mut rxing::DecodeHints,
+    ) -> rxing::common::Result<Vec<rxing::RXingResult>> {
         let reader = rxing::MultiFormatReader::default();
         let mut scanner = rxing::multi::GenericMultipleBarcodeReader::new(reader);
+
+        hints.TryHarder = hints.TryHarder.or(Some(true));
+
         rxing::multi::MultipleBarcodeReader::decode_multiple_with_hints(
             &mut scanner,
             &mut rxing::BinaryBitmap::new(rxing::common::HybridBinarizer::new(

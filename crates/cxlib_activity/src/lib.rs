@@ -117,11 +117,15 @@ impl Activity {
         let excludes = table.get_excludes();
         let set_excludes = set_excludes || excludes.is_empty();
         let mut course_sessions_map = courses;
-        let courses = course_sessions_map
-            .keys()
-            .filter(|course| set_excludes || !excludes.contains(&course.get_id()))
-            .cloned()
-            .collect::<Vec<_>>();
+        let courses = if set_excludes {
+            course_sessions_map.keys().cloned().collect::<Vec<_>>()
+        } else {
+            course_sessions_map
+                .keys()
+                .filter(|&course| !excludes.contains(&course.get_id()))
+                .cloned()
+                .collect()
+        };
         let excludes = Arc::new(Mutex::new(excludes));
         let mut valid_signs = HashMap::new();
         let thread_count = 256;

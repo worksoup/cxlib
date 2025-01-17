@@ -19,9 +19,9 @@ authors = ["worksoup"]
 chrono = "0.4"
 cookie_store = "0.21"
 des = "0.8"
-directories = "5.0"
+directories = "6.0"
 flate2 = "1.0"
-getset2 = "0.2"
+getset2 = "0.4"
 hex = "0.4"
 image = "0.25"
 imageproc = "0.25"
@@ -30,18 +30,18 @@ log = { version = "0.4", features = ["release_max_level_info"] }
 mime_guess = "2.0"
 num_enum = "0.7"
 num-traits = "0.2"
-onceinit = "0.0.10"
+onceinit = "0.0.11"
 percent-encoding = "2.3"
 rand = "0.8"
 rayon = "1.10"
-rxing = "0.6"
+rxing = "0.7"
 serde = "1.0"
 sqlite = "0.36"
 thiserror = "2.0"
 toml = "0.8"
 unicode-width = "0.2"
 ureq = "2.12"
-xcap = { version = "0.1.0" }
+xcap = { version = "0.2" }
 yapt = { git = "https://github.com/worksoup/yapt.git" }
 
 [dependencies]

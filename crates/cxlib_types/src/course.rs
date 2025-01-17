@@ -1,4 +1,4 @@
-use cxlib_error::{MaybeFatalError, CxlibResultUtils};
+use cxlib_error::{CxlibResultUtils, MaybeFatalError};
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::LoginError;
 use cxlib_user::Session;
@@ -36,9 +36,18 @@ impl Course {
     pub fn get_courses<'a, Sessions: Iterator<Item = &'a Session>>(
         sessions: Sessions,
     ) -> Result<HashMap<Course, Vec<Session>>, CourseError> {
-        let mut courses = HashMap::<_, Vec<_>>::new();
+        let mut handles = Vec::new();
         for session in sessions {
-            let courses_ = match Course::get_session_courses(session) {
+            let session_ = session.clone();
+            let handle = std::thread::spawn(move || -> Result<Vec<Course>, CourseError> {
+                Course::get_session_courses(&session_)
+            });
+            handles.push((handle, session));
+        }
+        let mut courses = HashMap::<_, Vec<_>>::new();
+        for (handle, session) in handles {
+            let r = handle.join().unwrap();
+            let courses_ = match r {
                 Ok(c) => c,
                 Err(e) => {
                     if e.is_fatal() {
