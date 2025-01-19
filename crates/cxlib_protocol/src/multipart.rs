@@ -4,8 +4,10 @@
 use log::debug;
 use mime_guess::{mime, Mime};
 use rand::Rng;
-use std::borrow::Cow;
-use std::io::{Cursor, Read, Write};
+use std::{
+    borrow::Cow,
+    io::{Cursor, Read, Write},
+};
 
 struct PreparedField<'d> {
     header: Cursor<Vec<u8>>,
@@ -111,7 +113,7 @@ impl<'d> PreparedFields<'d> {
                      name=\"{}\"\r\n\r\n{}",
                     boundary, field.name, text
                 )
-                .unwrap(),
+                .expect("[multipart]: Unable to write boundary."),
                 Data::Stream(stream) => {
                     streams.push(from_stream(
                         &field.name,

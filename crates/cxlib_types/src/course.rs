@@ -119,15 +119,6 @@ impl Course {
             name: name.into(),
         }
     }
-    // fn from_raw(raw: &CourseRaw, class_id: i64) -> Course {
-    //     Self {
-    //         id: raw.id,
-    //         class_id,
-    //         teacher: raw.teacher.clone(),
-    //         image_url: raw.image_url.clone(),
-    //         name: raw.name.clone(),
-    //     }
-    // }
     pub fn get_id(&self) -> i64 {
         self.id
     }
@@ -142,6 +133,81 @@ impl Course {
     }
     pub fn get_name(&self) -> &str {
         &self.name
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct CourseRaw {
+    id: i64,
+    #[serde(rename = "teacherfactor")]
+    teacher: String,
+    #[serde(rename = "imageurl")]
+    image_url: Option<String>,
+    name: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct Courses {
+    data: Vec<CourseRaw>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct CourseContent {
+    course: Option<Courses>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct ClassRaw {
+    #[serde(rename = "key")]
+    id: serde_json::Value,
+    content: CourseContent,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct GetCoursesR {
+    #[serde(rename = "channelList")]
+    channel_list: Option<Vec<ClassRaw>>,
+}
+impl Course {
+    pub fn get_locations(
+        &self,
+        session: &Session,
+    ) -> Result<HashMap<String, LocationWithRange>, AgentError> {
+        #[derive(Debug, Clone, Deserialize, Serialize)]
+        struct LocationWithRangeAndActiveId {
+            #[serde(rename = "activeid")]
+            active_id: i64,
+            #[serde(rename = "address")]
+            addr: String,
+            #[serde(rename = "longitude")]
+            lon: f64,
+            #[serde(rename = "latitude")]
+            lat: f64,
+            #[serde(rename = "locationrange")]
+            range: String,
+        }
+        impl LocationWithRangeAndActiveId {
+            pub fn into_location_with_range(self) -> LocationWithRange {
+                LocationWithRange::new(
+                    self.addr,
+                    self.lon.to_string(),
+                    self.lat.to_string(),
+                    self.range.trim().parse().unwrap_or(100),
+                )
+            }
+        }
+        #[derive(Debug, Clone, Deserialize, Serialize)]
+        struct Data {
+            #[serde(rename = "data")]
+            data: Vec<LocationWithRangeAndActiveId>,
+        }
+        let r = protocol::get_location_log(session, (self.get_id(), self.get_class_id()))?;
+        let data: Data = r.into_json().unwrap();
+        let mut map = HashMap::new();
+        for l in data.data {
+            map.insert(l.active_id.to_string(), l.into_location_with_range());
+        }
+        Ok(map)
     }
 }
 
@@ -239,87 +305,5 @@ impl Course {
         }
         let activities = Arc::into_inner(activities).unwrap().into_inner().unwrap();
         Ok(activities)
-    }
-}
-#[derive(Deserialize, Serialize, Debug)]
-struct CourseRaw {
-    id: i64,
-    #[serde(rename = "teacherfactor")]
-    teacher: String,
-    #[serde(rename = "imageurl")]
-    image_url: Option<String>,
-    name: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct Courses {
-    data: Vec<CourseRaw>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct CourseContent {
-    course: Option<Courses>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct ClassRaw {
-    #[serde(rename = "key")]
-    id: serde_json::Value,
-    content: CourseContent,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct GetCoursesR {
-    #[serde(rename = "channelList")]
-    channel_list: Option<Vec<ClassRaw>>,
-}
-impl Course {
-    pub fn get_locations(
-        &self,
-        session: &Session,
-    ) -> Result<HashMap<String, LocationWithRange>, AgentError> {
-        #[derive(Debug, Clone, Deserialize, Serialize)]
-        struct LocationWithRangeAndActiveId {
-            #[serde(rename = "activeid")]
-            active_id: i64,
-            #[serde(rename = "address")]
-            addr: String,
-            #[serde(rename = "longitude")]
-            lon: f64,
-            #[serde(rename = "latitude")]
-            lat: f64,
-            #[serde(rename = "locationrange")]
-            range: String,
-        }
-        impl LocationWithRangeAndActiveId {
-            // pub fn to_location_with_range(&self) -> LocationWithRange {
-            //     LocationWithRange::new(
-            //         self.addr.clone(),
-            //         self.lon.to_string(),
-            //         self.lat.to_string(),
-            //         self.range.trim().parse().unwrap_or(100),
-            //     )
-            // }
-            pub fn into_location_with_range(self) -> LocationWithRange {
-                LocationWithRange::new(
-                    self.addr,
-                    self.lon.to_string(),
-                    self.lat.to_string(),
-                    self.range.trim().parse().unwrap_or(100),
-                )
-            }
-        }
-        #[derive(Debug, Clone, Deserialize, Serialize)]
-        struct Data {
-            #[serde(rename = "data")]
-            data: Vec<LocationWithRangeAndActiveId>,
-        }
-        let r = protocol::get_location_log(session, (self.get_id(), self.get_class_id()))?;
-        let data: Data = r.into_json().unwrap();
-        let mut map = HashMap::new();
-        for l in data.data {
-            map.insert(l.active_id.to_string(), l.into_location_with_range());
-        }
-        Ok(map)
     }
 }
