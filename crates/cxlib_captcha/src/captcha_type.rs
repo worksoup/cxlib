@@ -8,12 +8,13 @@ use cxlib_error::{AgentError, CaptchaError, CxlibResultUtils, InitError, MaybeFa
 use cxlib_protocol::collect::captcha as protocol;
 use log::{debug, warn};
 use onceinit::{OnceInit, OnceInitError, StaticDefault};
-use serde::de::DeserializeOwned;
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use serde::{de::DeserializeOwned, Deserialize};
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+    str::FromStr,
+    sync::{Arc, RwLock},
+};
 use ureq::{serde_json, Agent};
 
 #[derive(Debug)]
