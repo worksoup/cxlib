@@ -5,7 +5,6 @@ version.workspace = true
 authors.workspace = true
 [features]
 default = []
-activity = ["ureq"]
 captcha = ["ureq", "percent-encoding"]
 default_impl = ["ureq"]
 sign = ["ureq"]

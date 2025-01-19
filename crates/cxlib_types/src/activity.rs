@@ -2,7 +2,7 @@ pub use cxlib_error::ActivityError;
 
 use crate::{Course, RawSign};
 use cxlib_error::{CxlibResultUtils, MaybeFatalError};
-use cxlib_protocol::collect::activity as protocol;
+use cxlib_protocol::collect::types as protocol;
 use cxlib_user::Session;
 use log::debug;
 use serde::{Deserialize, Serialize};

@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 chrono.workspace = true
 cxlib_error = { path = "../cxlib_error" }
-cxlib_protocol = { path = "../cxlib_protocol", features = ["types", "activity"] }
+cxlib_protocol = { path = "../cxlib_protocol", features = ["types"] }
 cxlib_user = { path = "../cxlib_user" }
 log.workspace = true
 onceinit.workspace = true

@@ -1,5 +1,3 @@
-#[cfg(feature = "activity")]
-pub mod activity;
 #[cfg(feature = "captcha")]
 pub mod captcha;
 #[cfg(feature = "default_impl")]
