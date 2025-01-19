@@ -1,4 +1,3 @@
-pub use cxlib_activity as activity;
 pub use cxlib_captcha as captcha;
 pub use cxlib_default_impl as default_impl;
 pub use cxlib_imageproc as imageproc;

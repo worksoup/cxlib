@@ -1,6 +1,6 @@
 use crate::sign::NormalSign;
-use cxlib_activity::RawSign;
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
+use cxlib_types::RawSign;
 use cxlib_user::Session;
 use std::collections::HashMap;
 

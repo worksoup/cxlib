@@ -1,11 +1,8 @@
-mod raw;
-
 pub use cxlib_error::ActivityError;
-pub use raw::*;
 
+use crate::{Course, RawSign};
 use cxlib_error::{CxlibResultUtils, MaybeFatalError};
 use cxlib_protocol::collect::activity as protocol;
-use cxlib_types::Course;
 use cxlib_user::Session;
 use log::debug;
 use serde::{Deserialize, Serialize};

@@ -1,9 +1,8 @@
 use crate::utils::try_secondary_verification;
-use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
 use cxlib_error::CxlibResultUtils;
 use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
-use cxlib_types::{Course, OptionPair, LocationWithRange};
+use cxlib_types::{Course, LocationWithRange, OptionPair, RawSign};
 use cxlib_user::Session;
 use log::info;
 use serde::Deserialize;

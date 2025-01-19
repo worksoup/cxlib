@@ -1,8 +1,16 @@
-use cxlib_types::Course;
-use cxlib_utils::get_width_str_should_be;
+use crate::Course;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::time::{Duration, SystemTime};
+
+pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
+    use unicode_width::UnicodeWidthStr;
+    if UnicodeWidthStr::width(s) > width {
+        width
+    } else {
+        UnicodeWidthStr::width(s) + 12 - s.len()
+    }
+}
 
 /// # RawSign
 ///

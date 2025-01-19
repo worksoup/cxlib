@@ -13,11 +13,10 @@ pub use photo::*;
 pub use qrcode::*;
 pub use signcode::*;
 
-use cxlib_activity::RawSign;
 use cxlib_error::CxlibResultUtils;
 use cxlib_protocol::collect::default_impl as protocol;
 use cxlib_sign::{PreSignResult, SignDetail, SignError, SignTrait};
-use cxlib_types::LocationWithRange;
+use cxlib_types::{LocationWithRange, RawSign};
 use cxlib_user::Session;
 use serde::Deserialize;
 use std::collections::HashMap;

@@ -5,7 +5,6 @@ version.workspace = true
 authors.workspace = true
 
 [dependencies]
-cxlib_activity = { path = "../cxlib_activity" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["default_impl"] }

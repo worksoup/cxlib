@@ -9,5 +9,4 @@ authors.workspace = true
 [dependencies]
 inquire.workspace = true
 log.workspace = true
-unicode-width.workspace = true
 ureq.workspace = true

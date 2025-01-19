@@ -38,12 +38,3 @@ pub fn inquire_pwd(pwd: Option<String>) -> Option<String> {
         }
     })
 }
-
-pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
-    use unicode_width::UnicodeWidthStr;
-    if UnicodeWidthStr::width(s) > width {
-        width
-    } else {
-        UnicodeWidthStr::width(s) + 12 - s.len()
-    }
-}

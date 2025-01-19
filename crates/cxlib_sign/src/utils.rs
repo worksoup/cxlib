@@ -1,9 +1,8 @@
 use crate::{protocol, PreSignResult, SignResult, SignTrait};
-use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
 use cxlib_error::{CxlibResultUtils, SignError};
 use cxlib_protocol::{utils::PPTSignHelper, ProtocolItem, ProtocolItemTrait};
-use cxlib_types::{OptionPair, LocationWithRange};
+use cxlib_types::{OptionPair, LocationWithRange, RawSign};
 use cxlib_user::Session;
 use log::{debug, trace, warn};
 use ureq::{Agent, Response};

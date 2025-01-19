@@ -5,7 +5,6 @@ version.workspace = true
 authors.workspace = true
 
 [dependencies]
-cxlib_activity = { path = "../cxlib_activity" }
 cxlib_captcha = { path = "../cxlib_captcha" }
 cxlib_default_impl = { path = "../cxlib_default_impl" }
 cxlib_error = { path = "../cxlib_error" }
