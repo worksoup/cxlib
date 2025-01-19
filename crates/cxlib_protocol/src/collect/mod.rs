@@ -1,7 +1,5 @@
 #[cfg(feature = "captcha")]
 pub mod captcha;
-#[cfg(feature = "default_impl")]
-pub mod default_impl;
 #[cfg(feature = "sign")]
 pub mod sign;
 #[cfg(feature = "types")]

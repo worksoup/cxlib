@@ -1,6 +1,6 @@
 pub use cxlib_error::CourseError;
 
-use cxlib_error::{ActivityError, CxlibResultUtils, MaybeFatalError};
+use cxlib_error::{ActivityError, AgentError, CxlibResultUtils, MaybeFatalError};
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::{LoginError, Session};
 use log::{info, warn};
@@ -13,7 +13,7 @@ use std::{
 };
 use ureq::serde_json;
 
-use crate::{Activity, OtherActivity, RawSign};
+use crate::{Activity, LocationWithRange, OtherActivity, RawSign};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Course {
@@ -272,4 +272,54 @@ struct ClassRaw {
 struct GetCoursesR {
     #[serde(rename = "channelList")]
     channel_list: Option<Vec<ClassRaw>>,
+}
+impl Course {
+    pub fn get_locations(
+        &self,
+        session: &Session,
+    ) -> Result<HashMap<String, LocationWithRange>, AgentError> {
+        #[derive(Debug, Clone, Deserialize, Serialize)]
+        struct LocationWithRangeAndActiveId {
+            #[serde(rename = "activeid")]
+            active_id: i64,
+            #[serde(rename = "address")]
+            addr: String,
+            #[serde(rename = "longitude")]
+            lon: f64,
+            #[serde(rename = "latitude")]
+            lat: f64,
+            #[serde(rename = "locationrange")]
+            range: String,
+        }
+        impl LocationWithRangeAndActiveId {
+            // pub fn to_location_with_range(&self) -> LocationWithRange {
+            //     LocationWithRange::new(
+            //         self.addr.clone(),
+            //         self.lon.to_string(),
+            //         self.lat.to_string(),
+            //         self.range.trim().parse().unwrap_or(100),
+            //     )
+            // }
+            pub fn into_location_with_range(self) -> LocationWithRange {
+                LocationWithRange::new(
+                    self.addr,
+                    self.lon.to_string(),
+                    self.lat.to_string(),
+                    self.range.trim().parse().unwrap_or(100),
+                )
+            }
+        }
+        #[derive(Debug, Clone, Deserialize, Serialize)]
+        struct Data {
+            #[serde(rename = "data")]
+            data: Vec<LocationWithRangeAndActiveId>,
+        }
+        let r = protocol::get_location_log(session, (self.get_id(), self.get_class_id()))?;
+        let data: Data = r.into_json().unwrap();
+        let mut map = HashMap::new();
+        for l in data.data {
+            map.insert(l.active_id.to_string(), l.into_location_with_range());
+        }
+        Ok(map)
+    }
 }

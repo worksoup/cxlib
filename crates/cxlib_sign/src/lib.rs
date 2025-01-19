@@ -249,35 +249,6 @@ pub struct SignActivityRaw {
     pub status: i32,
     pub start_time_secs: i64,
 }
-/// 区分签到类型时获取的一些签到的信息。
-#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SignDetail {
-    is_photo: bool,
-    is_refresh_qrcode: bool,
-    c: Option<String>,
-}
-impl SignDetail {
-    pub fn new(
-        is_photo_value: i64,
-        is_refresh_qrcode_value: i64,
-        sign_code: Option<String>,
-    ) -> SignDetail {
-        SignDetail {
-            is_photo: is_photo_value > 0,
-            is_refresh_qrcode: is_refresh_qrcode_value > 0,
-            c: sign_code,
-        }
-    }
-    pub fn is_photo(&self) -> bool {
-        self.is_photo
-    }
-    pub fn is_refresh_qrcode(&self) -> bool {
-        self.is_refresh_qrcode
-    }
-    pub fn sign_code(&self) -> Option<&str> {
-        self.c.as_deref()
-    }
-}
 /// 针对同一个签到，但不同 Session 的处理程序。
 pub trait SignnerTrait<T: SignTrait> {
     type ExtData<'e>;

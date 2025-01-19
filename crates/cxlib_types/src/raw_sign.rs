@@ -1,7 +1,12 @@
-use crate::Course;
+use crate::{Course, SignDetail};
+use cxlib_error::{CxlibResultUtils, SignError};
+use cxlib_protocol::collect::types as protocol;
+use cxlib_user::Session;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::time::{Duration, SystemTime};
+use std::{
+    fmt::{Display, Formatter},
+    time::{Duration, SystemTime},
+};
 
 pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
     use unicode_width::UnicodeWidthStr;
@@ -63,6 +68,27 @@ impl RawSign {
             time_string_from_mills(self.start_time_mills),
             width = name_width,
         )
+    }
+    pub fn get_sign_detail(active_id: &str, session: &Session) -> Result<SignDetail, SignError> {
+        #[derive(Deserialize)]
+        struct GetSignDetailR {
+            #[serde(rename = "ifPhoto")]
+            is_photo_sign: i64,
+            #[serde(rename = "ifRefreshEwm")]
+            is_refresh_qrcode: i64,
+            #[serde(rename = "signCode")]
+            sign_code: Option<String>,
+        }
+        let r = protocol::sign_detail(session, active_id)?;
+        let GetSignDetailR {
+            is_photo_sign,
+            is_refresh_qrcode,
+            sign_code,
+        } = r.into_json().log_unwrap();
+        Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
+    }
+    pub fn detail(&self, session: &Session) -> Result<SignDetail, SignError> {
+        Self::get_sign_detail(&self.active_id, session)
     }
 }
 impl RawSign {

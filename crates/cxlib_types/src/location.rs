@@ -172,45 +172,13 @@ pub struct LocationWithRange {
 }
 
 impl LocationWithRange {
-    pub fn from_log(
-        session: &Session,
-        course: &Course,
-    ) -> Result<HashMap<String, Self>, AgentError> {
-        #[derive(Debug, Clone, Deserialize, Serialize)]
-        struct LocationWithRangeAndActiveId {
-            #[serde(rename = "activeid")]
-            active_id: i64,
-            #[serde(rename = "address")]
-            addr: String,
-            #[serde(rename = "longitude")]
-            lon: f64,
-            #[serde(rename = "latitude")]
-            lat: f64,
-            #[serde(rename = "locationrange")]
-            range: String,
+    pub fn new(addr: String, lon: String, lat: String, range: u32) -> Self {
+        Self {
+            addr,
+            lon,
+            lat,
+            range,
         }
-        impl LocationWithRangeAndActiveId {
-            pub fn to_location_with_range(&self) -> LocationWithRange {
-                LocationWithRange {
-                    addr: self.addr.clone(),
-                    lon: self.lon.to_string(),
-                    lat: self.lat.to_string(),
-                    range: self.range.trim().parse().unwrap_or(100),
-                }
-            }
-        }
-        #[derive(Debug, Clone, Deserialize, Serialize)]
-        struct Data {
-            #[serde(rename = "data")]
-            data: Vec<LocationWithRangeAndActiveId>,
-        }
-        let r = protocol::get_location_log(session, (course.get_id(), course.get_class_id()))?;
-        let data: Data = r.into_json().unwrap();
-        let mut map = HashMap::new();
-        for l in data.data {
-            map.insert(l.active_id.to_string(), l.to_location_with_range());
-        }
-        Ok(map)
     }
     pub fn find_in_html(html: &str) -> Option<LocationWithRange> {
         let p = [
