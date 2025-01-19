@@ -3,7 +3,7 @@ use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
 use cxlib_error::{CxlibResultUtils, SignError};
 use cxlib_protocol::{utils::PPTSignHelper, ProtocolItem, ProtocolItemTrait};
-use cxlib_types::{Dioption, LocationWithRange};
+use cxlib_types::{OptionPair, LocationWithRange};
 use cxlib_user::Session;
 use log::{debug, trace, warn};
 use ureq::{Agent, Response};
@@ -25,7 +25,7 @@ pub fn analysis_after_presign(
             return Ok(PreSignResult::Susses);
         }
     }
-    let captcha_id_and_location = Dioption::from((
+    let captcha_id_and_location = OptionPair::from((
         find_captcha(session, &html),
         LocationWithRange::find_in_html(&html),
     ));

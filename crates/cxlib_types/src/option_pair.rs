@@ -1,14 +1,14 @@
 #[derive(Debug)]
-pub struct Dioption<T1, T2> {
+pub struct OptionPair<T1, T2> {
     first: Option<T1>,
     second: Option<T2>,
 }
-impl<T1, T2> From<(Option<T1>, Option<T2>)> for Dioption<T1, T2> {
+impl<T1, T2> From<(Option<T1>, Option<T2>)> for OptionPair<T1, T2> {
     fn from(v: (Option<T1>, Option<T2>)) -> Self {
         Self::from_tuple(v)
     }
 }
-impl<T1, T2> Dioption<T1, T2> {
+impl<T1, T2> OptionPair<T1, T2> {
     pub fn new_none() -> Self {
         Self {
             first: None,
@@ -87,7 +87,7 @@ impl<T1, T2> Dioption<T1, T2> {
     pub fn has_second(&self) -> bool {
         self.second.is_some()
     }
-    pub fn map<B1, B2, FF, SF>(self, mut ff: FF, mut sf: SF) -> Dioption<B1, B2>
+    pub fn map<B1, B2, FF, SF>(self, mut ff: FF, mut sf: SF) -> OptionPair<B1, B2>
     where
         Self: Sized,
         FF: FnMut(T1) -> B1,
@@ -95,16 +95,16 @@ impl<T1, T2> Dioption<T1, T2> {
     {
         let first = self.first.map(&mut ff);
         let second = self.second.map(&mut sf);
-        Dioption { first, second }
+        OptionPair { first, second }
     }
-    pub fn map_first<B, FF>(self, ff: FF) -> Dioption<B, T2>
+    pub fn map_first<B, FF>(self, ff: FF) -> OptionPair<B, T2>
     where
         Self: Sized,
         FF: FnMut(T1) -> B,
     {
         self.map(ff, |s| s)
     }
-    pub fn map_second<B, F>(self, f: F) -> Dioption<T1, B>
+    pub fn map_second<B, F>(self, f: F) -> OptionPair<T1, B>
     where
         Self: Sized,
         F: FnMut(T2) -> B,
@@ -135,7 +135,7 @@ impl<T1, T2> Dioption<T1, T2> {
     }
 }
 
-impl<T> Dioption<T, T> {
+impl<T> OptionPair<T, T> {
     pub fn push(&mut self, value: T) -> bool {
         if !self.has_first() {
             self.first = Some(value);
@@ -154,7 +154,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_dioption() {
-        let mut a = Dioption::new_both(1, 2);
+        let mut a = OptionPair::new_both(1, 2);
         let b = a.take_first();
         println!("a: {a:?}, b: {b:?}");
     }

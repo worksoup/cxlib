@@ -3,7 +3,7 @@ use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
 use cxlib_error::CxlibResultUtils;
 use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
-use cxlib_types::{Course, Dioption, LocationWithRange};
+use cxlib_types::{Course, OptionPair, LocationWithRange};
 use cxlib_user::Session;
 use log::info;
 use serde::Deserialize;
@@ -111,7 +111,7 @@ pub trait SignTrait: Ord {
         &self,
         session: &Session,
         pre_sign_url: &str,
-        pre_sign_result_data: &Dioption<CaptchaId, LocationWithRange>,
+        pre_sign_result_data: &OptionPair<CaptchaId, LocationWithRange>,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
     ) -> Result<SignResult, SignError> {
@@ -180,7 +180,7 @@ pub enum PreSignResult {
     Susses,
     Data {
         url: String,
-        data: Dioption<CaptchaId, LocationWithRange>,
+        data: OptionPair<CaptchaId, LocationWithRange>,
     },
 }
 impl PreSignResult {
