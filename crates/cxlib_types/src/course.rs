@@ -1,4 +1,6 @@
-use cxlib_error::{CxlibResultUtils, MaybeFatalError};
+pub use cxlib_error::CourseError;
+
+use cxlib_error::{ActivityError, CxlibResultUtils, MaybeFatalError};
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::{LoginError, Session};
 use log::{info, warn};
@@ -7,10 +9,11 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Display,
     ops::Deref,
+    sync::{Arc, Mutex},
 };
 use ureq::serde_json;
 
-pub use cxlib_error::CourseError;
+use crate::{Activity, OtherActivity, RawSign};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Course {
@@ -142,6 +145,102 @@ impl Course {
     }
 }
 
+/// # ActivityRaw
+///
+/// 未分类的活动类型，仅用于内部反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
+#[derive(Deserialize, Serialize, Clone)]
+struct ActivityRaw {
+    #[serde(rename = "nameOne")]
+    name_one: String,
+    id: i64,
+    #[serde(rename = "otherId")]
+    other_id: Option<String>,
+    status: i32,
+    #[serde(rename = "startTime")]
+    start_time_mills: u64,
+}
+/// 内部类型，用于反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
+#[derive(Deserialize, Serialize)]
+struct Data {
+    #[serde(rename = "activeList")]
+    active_list: Vec<ActivityRaw>,
+}
+/// 内部类型，用于反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
+#[derive(Deserialize, Serialize)]
+struct GetActivityR {
+    data: Option<Data>,
+}
+
+impl Course {
+    pub fn get_activities(&self, session: &Session) -> Result<Vec<Activity>, ActivityError> {
+        let r = protocol::active_list(session, (self.get_id(), self.get_class_id()))?;
+        let r: GetActivityR = r.into_json().unwrap();
+        let activities = Arc::new(Mutex::new(Vec::new()));
+        if let Some(data) = r.data {
+            let thread_count = 1;
+            let len = data.active_list.len();
+            let chunk_rest = len % thread_count;
+            let chunk_count = len / thread_count + if chunk_rest == 0 { 0 } else { 1 };
+            for i in 0..chunk_count {
+                let ars = &data.active_list[i * thread_count..if i != chunk_count - 1 {
+                    (i + 1) * thread_count
+                } else {
+                    len
+                }];
+                let mut handles = Vec::new();
+                for ar in ars {
+                    let ar = ar.clone();
+                    let c = self.clone();
+                    let activities = activities.clone();
+                    let handle = std::thread::spawn(move || {
+                        if ar.other_id.as_ref().is_some_and(|oid| {
+                            let other_id_i64: i64 = oid.parse().unwrap();
+                            (0..=5).contains(&other_id_i64)
+                        }) {
+                            let other_id = unsafe { ar.other_id.unwrap_unchecked() };
+                            let active_id = ar.id.to_string();
+                            let base_sign = RawSign {
+                                active_id,
+                                name: ar.name_one,
+                                course: c.clone(),
+                                other_id,
+                                status_code: ar.status,
+                                start_time_mills: ar.start_time_mills,
+                            };
+                            activities
+                                .lock()
+                                .unwrap()
+                                .push(Activity::RawSign(base_sign))
+                        } else {
+                            activities
+                                .lock()
+                                .unwrap()
+                                .push(Activity::Other(OtherActivity {
+                                    id: ar.id.to_string(),
+                                    name: ar.name_one,
+                                    course: c.clone(),
+                                    status: ar.status,
+                                    start_time_mills: ar.start_time_mills,
+                                }))
+                        }
+                    });
+                    handles.push(handle);
+                }
+                for h in handles {
+                    h.join().unwrap();
+                }
+            }
+        }
+        let activities = Arc::into_inner(activities).unwrap().into_inner().unwrap();
+        Ok(activities)
+    }
+}
 #[derive(Deserialize, Serialize, Debug)]
 struct CourseRaw {
     id: i64,
