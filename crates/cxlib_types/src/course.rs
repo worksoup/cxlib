@@ -1,7 +1,6 @@
 use cxlib_error::{CxlibResultUtils, MaybeFatalError};
 use cxlib_protocol::collect::types as protocol;
-use cxlib_user::LoginError;
-use cxlib_user::Session;
+use cxlib_user::{LoginError, Session};
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::{
