@@ -153,7 +153,7 @@ impl<T> OptionPair<T, T> {
 mod tests {
     use super::*;
     #[test]
-    fn test_dioption() {
+    fn test_option_pair() {
         let mut a = OptionPair::new_both(1, 2);
         let b = a.take_first();
         println!("a: {a:?}, b: {b:?}");
