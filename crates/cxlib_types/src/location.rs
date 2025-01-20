@@ -44,7 +44,9 @@ impl Location {
     pub fn get_location_preprocessor() -> &'static dyn LocationPreprocessorTrait {
         LOCATION_PREPROCESSOR.deref()
     }
-    /// 参见 [`LocationPreprocessorTrait`].
+    /// 参见 [`LocationPreprocessorTrait`], [`do_preprocess`](LocationPreprocessorTrait::do_preprocess)方法不会作用于 [`FromStr`] 和与 `[String; 4]` 间的转换当中。
+    ///
+    /// 另外，[`get_none_location`](Self::get_none_location) 内部通过 `[const { String::new() }; 4]` 构造自身，故不会调用 `do_preprocess`, 如需预处理后的结果，可手动调用本函数。
     #[inline]
     pub fn into_preprocessed(self) -> Location {
         Self::get_location_preprocessor().do_preprocess(self)
@@ -75,6 +77,8 @@ impl Location {
         [addr, lon, lat, alt]
     }
     /// 以 `[String; 4]` 构造自身，顺序为显示地址、经度、纬度、海拔（单位应该为米，在本程序中该字段无实际用途，可随意）。
+    ///
+    /// 注意，该函数不会对 [`Location`] 进行预处理。
     #[inline]
     pub fn from_owned_fields([addr, lon, lat, alt]: [String; 4]) -> Self {
         Location {
@@ -85,6 +89,8 @@ impl Location {
         }
     }
     /// Eq to `Self::from_owned_fields([const { String::new() }; 4])`.
+    ///
+    /// 注意，该函数不会对 [`Location`] 进行预处理。
     #[inline]
     pub fn get_none_location() -> Self {
         Self::from_owned_fields([const { String::new() }; 4])
