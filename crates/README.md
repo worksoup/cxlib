@@ -56,9 +56,9 @@
 
 ## 3
 
-- ### [`cxlib_user`](./cxlib_user)
+- ### [`cxlib_login`](./cxlib_login)
 
-  登录、Cookies 相关操作以及一个 `Session` 类型。
+  登录相关操作。
 
 ## 4
 

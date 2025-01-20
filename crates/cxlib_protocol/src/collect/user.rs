@@ -22,3 +22,10 @@ pub fn account_manage(client: &Agent) -> Result<Response, AgentError> {
         .get(&ProtocolItem::AccountManage.to_string())
         .call()?)
 }
+
+// 获取课程
+pub fn back_clazz_data(client: &Agent) -> Result<Response, AgentError> {
+    Ok(client
+        .get(&format!("{}?view=json&rss=1", ProtocolItem::BackClazzData,))
+        .call()?)
+}

@@ -1,8 +1,7 @@
 use crate::sign::{LocationSign, PreSignResult, RawSign, SignTrait};
 use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
 use cxlib_sign::SignError;
-use cxlib_types::Location;
-use cxlib_user::Session;
+use cxlib_types::{Location, Session};
 use log::info;
 use serde::{Deserialize, Serialize};
 

@@ -14,8 +14,7 @@ pub use qrcode::*;
 pub use signcode::*;
 
 use cxlib_sign::{PreSignResult, SignError, SignTrait};
-use cxlib_types::{RawSign, SignDetail};
-use cxlib_user::Session;
+use cxlib_types::{RawSign, Session, SignDetail};
 use std::collections::HashMap;
 
 pub type CaptchaId = String;

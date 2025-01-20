@@ -1,12 +1,11 @@
 [package]
-name = "cxlib_user"
+name = "cxlib_login"
 edition = "2021"
 version.workspace = true
 authors.workspace = true
 
 [dependencies]
 cookie_store.workspace = true
-cxlib_store = { path = "../cxlib_store" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["user"] }
 cxlib_utils = { path = "../cxlib_utils" }

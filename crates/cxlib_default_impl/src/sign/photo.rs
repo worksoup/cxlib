@@ -1,8 +1,6 @@
 use crate::sign::{RawSign, SignTrait};
-use cxlib_protocol::collect::sign as protocol;
-use cxlib_protocol::utils::PPTSignHelper;
-use cxlib_types::Photo;
-use cxlib_user::Session;
+use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
+use cxlib_types::{Photo, Session};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]

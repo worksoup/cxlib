@@ -1,8 +1,7 @@
 pub use cxlib_error::ActivityError;
 
-use crate::{Course, RawSign};
+use crate::{Course, RawSign, Session};
 use cxlib_error::{CxlibResultUtils, MaybeFatalError};
-use cxlib_user::Session;
 use log::debug;
 use std::{
     collections::{HashMap, HashSet},
@@ -200,7 +199,7 @@ impl Activity {
         sessions: Sessions,
         set_excludes: bool,
     ) -> Result<HashMap<Activity, Vec<Session>>, ActivityError> {
-        let courses = Course::get_courses(sessions)?;
+        let courses = Course::get_from_sessions(sessions)?;
         Self::get_from_courses(table, set_excludes, courses)
     }
 }

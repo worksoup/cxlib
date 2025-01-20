@@ -1,19 +1,17 @@
 pub use cxlib_error::CourseError;
 
-use cxlib_error::{ActivityError, AgentError, CxlibResultUtils, MaybeFatalError};
+use cxlib_error::{ActivityError, AgentError, MaybeFatalError};
 use cxlib_protocol::collect::types as protocol;
-use cxlib_user::{LoginError, Session};
-use log::{info, warn};
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Display,
-    ops::Deref,
     sync::{Arc, Mutex},
 };
-use ureq::serde_json;
+use ureq::Agent;
 
-use crate::{Activity, LocationWithRange, OtherActivity, RawSign};
+use crate::{Activity, LocationWithRange, OtherActivity, RawSign, Session};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Course {
@@ -35,14 +33,14 @@ impl Display for Course {
 }
 
 impl Course {
-    pub fn get_courses<'a, Sessions: Iterator<Item = &'a Session>>(
+    pub fn get_from_sessions<'a, Sessions: Iterator<Item = &'a Session>>(
         sessions: Sessions,
     ) -> Result<HashMap<Course, Vec<Session>>, CourseError> {
         let mut handles = Vec::new();
         for session in sessions {
             let session_ = session.clone();
             let handle = std::thread::spawn(move || -> Result<Vec<Course>, CourseError> {
-                Course::get_session_courses(&session_)
+                session_.get_courses()
             });
             handles.push((handle, session));
         }
@@ -77,39 +75,6 @@ impl Course {
         }
         Ok(courses)
     }
-    pub fn get_session_courses(session: &Session) -> Result<Vec<Course>, CourseError> {
-        let r = protocol::back_clazz_data(session.deref())?;
-        let courses = Course::get_list_from_response(r)?;
-        info!("用户[{}]已获取课程列表。", session.get_stu_name());
-        Ok(courses)
-    }
-    fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, CourseError> {
-        let r: GetCoursesR = r.into_json().log_unwrap();
-        let mut arr = Vec::new();
-        if let Some(channel_list) = r.channel_list {
-            for c in channel_list {
-                if let Some(data) = c.content.course {
-                    for course in data.data {
-                        if c.id.is_i64() {
-                            arr.push(Course::new(
-                                course.id,
-                                c.id.as_i64().unwrap(),
-                                course.teacher.as_str(),
-                                course.image_url.unwrap_or("".into()).as_str(),
-                                course.name.as_str(),
-                            ))
-                        }
-                    }
-                }
-            }
-            Ok(arr)
-        } else {
-            Err(LoginError::LoginExpired(
-                "`channelList` 字段为空!".to_string(),
-            ))?
-        }
-    }
-
     pub fn new(id: i64, class_id: i64, teacher: &str, image_url: &str, name: &str) -> Course {
         Course {
             id,
@@ -136,42 +101,10 @@ impl Course {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-struct CourseRaw {
-    id: i64,
-    #[serde(rename = "teacherfactor")]
-    teacher: String,
-    #[serde(rename = "imageurl")]
-    image_url: Option<String>,
-    name: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct Courses {
-    data: Vec<CourseRaw>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct CourseContent {
-    course: Option<Courses>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct ClassRaw {
-    #[serde(rename = "key")]
-    id: serde_json::Value,
-    content: CourseContent,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct GetCoursesR {
-    #[serde(rename = "channelList")]
-    channel_list: Option<Vec<ClassRaw>>,
-}
 impl Course {
     pub fn get_locations(
         &self,
-        session: &Session,
+        session: &Agent,
     ) -> Result<HashMap<String, LocationWithRange>, AgentError> {
         #[derive(Debug, Clone, Deserialize, Serialize)]
         struct LocationWithRangeAndActiveId {

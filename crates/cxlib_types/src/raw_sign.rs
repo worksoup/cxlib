@@ -1,7 +1,6 @@
-use crate::{Course, SignDetail};
+use crate::{Course, Session, SignDetail};
 use cxlib_error::{CxlibResultUtils, SignError};
 use cxlib_protocol::collect::types as protocol;
-use cxlib_user::Session;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
