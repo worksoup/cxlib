@@ -21,7 +21,7 @@ impl FromStr for LocationAndAliasesPair {
                 warn!("课程号解析失败，回退为 `-1`! 错误信息：{e}.");
                 -1_i64
             });
-            match Location::parse(data[1]) {
+            match data[1].parse() {
                 Ok(location) => {
                     let aliases: Vec<_> = if data.len() > 2 {
                         data[2].split('/').map(|s| s.trim().to_string()).collect()
@@ -69,10 +69,10 @@ impl LocationTable {
         location: &Location,
         or: O,
     ) {
-        let addr = location.get_addr();
-        let lat = location.get_lat();
-        let lon = location.get_lon();
-        let alt = location.get_alt();
+        let addr = location.addr();
+        let lat = location.lat();
+        let lon = location.lon();
+        let alt = location.alt();
         let mut query =db.prepare(format!("INSERT INTO {}(lid,courseid,addr,lat,lon,alt) values(:lid,:courseid,:addr,:lat,:lon,:alt);",Self::TABLE_NAME)).unwrap();
         query
             .bind::<&[(_, sqlite::Value)]>(

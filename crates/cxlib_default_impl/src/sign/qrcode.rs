@@ -33,7 +33,7 @@ impl SignTrait for QrCodeSign {
             self.as_inner().active_id.as_str(),
             location
                 .as_ref()
-                .map(|l| (l.get_addr(), l.get_lat(), l.get_lon(), l.get_alt())),
+                .map(|l| (l.addr(), l.lat(), l.lon(), l.alt())),
         )
     }
 
