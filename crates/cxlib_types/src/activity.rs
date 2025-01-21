@@ -83,7 +83,7 @@ impl Activity {
     ) -> Result<Vec<Activity>, ActivityError> {
         let activities = course.get_activities(session)?;
         if set_excludes {
-            let id = course.get_id();
+            let id = course.id();
             let dont_exclude = table.if_should_exclude(&activities);
             let excluded = table.is_excluded(id);
             if dont_exclude && excluded {
@@ -116,7 +116,7 @@ impl Activity {
         } else {
             course_sessions_map
                 .keys()
-                .filter(|&course| !excludes.contains(&course.get_id()))
+                .filter(|&course| !excludes.contains(&course.id()))
                 .cloned()
                 .collect()
         };

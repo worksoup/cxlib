@@ -1,11 +1,12 @@
 use crate::ProtocolItem;
-use ureq::{Agent, Response};
 use cxlib_error::AgentError;
+use std::fmt::Display;
+use ureq::{Agent, Response};
 
 // 获取位置信息列表
 pub fn get_location_log(
     session: &Agent,
-    (course_id, class_id): (i64, i64),
+    (course_id, class_id): (i64, impl Display),
 ) -> Result<Response, AgentError> {
     Ok(session
         .get(&format!(

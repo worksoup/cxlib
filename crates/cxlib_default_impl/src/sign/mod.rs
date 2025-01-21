@@ -45,7 +45,7 @@ impl Sign {
         if let Ok(sign_detail) = raw.detail(session) {
             let r#else = |e| {
                 error!("{}", raw.other_id);
-                error!("{}", raw.course.get_name());
+                error!("{}", raw.course.name());
                 panic!("{e}")
             };
             match raw.other_id.parse::<u8>().unwrap_or_else(r#else) {

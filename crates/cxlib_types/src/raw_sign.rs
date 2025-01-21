@@ -49,8 +49,8 @@ impl Display for RawSign {
             self.name,
             self.status_code,
             time_string_from_mills(self.start_time_mills),
-            self.course.get_id(),
-            self.course.get_name(),
+            self.course.id(),
+            self.course.name(),
             width = name_width,
         )
     }

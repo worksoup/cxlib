@@ -163,7 +163,7 @@ impl SignTrait for RawSign {
         let uid = session.get_uid();
         let response_of_pre_sign = protocol::pre_sign(
             session,
-            (self.course.get_id(), self.course.get_class_id()),
+            (self.course.id(), self.course.class_id()),
             active_id,
             uid,
         )?;

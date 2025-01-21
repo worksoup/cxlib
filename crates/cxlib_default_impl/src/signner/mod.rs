@@ -66,6 +66,6 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
         })
     }
     fn get_fallback_location(&self, sign: &LocationSign) -> Option<Location> {
-        LocationTable::get_location_list_by_course(self.0, sign.as_inner().course.get_id()).pop()
+        LocationTable::get_location_list_by_course(self.0, sign.as_inner().course.id()).pop()
     }
 }

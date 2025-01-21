@@ -11,27 +11,27 @@ use std::{
 };
 use ureq::Agent;
 
-use crate::{Activity, LocationWithRange, OtherActivity, RawSign, Session};
+use crate::{
+    Activity, ClassId, ClassInfo, LocationWithRange, OtherActivity, RawCourse, RawSign, Session,
+};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Course {
-    id: i64,
-    class_id: i64,
-    teacher: String,
-    image_url: String,
-    name: String,
+    raw: RawCourse,
+    class_info: ClassInfo,
 }
-
 impl Display for Course {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "班级号：{}, 课程号: {}, 课程名: {}, 任课教师: {}",
-            self.class_id, self.id, self.name, self.teacher
+            "班级号:{}, 课程号: {}, 课程名: {}, 任课教师: {}",
+            self.class_id(),
+            self.id(),
+            self.name(),
+            self.teacher()
         )
     }
 }
-
 impl Course {
     pub fn get_from_sessions<'a, Sessions: Iterator<Item = &'a Session>>(
         sessions: Sessions,
@@ -75,29 +75,26 @@ impl Course {
         }
         Ok(courses)
     }
-    pub fn new(id: i64, class_id: i64, teacher: &str, image_url: &str, name: &str) -> Course {
-        Course {
-            id,
-            class_id,
-            teacher: teacher.into(),
-            image_url: image_url.into(),
-            name: name.into(),
-        }
+    pub fn new(raw: RawCourse, class_info: ClassInfo) -> Course {
+        Course { raw, class_info }
     }
-    pub fn get_id(&self) -> i64 {
-        self.id
+    pub fn id(&self) -> i64 {
+        self.raw.id()
     }
-    pub fn get_class_id(&self) -> i64 {
-        self.class_id
+    pub fn teacher(&self) -> &str {
+        self.raw.teacher()
     }
-    pub fn get_teacher(&self) -> &str {
-        &self.teacher
+    pub fn image_url(&self) -> Option<&str> {
+        self.raw.image_url()
     }
-    pub fn get_image_url(&self) -> &str {
-        &self.image_url
+    pub fn name(&self) -> &str {
+        self.raw.name()
     }
-    pub fn get_name(&self) -> &str {
-        &self.name
+    pub fn class_id(&self) -> ClassId {
+        self.class_info.id()
+    }
+    pub fn class_ended(&self) -> bool {
+        self.class_info.ended()
     }
 }
 
@@ -134,7 +131,7 @@ impl Course {
             #[serde(rename = "data")]
             data: Vec<LocationWithRangeAndActiveId>,
         }
-        let r = protocol::get_location_log(session, (self.get_id(), self.get_class_id()))?;
+        let r = protocol::get_location_log(session, (self.id(), self.class_id()))?;
         let data: Data = r.into_json().unwrap();
         let mut map = HashMap::new();
         for l in data.data {
@@ -178,7 +175,7 @@ struct GetActivityR {
 
 impl Course {
     pub fn get_activities(&self, session: &Session) -> Result<Vec<Activity>, ActivityError> {
-        let r = protocol::active_list(session, (self.get_id(), self.get_class_id()))?;
+        let r = protocol::active_list(session, (self.id(), self.class_id()))?;
         let r: GetActivityR = r.into_json().unwrap();
         let activities = Arc::new(Mutex::new(Vec::new()));
         if let Some(data) = r.data {

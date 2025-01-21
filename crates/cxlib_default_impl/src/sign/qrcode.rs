@@ -46,7 +46,7 @@ impl SignTrait for QrCodeSign {
         let uid = session.get_uid();
         let response_of_presign = protocol::pre_sign_for_qrcode_sign(
             session,
-            (raw.course.get_id(), raw.course.get_class_id()),
+            (raw.course.id(), raw.course.class_id()),
             active_id,
             uid,
             &self.c,
