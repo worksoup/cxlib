@@ -77,31 +77,3 @@ impl Default for DataBase {
         Self::new()
     }
 }
-pub struct DefaultExcludeTable(Mutex<DataBase>);
-impl Deref for DefaultExcludeTable {
-    type Target = Mutex<DataBase>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl CourseExcludeInfoTrait for DefaultExcludeTable {
-    fn is_excluded(&self, id: i64) -> bool {
-        ExcludeTable::has_exclude(&self.lock().unwrap(), id)
-    }
-
-    fn excluded_courses(&self) -> HashSet<i64> {
-        ExcludeTable::get_excludes(&self.lock().unwrap())
-    }
-
-    fn exclude(&self, id: i64) {
-        ExcludeTable::add_exclude(&self.lock().unwrap(), id)
-    }
-
-    fn cancel(&self, id: i64) {
-        ExcludeTable::delete_exclude(&self.lock().unwrap(), id)
-    }
-
-    fn update<'a, I: IntoIterator<Item = &'a i64>>(&self, excludes: I) {
-        ExcludeTable::update_excludes(&self.lock().unwrap(), excludes)
-    }
-}

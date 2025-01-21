@@ -1,7 +1,8 @@
 use crate::store::{DataBase, DataBaseTableTrait};
 use cxlib_store::StorageTableCommandTrait;
+use cxlib_types::CourseExcludeInfoTrait;
 use log::warn;
-use std::collections::HashSet;
+use std::{collections::HashSet, ops::Deref, sync::Mutex};
 
 pub struct ExcludeTable;
 
@@ -91,5 +92,34 @@ impl DataBaseTableTrait for ExcludeTable {
 
     fn export(db: &DataBase) -> String {
         crate::utils::to_string(Self::get_excludes(db).into_iter())
+    }
+}
+
+pub struct DefaultExcludeInfo(Mutex<DataBase>);
+impl Deref for DefaultExcludeInfo {
+    type Target = Mutex<DataBase>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl CourseExcludeInfoTrait for DefaultExcludeInfo {
+    fn is_excluded(&self, id: i64) -> bool {
+        ExcludeTable::has_exclude(&self.lock().unwrap(), id)
+    }
+
+    fn excluded_courses(&self) -> HashSet<i64> {
+        ExcludeTable::get_excludes(&self.lock().unwrap())
+    }
+
+    fn exclude(&self, id: i64) {
+        ExcludeTable::add_exclude(&self.lock().unwrap(), id)
+    }
+
+    fn cancel(&self, id: i64) {
+        ExcludeTable::delete_exclude(&self.lock().unwrap(), id)
+    }
+
+    fn update<'a, I: IntoIterator<Item = &'a i64>>(&self, excludes: I) {
+        ExcludeTable::update_excludes(&self.lock().unwrap(), excludes)
     }
 }
