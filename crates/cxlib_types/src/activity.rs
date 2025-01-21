@@ -186,62 +186,53 @@ impl Activity {
         };
         let (sender, receiver) = std::sync::mpsc::channel();
         let chunks = courses_sorter.courses_chunks(courses);
-        let course_sessions_map_ = Arc::clone(&course_sessions_map);
-        std::thread::spawn(move || {
-            let fatal_error_occurred = Arc::new(AtomicBool::new(false));
-            let mut handles = Vec::new();
+        let fatal_error_occurred = Arc::new(AtomicBool::new(false));
+        for courses in chunks {
+            let fatal_error_occurred = Arc::clone(&fatal_error_occurred);
             let excludes = Arc::clone(&exclude_table);
-            for courses in chunks {
-                let fatal_error_occurred = Arc::clone(&fatal_error_occurred);
-                let excludes = excludes.clone();
-                let sender = sender.clone();
-                let course_sessions_map = Arc::clone(&course_sessions_map_);
-                let handle = std::thread::spawn(move || {
-                    for course in courses {
-                        if fatal_error_occurred.load(Ordering::Relaxed) {
-                            break;
-                        }
-                        debug!("加载课程{course}的签到。");
-                        if let Some(session) = course_sessions_map[&course].first() {
-                            let activities = Self::get_from_single_course(
-                                &*excludes,
-                                session,
-                                &course,
-                                set_excludes,
-                                expiry_days,
-                            );
-                            match activities {
-                                Ok(activities) => match sender.send((activities, course)) {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        warn!("Receiver is dropped: `{e}`.",);
-                                        fatal_error_occurred.store(true, Ordering::Relaxed);
-                                        return;
-                                    }
-                                },
+            let sender = sender.clone();
+            let course_sessions_map = Arc::clone(&course_sessions_map);
+            std::thread::spawn(move || {
+                for course in courses {
+                    if fatal_error_occurred.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    debug!("加载课程{course}的签到。");
+                    if let Some(session) = course_sessions_map[&course].first() {
+                        let activities = Self::get_from_single_course(
+                            &*excludes,
+                            session,
+                            &course,
+                            set_excludes,
+                            expiry_days,
+                        );
+                        match activities {
+                            Ok(activities) => match sender.send((activities, course)) {
+                                Ok(_) => {}
                                 Err(e) => {
-                                    if e.is_fatal() {
-                                        error!("`{e}`.");
-                                        fatal_error_occurred.store(true, Ordering::Relaxed);
-                                        return;
-                                    } else {
-                                        warn!("`{e}`.");
-                                        continue;
-                                    }
+                                    warn!("Receiver is dropped: `{e}`.",);
+                                    fatal_error_occurred.store(true, Ordering::Relaxed);
+                                    return;
+                                }
+                            },
+                            Err(e) => {
+                                if e.is_fatal() {
+                                    error!("`{e}`.");
+                                    fatal_error_occurred.store(true, Ordering::Relaxed);
+                                    return;
+                                } else {
+                                    warn!("`{e}`.");
+                                    continue;
                                 }
                             }
-                        } else {
-                            warn!("无法获取用户会话。");
                         }
+                    } else {
+                        warn!("无法获取用户会话。");
                     }
-                    drop(sender);
-                });
-                handles.push(handle);
-            }
-            for handle in handles {
-                handle.join().unwrap();
-            }
-        });
+                }
+                drop(sender);
+            });
+        }
         ActivitiesReceiver {
             receiver,
             sessions: course_sessions_map,
