@@ -2,7 +2,7 @@ use cxlib_error::InitError;
 use onceinit::{OnceInit, StaticDefault};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::{f64::consts::PI, ops::Deref, str::FromStr};
+use std::{ops::Deref, str::FromStr};
 
 /// [`LocationPreprocessorTrait`]
 /// 用来对位置作预处理。该特型试图解决如下问题：
@@ -29,8 +29,10 @@ unsafe impl StaticDefault for dyn LocationPreprocessorTrait {
         &NOP
     }
 }
-
 static LOCATION_PREPROCESSOR: OnceInit<dyn LocationPreprocessorTrait> = OnceInit::uninit();
+
+/// # [`Location`]
+/// 签到位置，由显示地址（一般可在签到完成界面查看）、经纬度、海拔高度组成。
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct Location {
     addr: String,
@@ -187,6 +189,10 @@ impl FromStr for Location {
 //     位置id
 // }
 
+/// #[`LocationWithRange`]
+/// 带范围的签到位置。参见 [`Location`], 包含额外的签到范围（半径，单位为米），但不包含海拔信息。
+///
+/// 使用 [`to_shifted_location`](LocationWithRange::to_shifted_location) 转换为偏移后的 `Location`.
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct LocationWithRange {
     #[serde(rename = "address")]
@@ -258,6 +264,11 @@ impl LocationWithRange {
             },
         })
     }
+    /// 本类型的数据一般直接从签到信息内获取，为避免与预设位置完全一致，本程序将默认以随机偏移一定距离后的位置作为签到位置，使之符合真实情况。
+    ///
+    /// 偏移距离在范围的百分之五以内，即 0--5 米到 0--100 米不等，但绝不会超出范围。
+    ///
+    /// 由于本类型不包含海拔数据，海拔将被设置为 `1108`(米).
     pub fn to_shifted_location(&self) -> Location {
         const R: f64 = 6371393.0;
         let LocationWithRange {
@@ -268,8 +279,12 @@ impl LocationWithRange {
         } = self;
         let lat: f64 = lat.parse().unwrap();
         let lon: f64 = lon.parse().unwrap();
-        let mut r = rand::thread_rng().gen_range(0..range * 3) as f64 / (*range as f64) / 60.0;
-        let theta = rand::thread_rng().gen_range(0..360) as f64 * PI / 180.0;
+        let mut rng = rand::thread_rng();
+        // r | [0.0..0.05].
+        let mut r: f64 = rng.gen_range(0.0..0.05);
+        use std::f64::consts::{PI, TAU};
+        // theta | [0.0..TAU].
+        let theta = rng.gen_range(0.0..TAU);
         r *= (*range as f64)
             / R
             / (1.0 - theta.cos().powi(2) * (lat * PI / 180.0).sin().powi(2)).sqrt();
