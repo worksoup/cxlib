@@ -110,17 +110,19 @@ impl Iterator for AsyncActivitiesIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.activities.is_empty() {
-            if let Ok((activities, course)) = self.receiver.recv() {
+            while let Ok((activities, course)) = self.receiver.recv() {
                 if activities.is_empty() {
-                    return None;
+                    continue;
+                } else {
+                    self.activities = activities;
+                    self.sessions = self.receiver.sessions[&course].clone();
+                    return Some((self.activities.remove(0), self.sessions.clone()));
                 }
-                self.activities = activities;
-                self.sessions = self.receiver.sessions[&course].clone();
-            } else {
-                return None;
             }
+            None
+        } else {
+            Some((self.activities.remove(0), self.sessions.clone()))
         }
-        Some((self.activities.remove(0), self.sessions.clone()))
     }
 }
 impl IntoIterator for ActivitiesReceiver {
