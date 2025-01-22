@@ -84,10 +84,7 @@ impl AliasTable {
                 .prepare(format!("SELECT * FROM {} WHERE name=?;", Self::TABLE_NAME))
                 .unwrap();
             query.bind((1, alias)).unwrap();
-            let c: Vec<sqlite::Row> = query
-                .iter()
-                .filter_map(|e| if let Ok(e) = e { Some(e) } else { None })
-                .collect();
+            let c: Vec<sqlite::Row> = query.iter().filter_map(Result::ok).collect();
             let row = &c[0];
             let location_id: i64 = row.read("lid");
             Some(location_id)

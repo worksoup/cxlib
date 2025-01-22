@@ -142,10 +142,7 @@ impl LocationTable {
             .prepare(format!("SELECT * FROM {} WHERE lid=?;", Self::TABLE_NAME))
             .unwrap();
         query.bind((1, location_id)).unwrap();
-        let c: Vec<sqlite::Row> = query
-            .iter()
-            .filter_map(|e| if let Ok(e) = e { Some(e) } else { None })
-            .collect();
+        let c: Vec<sqlite::Row> = query.iter().filter_map(Result::ok).collect();
         let row = &c[0];
         let addr = row.read("addr");
         let lat = row.read("lat");
