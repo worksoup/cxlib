@@ -15,6 +15,14 @@ impl Display for ClassId {
         }
     }
 }
+impl From<ClassId> for i64 {
+    fn from(value: ClassId) -> Self {
+        match value {
+            ClassId::Id(id) => id,
+            ClassId::TeacherId(id) => id,
+        }
+    }
+}
 impl ClassId {}
 
 /// # [`ClassInfo`]
