@@ -66,7 +66,7 @@ impl FromStr for AccountData {
             .collect::<Vec<_>>();
         if s.len() < 2 {
             Err(StoreError::ParseError(
-                "登录所需信息解析出错！格式为 `uname,enc_pwd[, login_typ]`.".to_string(),
+                "登录所需信息解析出错！格式为 `uname, enc_pwd[, login_typ]`.".to_string(),
             ))?
         } else {
             let uname = s[0].to_string();
