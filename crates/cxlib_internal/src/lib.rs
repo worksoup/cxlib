@@ -5,7 +5,10 @@ pub use cxlib_login as login;
 pub use cxlib_protocol as protocol;
 pub use cxlib_sign as sign;
 pub use cxlib_store as store;
-pub use cxlib_types as types;
+pub mod types {
+    pub use cxlib_types::*;
+    pub use cxlib_types_ext as ext;
+}
 pub use cxlib_utils as utils;
 
 pub mod error {

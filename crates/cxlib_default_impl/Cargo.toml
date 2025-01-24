@@ -12,6 +12,7 @@ cxlib_protocol = { path = "../cxlib_protocol", features = ["default_impl"] }
 cxlib_sign = { path = "../cxlib_sign" }
 cxlib_store = { path = "../cxlib_store" }
 cxlib_types = { path = "../cxlib_types" }
+cxlib_types_ext = { path = "../cxlib_types_ext" }
 cxlib_utils = { path = "../cxlib_utils" }
 image.workspace = true
 log.workspace = true

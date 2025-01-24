@@ -1,11 +1,10 @@
 pub use cxlib_error::CourseError;
 
-use cxlib_error::{ActivityError, AgentError, MaybeFatalError};
+use cxlib_error::{ActivityError, AgentError};
 use cxlib_protocol::collect::types as protocol;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::HashMap,
     fmt::Display,
     sync::{Arc, Mutex},
 };
@@ -33,48 +32,6 @@ impl Display for Course {
     }
 }
 impl Course {
-    pub fn get_from_sessions<'a, Sessions: Iterator<Item = &'a Session>>(
-        sessions: Sessions,
-    ) -> Result<HashMap<Course, Vec<Session>>, CourseError> {
-        let mut handles = Vec::new();
-        for session in sessions {
-            let session_ = session.clone();
-            let handle = std::thread::spawn(move || -> Result<Vec<Course>, CourseError> {
-                session_.get_courses()
-            });
-            handles.push((handle, session));
-        }
-        let mut courses = HashMap::<_, Vec<_>>::new();
-        for (handle, session) in handles {
-            let r = handle.join().unwrap();
-            let courses_ = match r {
-                Ok(c) => c,
-                Err(e) => {
-                    if e.is_fatal() {
-                        return Err(e);
-                    } else {
-                        warn!(
-                            "未能获取用户[{}]的课程，错误信息：{e}.",
-                            session.name()
-                        );
-                        Default::default()
-                    }
-                }
-            };
-            for course in courses_ {
-                let entry = courses.entry(course);
-                match entry {
-                    Entry::Occupied(mut entry) => {
-                        entry.get_mut().push(session.clone());
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(vec![session.clone()]);
-                    }
-                }
-            }
-        }
-        Ok(courses)
-    }
     pub fn new(raw: RawCourse, class_info: ClassInfo) -> Course {
         Course { raw, class_info }
     }

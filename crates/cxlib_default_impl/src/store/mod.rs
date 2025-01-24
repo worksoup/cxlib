@@ -4,11 +4,9 @@ pub use cxlib_error::StoreError;
 pub use table::*;
 
 use cxlib_store::{Dir, StorageTableCommandTrait, StorageTrait};
-use cxlib_types::CourseExcludeInfoTrait;
 use log::info;
 use sqlite::Connection;
-use std::sync::Mutex;
-use std::{collections::HashSet, fs::File, ops::Deref};
+use std::{fs::File, ops::Deref};
 
 pub trait DataBaseTableTrait: StorageTableCommandTrait<DataBase> {
     const TABLE_ARGS: &'static str;

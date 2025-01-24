@@ -1,6 +1,6 @@
 use crate::store::{DataBase, DataBaseTableTrait};
 use cxlib_store::StorageTableCommandTrait;
-use cxlib_types::CourseExcludeInfoTrait;
+use cxlib_types_ext::CourseExcludeInfoTrait;
 use log::warn;
 use std::{collections::HashSet, ops::Deref, sync::Mutex};
 

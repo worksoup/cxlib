@@ -14,6 +14,7 @@ cxlib_protocol = { path = "../cxlib_protocol" }
 cxlib_sign = { path = "../cxlib_sign" }
 cxlib_store = { path = "../cxlib_store" }
 cxlib_types = { path = "../cxlib_types" }
+cxlib_types_ext = { path = "../cxlib_types_ext" }
 #cxlib_unused = { path = "../cxlib_unused" }
 cxlib_utils = { path = "../cxlib_utils" }
 thiserror.workspace = true
