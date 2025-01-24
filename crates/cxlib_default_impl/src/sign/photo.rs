@@ -13,7 +13,7 @@ impl SignTrait for PhotoSign {
     type Data = Photo;
     fn sign_url(&self, session: &Session, _: &(), runtime_data: &Photo) -> PPTSignHelper {
         protocol::photo_sign_url(
-            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (session.uid(), session.fid(), session.name()),
             &self.as_inner().active_id,
             runtime_data.get_object_id(),
         )

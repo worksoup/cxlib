@@ -55,7 +55,7 @@ impl Course {
                     } else {
                         warn!(
                             "未能获取用户[{}]的课程，错误信息：{e}.",
-                            session.get_stu_name()
+                            session.name()
                         );
                         Default::default()
                     }

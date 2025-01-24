@@ -18,7 +18,7 @@ pub struct Session {
 
 impl PartialEq for Session {
     fn eq(&self, other: &Self) -> bool {
-        self.get_uid() == other.get_uid()
+        self.uid() == other.uid()
     }
 }
 
@@ -26,9 +26,9 @@ impl Eq for Session {}
 
 impl Hash for Session {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.get_uid().hash(state);
-        self.get_fid().hash(state);
-        self.get_stu_name().hash(state);
+        self.uid().hash(state);
+        self.fid().hash(state);
+        self.name().hash(state);
     }
 }
 
@@ -62,7 +62,7 @@ impl Session {
         let agent = Self::load_cookies_raw(Dir::get_json_file_path(uid))?;
         let cookies = UserCookies::new(&agent);
         let session = Self::from_raw(uname.to_string(), agent, cookies)?;
-        info!("用户[{}]加载 Cookies 成功！", session.get_stu_name());
+        info!("用户[{}]加载 Cookies 成功！", session.name());
         Ok(session)
     }
     /// 类似于 [`Session::load_cookies`], 不过须传入加密后的密码以重新登录。重新登录后将 [`Session::store_cookies`] 以持久化 Cookies.
@@ -82,9 +82,9 @@ impl Session {
         login_solver: &LoginSolver,
     ) -> Result<Session, LoginError> {
         let (agent, cookies) = Session::relogin_raw(uname, enc_pwd, login_solver)?;
-        Self::store_cookies(&agent, cookies.get_uid())?;
+        Self::store_cookies(&agent, cookies.uid())?;
         let session = Self::from_raw(uname.to_string(), agent, cookies)?;
-        info!("用户[{}]登录成功！", session.get_stu_name());
+        info!("用户[{}]登录成功！", session.name());
         Ok(session)
     }
     /// 先尝试 [`Session::load_cookies`], 如果发生错误且错误为登录过期或 Cookies 不存在，则 [`Session::relogin`]。
@@ -115,20 +115,20 @@ impl Session {
         cookie_store::serde::json::save(&agent.cookie_store(), &mut writer)
             .map_err(LoginError::CookiesStoreError)
     }
-    pub fn get_uid(&self) -> &str {
-        self.cookies.get_uid()
+    pub fn uid(&self) -> &str {
+        self.cookies.uid()
     }
-    pub fn get_fid(&self) -> &str {
-        self.cookies.get_fid()
+    pub fn fid(&self) -> &str {
+        self.cookies.fid()
     }
-    pub fn get_stu_name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.stu_name
     }
-    pub fn get_uname(&self) -> &str {
+    pub fn uname(&self) -> &str {
         &self.uname
     }
-    pub fn get_avatar_url(&self, size: usize) -> String {
-        format!("https://photo.chaoxing.com/p/{}_{}", self.get_uid(), size)
+    pub fn avatar_url(&self, size: usize) -> String {
+        format!("https://photo.chaoxing.com/p/{}_{}", self.uid(), size)
     }
 }
 impl Session {
@@ -139,7 +139,7 @@ impl Session {
         for class in classes {
             courses.append(&mut class.into_courses());
         }
-        info!("用户[{}]已获取课程列表。", self.get_stu_name());
+        info!("用户[{}]已获取课程列表。", self.name());
         Ok(courses)
     }
     pub fn get_classes(&self) -> Result<Vec<Class>, CourseError> {
@@ -202,7 +202,7 @@ impl Session {
                 "`channelList` 字段为空!".to_string(),
             ))?
         };
-        info!("用户[{}]已获取班级列表。", self.get_stu_name());
+        info!("用户[{}]已获取班级列表。", self.name());
         Ok(classes)
     }
 }

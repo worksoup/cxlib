@@ -28,7 +28,7 @@ impl SignTrait for QrCodeSign {
 
     fn sign_url(&self, session: &Session, enc: &str, location: &Option<Location>) -> PPTSignHelper {
         protocol::qrcode_sign_url(
-            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (session.uid(), session.fid(), session.name()),
             enc,
             self.as_inner().active_id.as_str(),
             location
@@ -43,7 +43,7 @@ impl SignTrait for QrCodeSign {
     fn pre_sign(&self, session: &Session, enc: &str) -> Result<PreSignResult, SignError> {
         let raw = self.as_inner();
         let active_id = raw.active_id.as_str();
-        let uid = session.get_uid();
+        let uid = session.uid();
         let response_of_presign = protocol::pre_sign_for_qrcode_sign(
             session,
             (raw.course.id(), raw.course.class_id()),
@@ -52,7 +52,7 @@ impl SignTrait for QrCodeSign {
             &self.c,
             enc,
         )?;
-        info!("用户[{}]预签到已请求。", session.get_stu_name());
+        info!("用户[{}]预签到已请求。", session.name());
         cxlib_sign::utils::analysis_after_presign(active_id, session, response_of_presign)
     }
 }

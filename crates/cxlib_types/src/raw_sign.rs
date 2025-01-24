@@ -86,7 +86,7 @@ impl RawSign {
         } = r.into_json().log_unwrap();
         Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
     }
-    pub fn detail(&self, session: &Session) -> Result<SignDetail, SignError> {
+    pub fn get_detail(&self, session: &Session) -> Result<SignDetail, SignError> {
         Self::get_sign_detail(&self.active_id, session)
     }
 }

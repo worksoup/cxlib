@@ -78,9 +78,9 @@ impl FromStr for AccountData {
             };
             let (agent, cookies) =
                 Session::relogin_raw(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;
-            Session::store_cookies(&agent, cookies.get_uid())?;
+            Session::store_cookies(&agent, cookies.uid())?;
             Ok(Self {
-                uid: cookies.get_uid().to_owned(),
+                uid: cookies.uid().to_owned(),
                 uname,
                 enc_pwd,
                 login_type,
@@ -270,7 +270,7 @@ impl AccountTable {
         let session = Session::relogin(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;
         Self::add_account_or(
             db,
-            &AccountData::new(session.get_uid().to_owned(), uname, enc_pwd, login_type),
+            &AccountData::new(session.uid().to_owned(), uname, enc_pwd, login_type),
             AccountTable::update_account,
         );
         Ok(session)
@@ -325,7 +325,7 @@ impl DataBaseTableTrait for AccountTable {
                     info!(
                         "账号 [{}]（用户名：{}）导入成功！",
                         account.uname(),
-                        session.get_stu_name()
+                        session.name()
                     );
                     Self::add_account_or(db, &account, AccountTable::update_account);
                 }

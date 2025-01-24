@@ -150,7 +150,7 @@ impl SignTrait for RawSign {
 
     fn sign_url(&self, session: &Session, _: &(), _: &()) -> PPTSignHelper {
         protocol::general_sign_url(
-            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (session.uid(), session.fid(), session.name()),
             &self.active_id,
         )
     }
@@ -160,14 +160,14 @@ impl SignTrait for RawSign {
     }
     fn pre_sign(&self, session: &Session, _: &()) -> Result<PreSignResult, SignError> {
         let active_id = self.active_id.as_str();
-        let uid = session.get_uid();
+        let uid = session.uid();
         let response_of_pre_sign = protocol::pre_sign(
             session,
             (self.course.id(), self.course.class_id()),
             active_id,
             uid,
         )?;
-        info!("用户[{}]预签到已请求。", session.get_stu_name());
+        info!("用户[{}]预签到已请求。", session.name());
         utils::analysis_after_presign(active_id, session, response_of_pre_sign)
     }
 }
@@ -310,7 +310,7 @@ impl<T: GestureOrSigncodeSignTrait> SignTrait for T {
         data: &Self::Data,
     ) -> PPTSignHelper {
         protocol::signcode_sign_url(
-            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (session.uid(), session.fid(), session.name()),
             &self.as_inner().active_id,
             data,
         )

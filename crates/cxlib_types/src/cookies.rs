@@ -154,10 +154,10 @@ impl UserCookies {
             _uid,
         }
     }
-    pub fn get_uid(&self) -> &str {
+    pub fn uid(&self) -> &str {
         &self._uid
     }
-    pub fn get_fid(&self) -> &str {
+    pub fn fid(&self) -> &str {
         &self.fid
     }
 }

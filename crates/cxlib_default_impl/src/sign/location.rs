@@ -24,7 +24,7 @@ impl SignTrait for LocationSign {
 
     fn sign_url(&self, session: &Session, _: &(), data: &Location) -> PPTSignHelper {
         protocol::location_sign_url(
-            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (session.uid(), session.fid(), session.name()),
             (data.addr(), data.lat(), data.lon()),
             self.raw_sign.active_id.as_str(),
             self.preset_location.is_some(),

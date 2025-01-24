@@ -39,10 +39,10 @@ pub enum Sign {
 }
 impl Sign {
     pub fn detail(&self, session: &Session) -> Result<SignDetail, SignError> {
-        self.as_raw().detail(session)
+        self.as_raw().get_detail(session)
     }
     pub fn from_raw(raw: RawSign, session: &Session) -> Self {
-        if let Ok(sign_detail) = raw.detail(session) {
+        if let Ok(sign_detail) = raw.get_detail(session) {
             let r#else = |e| {
                 error!("{}", raw.other_id);
                 error!("{}", raw.course.name());

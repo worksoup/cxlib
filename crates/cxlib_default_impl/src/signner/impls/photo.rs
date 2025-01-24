@@ -53,7 +53,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
                 } else {
                     warn!(
                         "用户[{}]在拍照签到时未能获取到照片，将尝试使用其他用户的照片！",
-                        session.get_stu_name(),
+                        session.name(),
                     );
                 }
             }

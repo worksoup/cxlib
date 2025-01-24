@@ -24,7 +24,7 @@ impl Photo {
 
     pub fn new(session: &Session, file: &File, file_name: &str) -> Result<Self, AgentError> {
         let token = Self::get_pan_token(session)?;
-        let r = protocol::pan_upload(session, file, session.get_uid(), &token, file_name)?;
+        let r = protocol::pan_upload(session, file, session.uid(), &token, file_name)?;
         #[derive(Deserialize)]
         struct Tmp {
             #[serde(rename = "objectId")]
