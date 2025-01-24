@@ -136,7 +136,7 @@ pub trait ActivityExt {
     ///
     /// 这里不会排除没有签到的课程，因为它可能是新课程。
     #[inline]
-    fn get_from_single_course(
+    fn get_from_course(
         table: &impl CourseExcludeInfoTrait,
         session: &Session,
         course: &Course,
@@ -153,7 +153,7 @@ pub trait ActivityExt {
     ///
     /// 当 `set_excludes` 为 `true` 时，该函数会获取所有这些课程的活动，并根据结果改变排除列表。
     ///
-    /// 具体逻辑参见 [`get_from_single_course`](Activity::get_from_single_course).
+    /// 具体逻辑参见 [`get_from_single_course`](Activity::get_from_course).
     ///
     /// 反之，则会根据排除列表排除部分课程，以此提高获取速度。
     ///
@@ -192,7 +192,7 @@ pub trait ActivityExt {
                     }
                     debug!("加载课程{course}的签到。");
                     if let Some(session) = course_sessions_map[&course].first() {
-                        let activities = Self::get_from_single_course(
+                        let activities = Self::get_from_course(
                             &*excludes,
                             session,
                             &course,
