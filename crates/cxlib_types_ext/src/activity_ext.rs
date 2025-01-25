@@ -1,4 +1,4 @@
-use cxlib_error::{ActivityError, CxlibResultUtils, MaybeFatalError};
+use cxlib_error::{CxlibResultUtils, MaybeFatalError};
 use cxlib_types::{Activity, Course, Session};
 use log::{debug, error, warn};
 use std::{
@@ -15,17 +15,6 @@ use std::{
 pub trait CourseCacheSortTrait {
     /// 对课程排序。要求更有可能存在有效签到的课程排在前面。
     fn sort_courses(&self, courses: Vec<Course>) -> Vec<Course>;
-    /// 分块，以便多个线程一同处理。若正确实现 [`sort_courses`](CourseCacheSortTrait::sort_courses),
-    /// 则该函数返回的每个块遵循同样的排列规则。
-    fn courses_chunks(&self, courses: Vec<Course>) -> Vec<Vec<Course>> {
-        const CHUNK_COUNT: usize = 256;
-        let mut chunks = vec![vec![]; CHUNK_COUNT];
-        let sorted_courses = self.sort_courses(courses);
-        for (index, course) in sorted_courses.into_iter().enumerate() {
-            chunks[index % CHUNK_COUNT].push(course);
-        }
-        chunks
-    }
 }
 /// # CourseExcludeInfoTrait
 /// 课程排除列表特型。在获取[活动](Activity)列表时排除部分课程的活动，以此提高加载速度。
@@ -130,61 +119,28 @@ impl IntoIterator for ActivitiesReceiver {
     }
 }
 pub trait ActivityExt {
-    /// 获取指定的**单个**课程的活动，并决定是否将该课程加入到排除列表中。
-    ///
-    /// 具体逻辑为：若该课程存在签到，但过期时间内没有签到，即很长时间没有再发签到，则排除该课程。
-    ///
-    /// 这里不会排除没有签到的课程，因为它可能是新课程。
-    #[inline]
-    fn get_from_course(
-        table: &impl CourseExcludeInfoTrait,
-        session: &Session,
-        course: &Course,
-        set_excludes: bool,
-        expiry_days: u64,
-    ) -> Result<Vec<Activity>, ActivityError> {
-        let activities = course.get_activities(session)?;
-        if set_excludes && !activities.is_empty() {
-            table.exclude_inactive_course(course, &activities, expiry_days);
+    /// 分块，以便多个线程一同处理。
+    fn courses_chunks<'a, Iter: Iterator<Item = &'a Course>>(
+        courses: Iter,
+        chunk_count: usize,
+    ) -> Vec<Vec<&'a Course>> {
+        let mut chunks = vec![vec![]; chunk_count];
+        for (index, course) in courses.enumerate() {
+            chunks[index % chunk_count].push(course);
         }
-        Ok(activities)
+        chunks
     }
-    /// 获取指定课程集合的活动，并决定是否将这些课程加入到排除列表中。
-    ///
-    /// 当 `set_excludes` 为 `true` 时，该函数会获取所有这些课程的活动，并根据结果改变排除列表。
-    ///
-    /// 具体逻辑参见 [`get_from_single_course`](Activity::get_from_course).
-    ///
-    /// 反之，则会根据排除列表排除部分课程，以此提高获取速度。
-    ///
-    /// 另见：[`CourseExcludeInfoTrait`].
-    fn get_from_courses(
-        exclude_table: Arc<impl CourseExcludeInfoTrait + 'static>,
-        courses: HashMap<Course, Vec<Session>>,
-        set_excludes: bool,
-        expiry_days: u64,
-        courses_sorter: impl CourseCacheSortTrait,
-    ) -> ActivitiesReceiver {
-        let excludes = exclude_table.excluded_courses();
-        let set_excludes = set_excludes || excludes.is_empty();
+    /// 异步获取指定课程集合的活动。内部使用 [`mpsc::channel`] 实现。
+    fn get_from_courses(courses: HashMap<Course, Vec<Session>>) -> ActivitiesReceiver {
         let course_sessions_map = Arc::new(courses);
-        let courses = if set_excludes {
-            course_sessions_map.keys().cloned().collect::<Vec<_>>()
-        } else {
-            course_sessions_map
-                .keys()
-                .filter(|&course| !excludes.contains(&course.id()))
-                .cloned()
-                .collect()
-        };
         let (sender, receiver) = std::sync::mpsc::channel();
-        let chunks = courses_sorter.courses_chunks(courses);
         let fatal_error_occurred = Arc::new(AtomicBool::new(false));
+        let chunks = Self::courses_chunks(course_sessions_map.keys(), 256);
         for courses in chunks {
             let fatal_error_occurred = Arc::clone(&fatal_error_occurred);
-            let excludes = Arc::clone(&exclude_table);
             let sender = sender.clone();
             let course_sessions_map = Arc::clone(&course_sessions_map);
+            let courses = courses.into_iter().cloned().collect::<Vec<_>>();
             std::thread::spawn(move || {
                 for course in courses {
                     if fatal_error_occurred.load(Ordering::Relaxed) {
@@ -192,13 +148,7 @@ pub trait ActivityExt {
                     }
                     debug!("加载课程{course}的签到。");
                     if let Some(session) = course_sessions_map[&course].first() {
-                        let activities = Self::get_from_course(
-                            &*excludes,
-                            session,
-                            &course,
-                            set_excludes,
-                            expiry_days,
-                        );
+                        let activities = course.get_activities(session);
                         match activities {
                             Ok(activities) => match sender.send((activities, course)) {
                                 Ok(_) => {}
