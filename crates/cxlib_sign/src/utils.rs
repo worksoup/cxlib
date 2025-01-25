@@ -83,7 +83,7 @@ pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
         SignResult::Fail { msg } => {
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。
-                let url = url.path_enc_by_pre_sign_result_msg(msg);
+                let url = url.patch_enc_by_pre_sign_result_msg(msg);
                 secondary_verification(agent, url, captcha_id, referer)
             } else {
                 Ok(SignResult::Fail { msg })
