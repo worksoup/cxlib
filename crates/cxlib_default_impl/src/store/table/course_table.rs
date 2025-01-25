@@ -3,6 +3,7 @@ use cxlib_error::StoreError;
 use cxlib_store::StorageTableCommandTrait;
 use cxlib_types::{ClassId, ClassInfo, Course, RawCourse, Session};
 use log::warn;
+use std::collections::HashSet;
 use std::{collections::HashMap, ops::Deref};
 
 pub struct CourseTable;
@@ -26,6 +27,7 @@ impl Deref for CourseData {
 // }
 impl CourseTable {
     /// 从缓存中获取课程与会话。
+    #[inline]
     pub fn get_courses_with_sessions(db: &DataBase) -> HashMap<CourseData, Vec<Session>> {
         let sessions = AccountTable::get_sessions(db);
         Self::get_courses(db)
@@ -71,6 +73,35 @@ impl CourseTable {
             .map_err(|e| StoreError::ParseError(e.to_string()))
             .map(|_| ())
     }
+    pub fn update_users(db: &DataBase, course_id: i64, users: &str) -> Result<(), StoreError> {
+        let mut query = db
+            .prepare(format!(
+                "UPDATE {} SET users=:users WHERE id=:id;",
+                Self::TABLE_NAME
+            ))
+            .unwrap();
+        query
+            .bind::<&[(_, sqlite::Value)]>(
+                &[(":id", course_id.into()), (":users", users.into())][..],
+            )
+            .unwrap();
+        query
+            .next()
+            .map_err(|e| StoreError::ParseError(e.to_string()))
+            .map(|_| ())
+    }
+    #[inline]
+    pub fn insert_uid(db: &DataBase, course_id: i64, uid: &str) -> Result<(), StoreError> {
+        let course = Self::get_course(db, course_id)?;
+        if let Some(course) = course {
+            let mut set = course.uid_list.split(",").collect::<HashSet<&str>>();
+            set.insert(uid);
+            let uid_list = set.into_iter().collect::<Vec<&str>>().join(",");
+            Self::update_users(db, course_id, uid_list.as_str())?;
+        }
+        Ok(())
+    }
+    #[inline]
     pub fn insert_course_or<O: Fn(&DataBase, &CourseData) -> Result<(), StoreError>>(
         db: &DataBase,
         course: &CourseData,
@@ -153,14 +184,6 @@ impl CourseTable {
         courses
     }
     pub fn update_course(db: &DataBase, course: &CourseData) -> Result<(), StoreError> {
-        #[inline]
-        fn now_secs() -> u64 {
-            std::time::SystemTime::now()
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        }
-        let recently_used_timestamp_secs = now_secs();
         let mut query = db.prepare(format!("UPDATE {} SET name=:name,teacher=:teacher,image=:image,ended=:ended,RU=:RU,users=:users WHERE id=:id;", Self::TABLE_NAME)).unwrap();
         query
             .bind::<&[(_, sqlite::Value)]>(
@@ -171,7 +194,10 @@ impl CourseTable {
                     (":teacher", course.teacher().into()),
                     (":image", course.image_url().into()),
                     (":ended", if course.class_ended() { 1 } else { 0 }.into()),
-                    (":RU", recently_used_timestamp_secs.to_string().into()),
+                    (
+                        ":RU",
+                        course.recently_used_timestamp_secs.to_string().into(),
+                    ),
                     (":users", course.uid_list.as_str().into()),
                 ][..],
             )
@@ -181,6 +207,7 @@ impl CourseTable {
             .map_err(|e| StoreError::ParseError(e.to_string()))
             .map(|_| ())
     }
+    #[inline]
     pub fn update_course_or(
         db: &DataBase,
         course: &CourseData,
@@ -207,18 +234,23 @@ impl CourseTable {
 }
 
 impl StorageTableCommandTrait<DataBase> for CourseTable {
+    #[inline]
     fn init(storage: &DataBase) {
         <Self as DataBaseTableTrait>::init(storage);
     }
+    #[inline]
     fn uninit(storage: &DataBase) -> bool {
         !Self::is_existed(storage)
     }
+    #[inline]
     fn clear(storage: &DataBase) {
         Self::delete(storage);
     }
+    #[inline]
     fn import(storage: &DataBase, content: &str) {
         <Self as DataBaseTableTrait>::import(storage, content);
     }
+    #[inline]
     fn export(storage: &DataBase) -> String {
         <Self as DataBaseTableTrait>::export(storage)
     }
