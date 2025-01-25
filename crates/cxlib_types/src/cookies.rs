@@ -21,6 +21,7 @@ pub struct UserCookies {
 }
 
 impl UserCookies {
+    #[inline]
     pub fn new(client: &Agent) -> Self {
         let cookies = {
             let mut cookies = Vec::new();
@@ -32,6 +33,7 @@ impl UserCookies {
         UserCookies::from_cookies_vec(cookies)
     }
     #[allow(non_snake_case)]
+    #[inline]
     fn create(
         // JSESSIONID: &str,
         // lv: &str,
@@ -68,6 +70,7 @@ impl UserCookies {
         }
     }
     #[allow(non_snake_case)]
+    #[inline]
     pub fn from_cookies_vec(cookies: Vec<Cookie>) -> Self {
         // let mut JSESSIONID = String::new();
         // let mut lv = String::new();
@@ -154,15 +157,18 @@ impl UserCookies {
             _uid,
         }
     }
+    #[inline]
     pub fn uid(&self) -> &str {
         &self._uid
     }
+    #[inline]
     pub fn fid(&self) -> &str {
         &self.fid
     }
 }
 
 impl Default for UserCookies {
+    #[inline]
     fn default() -> Self {
         Self::create("-1", "")
     }

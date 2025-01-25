@@ -2,8 +2,7 @@ use crate::sign::PhotoSign;
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::{Photo, Session};
 use log::warn;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 pub struct DefaultPhotoSignner {
     path: Option<PathBuf>,

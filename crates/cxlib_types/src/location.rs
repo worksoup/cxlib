@@ -22,11 +22,11 @@ pub trait LocationPreprocessorTrait: Send + Sync {
     }
 }
 struct DefaultLocationPreprocessor;
+static NULL_LOCATION_PREPROCESSOR: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
 impl LocationPreprocessorTrait for DefaultLocationPreprocessor {}
 unsafe impl StaticDefault for dyn LocationPreprocessorTrait {
     fn static_default() -> &'static Self {
-        static NOP: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
-        &NOP
+        &NULL_LOCATION_PREPROCESSOR
     }
 }
 static LOCATION_PREPROCESSOR: OnceInit<dyn LocationPreprocessorTrait> = OnceInit::uninit();
@@ -151,6 +151,7 @@ impl Location {
 }
 
 impl std::fmt::Display for Location {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{},{},{},{}", self.addr, self.lon, self.lat, self.alt)
     }
@@ -206,6 +207,7 @@ pub struct LocationWithRange {
 }
 
 impl LocationWithRange {
+    #[inline]
     pub fn new(addr: String, lon: String, lat: String, range: u32) -> Self {
         Self {
             addr,

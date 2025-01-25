@@ -1,11 +1,14 @@
 mod impls;
 pub mod utils;
 
-use crate::sign::LocationSign;
-use crate::store::{DataBase, LocationTable};
+pub use impls::*;
+
+use crate::{
+    sign::LocationSign,
+    store::{DataBase, LocationTable},
+};
 use cxlib_sign::SignTrait;
 use cxlib_types::Location;
-pub use impls::*;
 
 pub trait LocationInfoGetterTrait {
     fn get_location_by_location_str(&self, location_str: &str) -> Option<Location>;

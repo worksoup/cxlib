@@ -3,10 +3,9 @@ use cxlib_protocol::{collect::user as protocol, ProtocolItem};
 use cxlib_utils::pkcs7_pad;
 use log::{trace, warn};
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
-use std::ops::Deref;
 use std::{
     collections::HashMap,
-    ops::Index,
+    ops::{Deref, Index},
     sync::{Arc, RwLock},
 };
 use ureq::{serde, Agent, AgentBuilder};

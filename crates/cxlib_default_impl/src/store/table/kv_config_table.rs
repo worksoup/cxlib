@@ -1,9 +1,11 @@
-use crate::store::{DataBase, DataBaseTableTrait,StoreError };
+use crate::store::{DataBase, DataBaseTableTrait, StoreError};
 use cxlib_store::StorageTableCommandTrait;
 use log::warn;
-use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
-use std::str::FromStr;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    str::FromStr,
+};
 
 pub struct KVConfigTable;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

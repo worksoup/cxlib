@@ -39,58 +39,58 @@ pub enum ProtocolItem {
     QrcodePat,
 }
 impl ProtocolItem {
-    // 查询活动
+    /// 查询活动
     pub const ACTIVE_LIST: &'static str =
         "https://mobilelearn.chaoxing.com/v2/apis/active/student/activelist";
     pub const CAPTCHA_ID: &'static str = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
-    // 获取滑块。
+    /// 获取滑块。
     pub const GET_CAPTCHA: &'static str =
         "https://captcha.chaoxing.com/captcha/get/verification/image";
-    // 滑块验证。
+    /// 滑块验证。
     pub const CHECK_CAPTCHA: &'static str =
         "https://captcha.chaoxing.com/captcha/check/verification/result";
-    // 获取服务器时间。
+    /// 获取服务器时间。
     pub const GET_SERVER_TIME: &'static str = "https://captcha.chaoxing.com/captcha/get/conf";
     pub const MY_SIGN_CAPTCHA_UTILS: &'static str =
         "https://mobilelearn.chaoxing.com/front/mobile/sign/js/mySignCaptchaUtils.js";
-    // 签到码检查
+    /// 签到码检查
     pub const CHECK_SIGNCODE: &'static str =
         "https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/checkSignCode";
-    // 签到信息获取
+    /// 签到信息获取
     pub const SIGN_DETAIL: &'static str = "https://mobilelearn.chaoxing.com/newsign/signDetail";
-    // 登录页
+    /// 登录页
     pub const LOGIN_PAGE: &'static str =
         "https://passport2.chaoxing.com/mlogin?fid=&newversion=true&refer=http%3A%2F%2Fi.chaoxing.com";
-    // 非明文密码登录
+    /// 非明文密码登录
     pub const LOGIN_ENC: &'static str = "https://passport2.chaoxing.com/fanyalogin";
-    // 超星网盘页
+    /// 超星网盘页
     pub const PAN_CHAOXING: &'static str = "https://pan-yz.chaoxing.com";
-    // 网盘列表
+    /// 网盘列表
     pub const PAN_LIST: &'static str = "https://pan-yz.chaoxing.com/opt/listres";
-    // 获取超星云盘的 token
+    /// 获取超星云盘的 token
     pub const PAN_TOKEN: &'static str = "https://pan-yz.chaoxing.com/api/token/uservalid";
-    // 网盘上传接口
+    /// 网盘上传接口
     pub const PAN_UPLOAD: &'static str = "https://pan-yz.chaoxing.com/upload";
     pub const QRCODE_PAT: &'static str = "https://mobilelearn.chaoxing.com/widget/sign/e";
-    // analysis
+    /// analysis
     pub const ANALYSIS: &'static str = "https://mobilelearn.chaoxing.com/pptSign/analysis";
-    // analysis 2
+    /// analysis 2
     pub const ANALYSIS2: &'static str = "https://mobilelearn.chaoxing.com/pptSign/analysis2";
-    // 获取签到之后的信息，例如签到时的 ip, UA, 时间等
-    // 参见 "http://mobilelearn.chaoxing.com/page/sign/signIn?courseId=$&classId=$&activeId=$&fid=$"
+    /// 获取签到之后的信息，例如签到时的 ip, UA, 时间等
+    /// 参见 "http://mobilelearn.chaoxing.com/page/sign/signIn?courseId=$&classId=$&activeId=$&fid=$"
     pub const GET_ATTEND_INFO: &'static str =
         "https://mobilelearn.chaoxing.com/v2/apis/sign/getAttendInfo";
-    // 签到
+    /// 签到
     pub const PPT_SIGN: &'static str = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax";
-    // 预签到
+    /// 预签到
     pub const PRE_SIGN: &'static str = "https://mobilelearn.chaoxing.com/newsign/preSign";
-    // 获取课程
+    /// 获取课程
     pub const BACK_CLAZZ_DATA: &'static str =
         "https://mooc1-api.chaoxing.com/mycourse/backclazzdata";
-    // 获取位置信息列表
+    /// 获取位置信息列表
     pub const GET_LOCATION_LOG: &'static str =
         "https://mobilelearn.chaoxing.com/v2/apis/sign/getLocationLog";
-    // 账号设置页
+    /// 账号设置页
     pub const ACCOUNT_MANAGE: &'static str = "https://passport2.chaoxing.com/mooc/accountManage";
     pub const USER_AGENT: &'static str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_5.3.1_android_phone_5000_83";
     // pub const USER_AGENT: &'static str = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 (device:MNA-LX9) Language/zh_CN com.chaoxing.mobile.xuezaixidian/ChaoXingStudy_1000149_6.3.7_android_phone_6005_249";

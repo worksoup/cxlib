@@ -7,7 +7,6 @@ mod signcode;
 
 pub use gesture::*;
 pub use location::*;
-use log::{error, warn};
 pub use normal::*;
 pub use photo::*;
 pub use qrcode::*;
@@ -16,6 +15,7 @@ pub use signcode::*;
 use cxlib_sign::{PreSignResult, SignError, SignTrait};
 use cxlib_types::{RawSign, Session, SignDetail};
 use std::collections::HashMap;
+use log::{error, warn};
 
 pub type CaptchaId = String;
 

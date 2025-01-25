@@ -120,6 +120,7 @@ impl IntoIterator for ActivitiesReceiver {
 }
 pub trait ActivityExt {
     /// 分块，以便多个线程一同处理。
+    #[inline]
     fn courses_chunks<'a, Iter: Iterator<Item = &'a Course>>(
         courses: Iter,
         chunk_count: usize,

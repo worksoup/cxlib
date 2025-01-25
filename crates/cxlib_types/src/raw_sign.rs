@@ -31,6 +31,7 @@ pub struct RawSign {
     pub status_code: i32,
 }
 fn time_string_from_mills(mills: u64) -> String {
+    #[inline]
     pub fn time_string(t: SystemTime) -> String {
         chrono::DateTime::<chrono::Local>::from(t)
             .format("%+")
@@ -86,6 +87,7 @@ impl RawSign {
         } = r.into_json().log_unwrap();
         Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
     }
+    #[inline]
     pub fn get_detail(&self, session: &Session) -> Result<SignDetail, SignError> {
         Self::get_sign_detail(&self.active_id, session)
     }

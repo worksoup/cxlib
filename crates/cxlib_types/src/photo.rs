@@ -38,6 +38,7 @@ impl Photo {
     pub fn get_object_id(&self) -> &str {
         &self.object_id
     }
+    #[inline]
     pub fn default(session: &Session) -> Option<Self> {
         Self::find_in_cxpan(session, |a| a == "1.png" || a == "1.jpg").unwrap()
     }
@@ -73,6 +74,7 @@ impl Photo {
         }
         Ok(None)
     }
+    #[inline]
     pub fn get_from_file(session: &Session, file_path: impl AsRef<Path>) -> Self {
         let f = File::open(&file_path).unwrap();
         let file_name = file_path.as_ref().file_name().unwrap().to_str().unwrap();

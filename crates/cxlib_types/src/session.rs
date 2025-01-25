@@ -25,6 +25,7 @@ impl PartialEq for Session {
 impl Eq for Session {}
 
 impl Hash for Session {
+    #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.uid().hash(state);
         self.fid().hash(state);
@@ -33,6 +34,7 @@ impl Hash for Session {
 }
 
 impl Session {
+    #[inline]
     pub fn from_raw(
         uname: String,
         agent: Agent,
@@ -47,6 +49,7 @@ impl Session {
         };
         Ok(session)
     }
+    #[inline]
     pub fn load_cookies_raw<P: AsRef<Path>>(cookies_file: P) -> Result<Agent, std::io::Error> {
         let cookie_store = {
             let file = std::fs::File::open(cookies_file).map(std::io::BufReader::new)?;
@@ -58,6 +61,7 @@ impl Session {
             .build())
     }
     /// 加载本地 Cookies 并返回 [`Session`].
+    #[inline]
     pub fn load_cookies(uid: &str, uname: &str) -> Result<Session, LoginError> {
         let agent = Self::load_cookies_raw(Dir::get_json_file_path(uid))?;
         let cookies = UserCookies::new(&agent);
@@ -66,6 +70,7 @@ impl Session {
         Ok(session)
     }
     /// 类似于 [`Session::load_cookies`], 不过须传入加密后的密码以重新登录。重新登录后将 [`Session::store_cookies`] 以持久化 Cookies.
+    #[inline]
     pub fn relogin_raw<LoginSolver: LoginSolverTrait>(
         uname: &str,
         enc_pwd: &str,
@@ -76,6 +81,7 @@ impl Session {
         Ok((agent, cookies))
     }
     /// 相当于 [`Session::relogin_raw`] 后 [`Session::from_raw`].
+    #[inline]
     pub fn relogin<LoginSolver: LoginSolverTrait>(
         uname: &str,
         enc_pwd: &str,
@@ -109,29 +115,36 @@ impl Session {
         }
     }
     /// 将 Cookies 保存在某位置。具体请查看代码：[`Session::store_cookies`].
+    #[inline]
     pub fn store_cookies(agent: &Agent, file_name_without_ext: &str) -> Result<(), LoginError> {
         let store_path = Dir::get_json_file_path(file_name_without_ext);
         let mut writer = std::fs::File::create(store_path).map(std::io::BufWriter::new)?;
         cookie_store::serde::json::save(&agent.cookie_store(), &mut writer)
             .map_err(LoginError::CookiesStoreError)
     }
+    #[inline]
     pub fn uid(&self) -> &str {
         self.cookies.uid()
     }
+    #[inline]
     pub fn fid(&self) -> &str {
         self.cookies.fid()
     }
+    #[inline]
     pub fn name(&self) -> &str {
         &self.stu_name
     }
+    #[inline]
     pub fn uname(&self) -> &str {
         &self.uname
     }
+    #[inline]
     pub fn avatar_url(&self, size: usize) -> String {
         format!("https://photo.chaoxing.com/p/{}_{}", self.uid(), size)
     }
 }
 impl Session {
+    #[inline]
     pub fn get_courses(&self) -> Result<Vec<Course>, CourseError> {
         let classes = self.get_classes()?;
         let mut courses = Vec::new();
@@ -209,6 +222,7 @@ impl Session {
 
 impl Deref for Session {
     type Target = Agent;
+    #[inline]
     fn deref(&self) -> &Agent {
         &self.agent
     }

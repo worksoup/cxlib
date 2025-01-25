@@ -32,24 +32,31 @@ impl Display for Course {
     }
 }
 impl Course {
+    #[inline]
     pub fn new(raw: RawCourse, class_info: ClassInfo) -> Course {
         Course { raw, class_info }
     }
+    #[inline]
     pub fn id(&self) -> i64 {
         self.raw.id()
     }
+    #[inline]
     pub fn teacher(&self) -> &str {
         self.raw.teacher()
     }
+    #[inline]
     pub fn image_url(&self) -> Option<&str> {
         self.raw.image_url()
     }
+    #[inline]
     pub fn name(&self) -> &str {
         self.raw.name()
     }
+    #[inline]
     pub fn class_id(&self) -> ClassId {
         self.class_info.id()
     }
+    #[inline]
     pub fn class_ended(&self) -> bool {
         self.class_info.ended()
     }
@@ -74,6 +81,7 @@ impl Course {
             range: String,
         }
         impl LocationWithRangeAndActiveId {
+            #[inline]
             pub fn into_location_with_range(self) -> LocationWithRange {
                 LocationWithRange::new(
                     self.addr,

@@ -8,6 +8,7 @@ pub enum ClassId {
     TeacherId(i64),
 }
 impl Display for ClassId {
+    #[inline]
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ClassId::Id(id) => id.fmt(fmt),
@@ -16,6 +17,7 @@ impl Display for ClassId {
     }
 }
 impl From<ClassId> for i64 {
+    #[inline]
     fn from(value: ClassId) -> Self {
         match value {
             ClassId::Id(id) => id,
@@ -33,14 +35,17 @@ pub struct ClassInfo {
     ended: bool,
 }
 impl ClassInfo {
+    #[inline]
     pub fn new(id: ClassId, ended: bool) -> ClassInfo {
         ClassInfo { id, ended }
     }
     /// 返回 [`ClassId`].
+    #[inline]
     pub fn id(&self) -> ClassId {
         self.id
     }
     /// 返回是否已经结课。
+    #[inline]
     pub fn ended(&self) -> bool {
         self.ended
     }
@@ -54,6 +59,7 @@ pub struct Class {
     info: ClassInfo,
 }
 impl Class {
+    #[inline]
     pub fn new(courses: Vec<RawCourse>, info: ClassInfo) -> Self {
         Self {
             raw_courses: courses,
@@ -61,14 +67,17 @@ impl Class {
         }
     }
     /// 获取班级信息。
+    #[inline]
     pub fn info(&self) -> &ClassInfo {
         &self.info
     }
     /// 获取班级内的课程（不包含班级信息）。
+    #[inline]
     pub fn raw_courses(&self) -> &[RawCourse] {
         &self.raw_courses
     }
     /// 获取班级内的课程（包含班级信息）。
+    #[inline]
     pub fn into_courses(self) -> Vec<Course> {
         let Self { raw_courses, info } = self;
         raw_courses
