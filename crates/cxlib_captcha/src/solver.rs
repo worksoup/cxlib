@@ -14,7 +14,7 @@ mod click_captcha_helper {
 
     #[derive(Debug)]
     pub struct Point<T>(T, T);
-    impl_point2d!(Point<T>, t, t);
+    impl_point2d!(Point<T>, Tuple, Tuple);
     impl<T: Display> Display for Point<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             write!(f, "%7B%22x%22%3A{}%2C%22y%22%3A{}%7D", self.0, self.1)
