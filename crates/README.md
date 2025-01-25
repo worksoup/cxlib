@@ -14,7 +14,7 @@
   cxsign 库中所使用的错误类型。见 [lib.rs](cxlib_error/src/lib.rs).
 - ### [`cxlib_imageproc`](./cxlib_imageproc)
 
-  与图像相关的函数。包括裁剪、下载、定位子图像等操作。见 [utils.rs](cxlib_imageproc/src/utils.rs).
+  与图像相关的函数。包括裁剪、下载、定位子图像等操作。见 [lib.rs](cxlib_imageproc/src/lib.rs).
 - ### [`cxlib_obfuscate`](./cxlib_obfuscate)
 
   一些经过混淆过的代码，用于 `cxlib_captcha` 中。无意隐藏，仅在仓库中不可见；若使用 IDE 或熟悉 rust, 则易看到源码。
@@ -38,7 +38,7 @@
   登录的低级 api, crate 中包含 UA 标识、基本的登录协议描述、`LoginTrait` 以及对 `ureq::Agent` 的 `LoginTrait`
   实现；也包含一个简单的 des 加密函数。
 
-  见 [lib.rs](cxlib_login/src/lib.rs) 及 [utils.rs](cxlib_login/src/utils.rs).
+  见 [lib.rs](cxlib_login/src/lib.rs).
 
 ## 4
 

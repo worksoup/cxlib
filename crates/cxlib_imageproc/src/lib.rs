@@ -1,15 +1,13 @@
 pub mod map;
 
 use crate::map::map_colors;
-use image::buffer::ConvertBuffer;
 use image::{
-    DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, ImageError, Luma, LumaA,
-    Pixel, Primitive, Rgba, SubImage,
+    buffer::ConvertBuffer, DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer,
+    ImageError, Luma, LumaA, Pixel, Primitive, Rgba, SubImage,
 };
 use imageproc::contours::find_contours;
 use num_traits::ToPrimitive;
-use std::ops::Add;
-use std::path::Path;
+use std::{ops::Add, path::Path};
 pub use yapt::point_2d::Point;
 use yapt::point_2d::Point2D;
 
