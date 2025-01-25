@@ -131,6 +131,7 @@ struct GetActivityR {
 }
 
 impl Course {
+    /// 获取该课程的活动。
     pub fn get_activities(&self, session: &Session) -> Result<Vec<Activity>, ActivityError> {
         let r = protocol::active_list(session, (self.id(), self.class_id()))?;
         let r: GetActivityR = r.into_json().unwrap();
