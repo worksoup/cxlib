@@ -1,5 +1,6 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
 use clap::{ArgMatches, FromArgMatches, Parser};
+use cxlib_internal::default_impl::signner::LocationInfoGetterTrait;
 use cxlib_internal::{
     activity::{Activity, RawSign},
     default_impl::{
@@ -95,9 +96,9 @@ impl SignParser {
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 "#;
-    pub fn match_signs(
+    pub fn match_signs<T: LocationInfoGetterTrait>(
         raw_sign: RawSign,
-        db: &DataBase,
+        location_getter: T,
         sessions: &[Session],
         cli_args: &CliArgs,
     ) -> Result<(), Error> {
@@ -132,7 +133,7 @@ impl SignParser {
             Sign::QrCode(qs) => {
                 info!("签到[{sign_name}]为二维码签到。");
                 sign_results = DefaultQrCodeSignner::new(
-                    DefaultLocationInfoGetter::from(db),
+                    location_getter,
                     location_str,
                     image,
                     &None,
@@ -155,9 +156,8 @@ impl SignParser {
             }
             Sign::Location(ls) => {
                 info!("签到[{sign_name}]为位置签到。");
-                sign_results =
-                    DefaultLocationSignner::new(DefaultLocationInfoGetter::from(db), location_str)
-                        .sign(ls, sessions)?;
+                sign_results = DefaultLocationSignner::new(location_getter, location_str)
+                    .sign(ls, sessions)?;
             }
             Sign::Signcode(ss) => {
                 info!("签到[{sign_name}]为签到码签到。");
@@ -192,7 +192,11 @@ impl SignParser {
         }
         Ok(())
     }
-    pub fn do_sign(self, db: &DataBase) -> Result<(), Error> {
+    pub fn do_sign<T: LocationInfoGetterTrait + Copy>(
+        self,
+        db: &DataBase,
+        location_getter: T,
+    ) -> Result<(), Error> {
         let Self {
             id: active_id,
             uid: uid_list_str,
@@ -278,28 +282,30 @@ impl SignParser {
                 names.push(s.get_stu_name().to_string())
             }
             info!("签到者：{names:?}");
-            Self::match_signs(sign, db, &sessions, &arg).unwrap_or_else(|e| warn!("{e}"));
+            Self::match_signs(sign, location_getter, &sessions, &arg)
+                .unwrap_or_else(|e| warn!("{e}"));
         }
         Ok(())
     }
 }
-pub struct SignMainApp;
-impl Default for SignMainApp {
-    fn default() -> SignMainApp {
-        SignMainApp
-    }
+pub struct SignMainApp<T: LocationInfoGetterTrait + Copy> {
+    location_getter: T,
 }
-impl<Context: AsRef<DataBase>> AppTrait<Context> for SignMainApp {
+impl<Context: AsRef<DataBase>, T: LocationInfoGetterTrait + Copy> AppTrait<Context>
+    for SignMainApp<T>
+{
     type OwnedData = SignParser;
 
     fn run(&self, db: &Context, data: Self::OwnedData) {
         warn!("{}", SignParser::NOTICE);
-        data.do_sign(db.as_ref())
+        data.do_sign(db.as_ref(), self.location_getter)
             .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
     }
 }
 
-impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp {
+impl<Context: AsRef<DataBase> + 'static, T: LocationInfoGetterTrait + Copy + 'static>
+    CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp<T>
+{
     fn read_owned_data(
         &self,
         _: &Context,

@@ -35,7 +35,7 @@ pub trait LocationInfoGetterTrait {
         locations
     }
 }
-
+#[derive(Clone, Copy)]
 pub struct DefaultLocationInfoGetter<'a>(&'a DataBase);
 impl<'a> DefaultLocationInfoGetter<'a> {
     pub fn new(db: &'a DataBase) -> Self {
