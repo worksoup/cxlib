@@ -3,8 +3,10 @@ use cxlib_error::StoreError;
 use cxlib_store::StorageTableCommandTrait;
 use cxlib_types::{ClassId, ClassInfo, Course, RawCourse, Session};
 use log::warn;
-use std::collections::HashSet;
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+};
 
 pub struct CourseTable;
 
@@ -13,6 +15,11 @@ pub struct CourseData {
     inner: Course,
     recently_used_timestamp_secs: u64,
     uid_list: String,
+}
+impl CourseData {
+    pub fn as_inner(&self) -> &Course {
+        &self.inner
+    }
 }
 impl Deref for CourseData {
     type Target = Course;
@@ -30,6 +37,14 @@ impl CourseTable {
     #[inline]
     pub fn get_courses_with_sessions(db: &DataBase) -> HashMap<CourseData, Vec<Session>> {
         let sessions = AccountTable::get_sessions(db);
+        Self::get_courses_with_current_sessions(db, sessions)
+    }
+    /// 从缓存中获取课程与会话。
+    #[inline]
+    pub fn get_courses_with_current_sessions(
+        db: &DataBase,
+        sessions: HashMap<String, Session>,
+    ) -> HashMap<CourseData, Vec<Session>> {
         Self::get_courses(db)
             .into_values()
             .map(|course| {
