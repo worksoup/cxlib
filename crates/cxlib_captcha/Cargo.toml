@@ -10,7 +10,7 @@ rotate_ui_solver = ["ui_solver"]
 obstacle_ui_solver = ["ui_solver"]
 icon_click_ui_solver = ["ui_solver"]
 text_click_ui_solver = ["ui_solver"]
-ui_solver = ["captcha_solver_ui"]
+ui_solver = ["dep:captcha_solver_ui"]
 
 [dependencies]
 yapt.workspace = true

@@ -43,8 +43,24 @@ unicode-width = "0.2"
 ureq = "2.12"
 xcap = { version = "0.2" }
 yapt = { git = "https://github.com/worksoup/yapt.git" }
+############### cxlib_app ###############
+clap = "4.5"
+clap_complete_command = "0.6"
+[features]
+completions = ["completion-nu", "completion-carapace", "completion-fig"]
+completion-nu = ["cxlib_app/completion-nu"]
+completion-carapace = ["cxlib_app/completion-carapace"]
+completion-fig = ["cxlib_app/completion-fig"]
 
+all_ui_solver = ["slide_ui_solver", "ui_solver", "obstacle_ui_solver", "rotate_ui_solver"]
+ui_solver = ["icon_click_ui_solver", "text_click_ui_solver"]
+slide_ui_solver = ["cxlib_internal/slide_ui_solver"]
+rotate_ui_solver = ["cxlib_internal/rotate_ui_solver"]
+obstacle_ui_solver = ["cxlib_internal/obstacle_ui_solver"]
+icon_click_ui_solver = ["cxlib_internal/icon_click_ui_solver"]
+text_click_ui_solver = ["cxlib_internal/text_click_ui_solver"]
 [dependencies]
+cxlib_app = { path = "crates/cxlib_app" }
 cxlib_internal = { path = "crates/cxlib_internal" }
 
 #chrono = "0.4"
