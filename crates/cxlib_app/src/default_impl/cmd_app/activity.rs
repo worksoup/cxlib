@@ -79,7 +79,7 @@ pub struct SignParser {
     pub code: Option<String>,
 }
 impl SignParser {
-    pub(crate) const NOTICE: &'static str = r#"
+    pub const NOTICE: &'static str = r#"
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
