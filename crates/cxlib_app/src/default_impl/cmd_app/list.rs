@@ -1,0 +1,134 @@
+use crate::{AppTrait, CmdApp, CmdMetaAppTrait, SignParser};
+use clap::{ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
+use cxlib_internal::{
+    activity::{Activity, RawSign},
+    default_impl::store::{AccountTable, DataBase},
+    sign::SignTrait,
+    types::Course,
+    user::Session,
+};
+use log::warn;
+use std::collections::HashMap;
+
+#[derive(Debug, Parser, Clone)]
+#[command(name = "list")]
+#[clap(about = "列出有效签到。")]
+pub struct ListParser {
+    /// 列出指定课程的签到。
+    #[arg(short, long)]
+    course: Option<i64>,
+    /// 列出所有签到（包括无效签到）。
+    #[arg(short, long)]
+    all: bool,
+}
+impl ListParser {
+    pub fn list_course_activities(
+        db: &DataBase,
+        course: i64,
+        all: bool,
+        sessions: HashMap<String, Session>,
+    ) {
+        let courses = Course::get_courses(sessions.values())
+            .unwrap_or_default()
+            .into_keys()
+            .map(|c| (c.get_id(), c))
+            .collect::<HashMap<_, _>>();
+        let (a, n) = courses
+            .get(&course)
+            .and_then(|course| {
+                sessions.values().next().and_then(|session| {
+                    Activity::get_course_activities(db, session, course, true).ok()
+                })
+            })
+            .map(|a| {
+                a.into_iter()
+                    .filter_map(|k| match k {
+                        Activity::RawSign(k) => Some(k),
+                        Activity::Other(_) => None,
+                    })
+                    .partition(|k| k.is_valid())
+            })
+            .unwrap_or_else(|| (vec![], vec![]));
+        // 列出指定课程的有效签到。
+        for a in a {
+            if a.course.get_id() == course {
+                println!("{}", a.fmt_without_course_info());
+            }
+        }
+        if all {
+            // 列出指定课程的所有签到。
+            for a in n {
+                if a.course.get_id() == course {
+                    println!("{}", a.fmt_without_course_info());
+                }
+            }
+        }
+    }
+    pub fn list_all_activities(db: &DataBase, all: bool) {
+        let sessions = AccountTable::get_sessions(db);
+        let activities =
+            Activity::get_all_activities(db, sessions.values(), all).unwrap_or_else(|e| {
+                warn!("未能获取签到列表，错误信息：{e}.",);
+                Default::default()
+            });
+        let (available_sign_activities, other_sign_activities): (Vec<RawSign>, Vec<RawSign>) =
+            activities
+                .into_keys()
+                .filter_map(|k| match k {
+                    Activity::RawSign(k) => Some(k),
+                    Activity::Other(_) => None,
+                })
+                .partition(|a| a.is_valid());
+        // 列出所有有效签到。
+        for a in available_sign_activities {
+            println!("{}", a.as_inner());
+        }
+        if all {
+            // 列出所有签到。
+            for a in other_sign_activities {
+                println!("{}", a.as_inner());
+            }
+        } else {
+            warn!("{}", SignParser::NOTICE);
+        }
+    }
+}
+pub struct ListCmdApp {
+    command: Command,
+}
+impl ListCmdApp {
+    pub fn new() -> ListCmdApp {
+        let command = ListParser::command();
+        ListCmdApp { command }
+    }
+}
+impl Default for ListCmdApp {
+    fn default() -> ListCmdApp {
+        ListCmdApp::new()
+    }
+}
+impl<Context: AsRef<DataBase>> AppTrait<Context> for ListCmdApp {
+    type OwnedData = ListParser;
+
+    fn run(&self, context: &Context, ListParser { course, all }: Self::OwnedData) {
+        let sessions = AccountTable::get_sessions(context.as_ref());
+        if let Some(course) = course {
+            ListParser::list_course_activities(context.as_ref(), course, all, sessions)
+        } else {
+            ListParser::list_all_activities(context.as_ref(), all)
+        }
+    }
+}
+impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context> for ListCmdApp {
+    fn subcommand(&self) -> Option<&Command> {
+        Some(&self.command)
+    }
+
+    fn read_owned_data(
+        &self,
+        _: &Context,
+        matches: &[&ArgMatches],
+    ) -> <Self as AppTrait<Context, ()>>::OwnedData {
+        ListParser::from_arg_matches(matches.last().unwrap()).unwrap()
+    }
+}
