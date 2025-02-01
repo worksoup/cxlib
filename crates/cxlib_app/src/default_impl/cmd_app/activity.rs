@@ -16,6 +16,8 @@ use cxlib_internal::{
     user::Session,
 };
 use log::{error, info, warn};
+use std::marker::PhantomData;
+use std::task::Context;
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 #[derive(Clone)]
@@ -288,23 +290,27 @@ impl SignParser {
         Ok(())
     }
 }
-pub struct SignMainApp<T: LocationInfoGetterTrait + Copy> {
-    location_getter: T,
+pub struct SignMainApp<T: LocationInfoGetterTrait + Copy, Context, F: Fn(&Context) -> T> {
+    _context: PhantomData<Context>,
+    f: F,
 }
-impl<Context: AsRef<DataBase>, T: LocationInfoGetterTrait + Copy> AppTrait<Context>
-    for SignMainApp<T>
+impl<Context: AsRef<DataBase>, T: LocationInfoGetterTrait + Copy, F: Fn(&Context) -> T>
+    AppTrait<Context> for SignMainApp<T, Context, F>
 {
     type OwnedData = SignParser;
 
     fn run(&self, db: &Context, data: Self::OwnedData) {
         warn!("{}", SignParser::NOTICE);
-        data.do_sign(db.as_ref(), self.location_getter)
+        data.do_sign(db.as_ref(), (self.f)(db))
             .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
     }
 }
 
-impl<Context: AsRef<DataBase> + 'static, T: LocationInfoGetterTrait + Copy + 'static>
-    CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp<T>
+impl<
+        Context: AsRef<DataBase> + 'static,
+        T: LocationInfoGetterTrait + Copy + 'static,
+        F: Fn(&Context) -> T + 'static,
+    > CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp<T, Context, F>
 {
     fn read_owned_data(
         &self,
