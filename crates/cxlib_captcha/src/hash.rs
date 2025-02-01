@@ -61,7 +61,7 @@ pub(crate) fn uuid() -> String {
     let mut v = [0; 0x24];
     let hex: [u8; 16] = *b"0123456789abcdef";
     v = v.map(|_| {
-        let index = rand::thread_rng().gen_range(0x00..0x10) as usize;
+        let index = rand::rng().random_range(0x00..0x10) as usize;
         hex[index]
     });
     v[0x0e] = b'4';

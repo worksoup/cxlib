@@ -272,8 +272,8 @@ impl LocationWithRange {
         } = self;
         let lat: f64 = lat.parse().unwrap();
         let lon: f64 = lon.parse().unwrap();
-        let mut r = rand::thread_rng().gen_range(0..range * 3) as f64 / (*range as f64) / 60.0;
-        let theta = rand::thread_rng().gen_range(0..360) as f64 * PI / 180.0;
+        let mut r = rand::rng().random_range(0..range * 3) as f64 / (*range as f64) / 60.0;
+        let theta = rand::rng().random_range(0..360) as f64 * PI / 180.0;
         r *= (*range as f64)
             / R
             / (1.0 - theta.cos().powi(2) * (lat * PI / 180.0).sin().powi(2)).sqrt();

@@ -93,8 +93,8 @@ impl<'d> PreparedFields<'d> {
         debug!("Field count: {}", fields.len());
         let mut boundary = format!(
             "\r\n--{}",
-            rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
+            rand::rng()
+                .sample_iter(&rand::distr::Alphanumeric)
                 .take(16)
                 .map(|c| c as char)
                 .collect::<String>()
