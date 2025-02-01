@@ -290,9 +290,17 @@ impl SignParser {
         Ok(())
     }
 }
-pub struct SignMainApp<T: LocationInfoGetterTrait + Copy, Context, F: Fn(&Context) -> T> {
+pub struct SignMainApp<T: LocationInfoGetterTrait, Context, F: Fn(&Context) -> T> {
     _context: PhantomData<Context>,
     f: F,
+}
+impl<T: LocationInfoGetterTrait, Context, F: Fn(&Context) -> T> SignMainApp<T, Context, F> {
+    pub fn new(f: F) -> Self {
+        Self {
+            _context: PhantomData,
+            f,
+        }
+    }
 }
 impl<Context: AsRef<DataBase>, T: LocationInfoGetterTrait + Copy, F: Fn(&Context) -> T>
     AppTrait<Context> for SignMainApp<T, Context, F>
