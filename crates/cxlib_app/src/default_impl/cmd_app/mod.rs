@@ -16,9 +16,9 @@ pub use location::*;
 pub use locations::*;
 pub use where_is_config::*;
 
-#[cfg(feature = "clap_complete_command")]
+#[cfg(feature = "completion")]
 mod completions;
-#[cfg(feature = "clap_complete_command")]
+#[cfg(feature = "completion")]
 pub use completions::*;
 
 use clap::Command;
