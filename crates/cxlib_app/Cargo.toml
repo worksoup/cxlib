@@ -5,9 +5,10 @@ version.workspace = true
 authors.workspace = true
 
 [features]
-completion-nu = ["clap_complete_command", "clap_complete_command/nushell"]
-completion-carapace = ["clap_complete_command", "clap_complete_command/carapace"]
-completion-fig = ["clap_complete_command", "clap_complete_command/fig"]
+completion = ["dep:clap_complete_command"]
+completion-nu = ["completion", "clap_complete_command/nushell"]
+completion-carapace = ["completion", "clap_complete_command/carapace"]
+completion-fig = ["completion", "clap_complete_command/fig"]
 
 [dependencies]
 clap = { workspace = true, features = ["derive", "cargo"] }

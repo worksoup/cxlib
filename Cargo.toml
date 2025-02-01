@@ -47,7 +47,8 @@ yapt = { git = "https://github.com/worksoup/yapt.git" }
 clap = "4.5"
 clap_complete_command = "0.6"
 [features]
-completions = ["completion-nu", "completion-carapace", "completion-fig"]
+completion-all = ["completion-nu", "completion-carapace", "completion-fig"]
+completion = ["cxlib_app/completion"]
 completion-nu = ["cxlib_app/completion-nu"]
 completion-carapace = ["cxlib_app/completion-carapace"]
 completion-fig = ["cxlib_app/completion-fig"]
