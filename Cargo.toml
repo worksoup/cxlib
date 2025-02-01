@@ -43,8 +43,12 @@ unicode-width = "0.2"
 ureq = "2.12"
 xcap = { version = "0.2" }
 yapt = { git = "https://github.com/worksoup/yapt.git" }
+############### cxlib_app ###############
+clap = "4.5"
+clap_complete_command = "0.6"
 
 [dependencies]
+cxlib_app = { path = "crates/cxlib_app" }
 cxlib_internal = { path = "crates/cxlib_internal" }
 
 #chrono = "0.4"

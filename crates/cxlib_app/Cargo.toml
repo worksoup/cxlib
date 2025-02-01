@@ -1,0 +1,19 @@
+[package]
+name = "cxlib_app"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+[features]
+default = ["completions", ]
+completions = ["completion-nu", "completion-carapace", "completion-fig"]
+completion-nu = ["clap_complete_command", "clap_complete_command/nushell"]
+completion-carapace = ["clap_complete_command", "clap_complete_command/carapace"]
+completion-fig = ["clap_complete_command", "clap_complete_command/fig"]
+
+[dependencies]
+clap = { workspace = true, features = ["derive", "cargo"] }
+clap_complete_command = { workspace = true, optional = true }
+inquire.workspace = true
+log.workspace = true
+chrono.workspace = true
+cxlib_internal = { path = "../cxlib_internal" }
