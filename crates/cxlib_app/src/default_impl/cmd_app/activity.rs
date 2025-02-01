@@ -1,4 +1,4 @@
-use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
+use crate::{AppTrait, CmdApp, CmdAppContext, CmdMetaAppTrait};
 use clap::{ArgMatches, FromArgMatches, Parser};
 use cxlib_internal::default_impl::signner::LocationInfoGetterTrait;
 use cxlib_internal::{
@@ -16,8 +16,6 @@ use cxlib_internal::{
     user::Session,
 };
 use log::{error, info, warn};
-use std::marker::PhantomData;
-use std::task::Context;
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 #[derive(Clone)]
@@ -290,35 +288,25 @@ impl SignParser {
         Ok(())
     }
 }
-pub struct SignMainApp<T: LocationInfoGetterTrait, Context, F: Fn(&Context) -> T> {
-    _context: PhantomData<Context>,
-    f: F,
-}
-impl<T: LocationInfoGetterTrait, Context, F: Fn(&Context) -> T> SignMainApp<T, Context, F> {
-    pub fn new(f: F) -> Self {
-        Self {
-            _context: PhantomData,
-            f,
-        }
+pub struct SignMainApp;
+impl Default for SignMainApp {
+    fn default() -> SignMainApp {
+        SignMainApp
     }
 }
-impl<Context: AsRef<DataBase>, T: LocationInfoGetterTrait + Copy, F: Fn(&Context) -> T>
-    AppTrait<Context> for SignMainApp<T, Context, F>
-{
+impl AppTrait<CmdAppContext> for SignMainApp {
     type OwnedData = SignParser;
 
-    fn run(&self, db: &Context, data: Self::OwnedData) {
+    fn run(&self, db: &CmdAppContext, data: Self::OwnedData) {
         warn!("{}", SignParser::NOTICE);
-        data.do_sign(db.as_ref(), (self.f)(db))
+        data.do_sign(db.as_ref(), DefaultLocationInfoGetter::from(db.as_ref()))
             .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
     }
 }
 
-impl<
-        Context: AsRef<DataBase> + 'static,
-        T: LocationInfoGetterTrait + Copy + 'static,
-        F: Fn(&Context) -> T + 'static,
-    > CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp<T, Context, F>
+impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp
+where
+    Self: AppTrait<Context, OwnedData = SignParser>,
 {
     fn read_owned_data(
         &self,
