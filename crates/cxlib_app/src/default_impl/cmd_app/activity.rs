@@ -294,20 +294,17 @@ impl Default for SignMainApp {
         SignMainApp
     }
 }
-impl AppTrait<CmdAppContext> for SignMainApp {
+impl<Context: AsRef<DataBase>> AppTrait<Context> for SignMainApp {
     type OwnedData = SignParser;
 
-    fn run(&self, db: &CmdAppContext, data: Self::OwnedData) {
+    fn run(&self, db: &Context, data: Self::OwnedData) {
         warn!("{}", SignParser::NOTICE);
         data.do_sign(db.as_ref(), DefaultLocationInfoGetter::from(db.as_ref()))
             .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
     }
 }
 
-impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp
-where
-    Self: AppTrait<Context, OwnedData = SignParser>,
-{
+impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp {
     fn read_owned_data(
         &self,
         _: &Context,
