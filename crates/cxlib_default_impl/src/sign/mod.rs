@@ -58,7 +58,7 @@ impl Sign {
             is_photo_sign,
             is_refresh_qrcode,
             sign_code,
-        } = r.into_json().log_unwrap();
+        } = r.into_body().read_json().log_unwrap();
         Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
     }
     pub fn from_raw(raw: RawSign, session: &Session) -> Self {

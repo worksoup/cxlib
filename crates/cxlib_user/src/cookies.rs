@@ -1,5 +1,4 @@
-use cookie_store::Cookie;
-use ureq::Agent;
+use ureq::{Agent, Cookie};
 #[allow(non_snake_case)]
 #[derive(Debug, Clone)]
 pub struct UserCookies {
@@ -22,13 +21,11 @@ pub struct UserCookies {
 
 impl UserCookies {
     pub fn new(client: &Agent) -> Self {
-        let cookies = {
-            let mut cookies = Vec::new();
-            for c in client.cookie_store().iter_any() {
-                cookies.push(c.to_owned());
-            }
-            cookies
-        };
+        let mut cookies = Vec::new();
+        let binding = client.cookie_jar_lock();
+        for c in binding.iter() {
+            cookies.push(c);
+        }
         UserCookies::from_cookies_vec(cookies)
     }
     #[allow(non_snake_case)]

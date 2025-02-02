@@ -65,7 +65,7 @@ pub trait SignTrait: Ord {
         }
         let Data {
             data: Status { status },
-        } = r.into_json().log_unwrap();
+        } = r.into_body().read_json().log_unwrap();
         Ok(status.into())
     }
     /// 通过签到结果的字符串判断签到结果如何。
@@ -319,7 +319,8 @@ pub trait GestureOrSigncodeSignTrait: Ord {
             result: i64,
         }
         let CheckR { result } = protocol::check_signcode(session, active_id, signcode)?
-            .into_json()
+            .into_body()
+            .read_json()
             .log_unwrap();
         if result == 1 {
             Ok(Ok(()))

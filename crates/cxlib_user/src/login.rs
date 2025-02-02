@@ -3,13 +3,12 @@ use cxlib_protocol::{collect::user as protocol, ProtocolItem};
 use cxlib_utils::pkcs7_pad;
 use log::{trace, warn};
 use onceinit::{OnceInit, OnceInitState, StaticDefault};
-use std::ops::Deref;
 use std::{
     collections::HashMap,
-    ops::Index,
+    ops::{Deref, Index},
     sync::{Arc, RwLock},
 };
-use ureq::{serde, Agent, AgentBuilder};
+use ureq::Agent;
 
 pub trait LoginSolverTrait: Send + Sync {
     fn login_type(&self) -> &str;
@@ -22,7 +21,7 @@ impl DefaultLoginSolver {
     pub fn find_stu_name_in_html(agent: &Agent) -> Result<String, LoginError> {
         let login_expired_err = || LoginError::LoginExpired("无法获取姓名！".to_string());
         let r = protocol::account_manage(agent)?;
-        let html_content = r.into_string().log_unwrap();
+        let html_content = r.into_body().read_to_string().log_unwrap();
         trace!("{html_content}");
         let e = html_content
             .find("colorBlue")
@@ -65,11 +64,11 @@ impl LoginSolverTrait for DefaultLoginSolver {
     }
 
     fn login_s(&self, account: &str, enc_passwd: &str) -> Result<Agent, LoginError> {
-        let cookie_store = cookie_store::CookieStore::new(None);
-        let client = AgentBuilder::new()
-            .user_agent(&ProtocolItem::UserAgent.to_string())
-            .cookie_store(cookie_store)
-            .build();
+        let client = Agent::new_with_config(
+            Agent::config_builder()
+                .user_agent(ProtocolItem::UserAgent.to_string())
+                .build(),
+        );
         let response = protocol::login_enc(&client, account, enc_passwd)?;
         /// TODO: 存疑
         #[derive(serde::Deserialize)]
@@ -84,7 +83,10 @@ impl LoginSolverTrait for DefaultLoginSolver {
             url,
             msg1,
             msg2,
-        } = response.into_json().expect("json 反序列化失败！");
+        } = response
+            .into_body()
+            .read_json()
+            .expect("json 反序列化失败！");
         let mut mes = Vec::new();
         if let Some(url) = url {
             mes.push(url);

@@ -14,4 +14,5 @@ log.workspace = true
 onceinit.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }

@@ -50,7 +50,7 @@ use image::DynamicImage;
 use log::debug;
 use serde::Deserialize;
 use std::fmt::Display;
-use ureq::{serde_json, Agent};
+use ureq::Agent;
 
 pub fn get_now_timestamp_mills() -> u128 {
     std::time::SystemTime::now()
@@ -68,7 +68,8 @@ pub fn get_server_time(
     struct Tmp {
         t: u128,
     }
-    let Tmp { t } = trim_response_to_json(r.into_string().log_unwrap().as_str()).log_unwrap();
+    let Tmp { t } =
+        trim_response_to_json(r.into_body().read_to_string().log_unwrap().as_str()).log_unwrap();
     Ok(t)
 }
 pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, serde_json::Error>
@@ -86,7 +87,7 @@ pub fn find_captcha(client: &Agent, presign_html: &str) -> Option<CaptchaId> {
         Some(id.to_string())
     } else {
         protocol::my_sign_captcha_utils(client).ok().and_then(|r| {
-            let js = r.into_string().log_unwrap();
+            let js = r.into_body().read_to_string().log_unwrap();
             js.find("captchaId: '").map(|start_of_captcha_id| {
                 debug!("start_of_captcha_id: {start_of_captcha_id}");
                 let id = &js[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];

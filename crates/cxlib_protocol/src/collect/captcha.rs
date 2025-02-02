@@ -2,7 +2,7 @@ use crate::ProtocolItem;
 use cxlib_error::AgentError;
 use log::debug;
 use std::fmt::Display;
-use ureq::Agent;
+use ureq::{http::Response, Agent, Body};
 
 // Doesn't matter.
 pub static CALLBACK_NAME: &str = "cx_captcha_function";
@@ -11,7 +11,7 @@ pub fn get_server_time(
     agent: &Agent,
     captcha_id: &str,
     time_stamp_mills: impl Display + Copy,
-) -> Result<ureq::Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     let url = format!(
         "{}?callback={CALLBACK_NAME}&captchaId={captcha_id}&_={time_stamp_mills}",
         ProtocolItem::GetServerTime,
@@ -28,7 +28,7 @@ pub fn get_captcha(
     iv: &str,
     time_stamp_mills: impl Display + Copy,
     referer: &str,
-) -> Result<ureq::Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     let referer =
         percent_encoding::utf8_percent_encode(referer, percent_encoding::NON_ALPHANUMERIC)
             .to_string();
@@ -44,7 +44,7 @@ pub fn get_captcha(
         version = VERSION_PARAM,
         referer_ = format_args!("referer={}", referer),
     );
-    Ok(agent.get(&url).set("Referer", &referer).call()?)
+    Ok(agent.get(&url).header("Referer", &referer).call()?)
 }
 
 // 滑块验证。
@@ -56,7 +56,7 @@ pub fn check_captcha(
     token: &str,
     iv: &str,
     time_stamp_mills: impl Display + Copy,
-) -> Result<ureq::Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     let url = format!(
         "{}?{}&{}&{}&{}&{}&{}&{}&{}&{}&_={time_stamp_mills}",
         ProtocolItem::CheckCaptcha,
@@ -76,11 +76,11 @@ pub fn check_captcha(
     );
     let get = agent
         .get(&url)
-        .set("Referer", "https://mobilelearn.chaoxing.com");
+        .header("Referer", "https://mobilelearn.chaoxing.com");
     Ok(get.call()?)
 }
 
-pub fn my_sign_captcha_utils(client: &Agent) -> Result<ureq::Response, AgentError> {
+pub fn my_sign_captcha_utils(client: &Agent) -> Result<Response<Body>, AgentError> {
     let url = ProtocolItem::MySignCaptchaUtils;
     debug!("{url}");
     Ok(client.get(&url.to_string()).call()?)

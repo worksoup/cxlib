@@ -1,5 +1,5 @@
 use crate::Course;
-use cxlib_error::{AgentError, InitError};
+use cxlib_error::{AgentError, CxlibResultUtils, InitError};
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::Session;
 use onceinit::{OnceInit, StaticDefault};
@@ -205,7 +205,7 @@ impl LocationWithRange {
             data: Vec<LocationWithRangeAndActiveId>,
         }
         let r = protocol::get_location_log(session, (course.get_id(), course.get_class_id()))?;
-        let data: Data = r.into_json().unwrap();
+        let data: Data = r.into_body().read_json().log_unwrap();
         let mut map = HashMap::new();
         for l in data.data {
             map.insert(l.active_id.to_string(), l.to_location_with_range());

@@ -6,15 +6,20 @@ use cxlib_protocol::{utils::PPTSignHelper, ProtocolItem, ProtocolItemTrait};
 use cxlib_types::{Dioption, LocationWithRange};
 use cxlib_user::Session;
 use log::{debug, trace, warn};
-use ureq::{Agent, Response};
+use ureq::{http::Response, Agent, Body, ResponseExt};
 
 pub fn analysis_after_presign(
     active_id: &str,
     session: &Session,
-    response_of_presign: Response,
+    response_of_presign: Response<Body>,
 ) -> Result<PreSignResult, SignError> {
-    let presign_url = response_of_presign.get_url().to_string();
-    let html = response_of_presign.into_string().log_unwrap();
+    // TODO
+    // 需要确定重定向后的 uri 为所需。
+    let presign_url = response_of_presign.get_uri().to_string();
+    let html = response_of_presign
+        .into_body()
+        .read_to_string()
+        .log_unwrap();
     trace!("预签到请求结果：{html}");
     if let Some(start_of_statuscontent_h1) = html.find("id=\"statuscontent\"") {
         let html = &html[start_of_statuscontent_h1 + 19..];
@@ -31,7 +36,8 @@ pub fn analysis_after_presign(
     ));
     let response_of_analysis = protocol::analysis(session, active_id)?;
     let data = response_of_analysis
-        .into_string()
+        .into_body()
+        .read_to_string()
         .expect("Convert response of analysis into String failed.");
     let code = {
         let start_of_code = data.find("code='+'").unwrap() + 8;
@@ -44,7 +50,8 @@ pub fn analysis_after_presign(
     debug!(
         "analysis 结果：{}",
         _response_of_analysis2
-            .into_string()
+            .into_body()
+            .read_to_string()
             .expect("Convert response of analysis2 into String failed.")
     );
     // 防止行为检测导致失败。
@@ -70,7 +77,7 @@ pub fn secondary_verification(
     let r = {
         let url = url.with_validate(&url_param);
         let r = url.get(agent)?;
-        RawSign::guess_sign_result_by_text(&r.into_string().log_unwrap())
+        RawSign::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap())
     };
     Ok(r)
 }
@@ -81,7 +88,7 @@ pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
     referer: &str,
 ) -> Result<SignResult, SignError> {
     let r = url.get(agent)?;
-    match Sign::guess_sign_result_by_text(&r.into_string().log_unwrap()) {
+    match Sign::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap()) {
         SignResult::Fail { msg } => {
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。

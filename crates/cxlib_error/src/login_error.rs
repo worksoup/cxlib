@@ -10,7 +10,7 @@ pub enum LoginError {
     #[error(transparent)]
     CaptchaError(#[from] CaptchaError),
     #[error("Cookies 持久化失败：`{0}`.")]
-    CookiesStoreError(Box<dyn std::error::Error + Send + Sync>),
+    CookiesStoreError(AgentError),
     #[error("加解密错误：`{0}`.")]
     CryptoError(String),
     #[error(transparent)]

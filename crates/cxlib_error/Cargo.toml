@@ -8,4 +8,5 @@ authors.workspace = true
 log.workspace = true
 thiserror.workspace = true
 ureq.workspace = true
+ureq-proto.workspace = true
 onceinit.workspace = true

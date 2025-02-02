@@ -5,7 +5,6 @@ version.workspace = true
 authors.workspace = true
 
 [dependencies]
-cookie_store.workspace = true
 cxlib_store = { path = "../cxlib_store" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["user"] }
@@ -15,4 +14,4 @@ hex.workspace = true
 log = { workspace = true, features = ["release_max_level_info"] }
 onceinit.workspace = true
 serde = { workspace = true, features = ["derive"] }
-ureq = { workspace = true, features = ["cookies", "json"] }
+ureq = { workspace = true, features = ["cookies", "json", ] }

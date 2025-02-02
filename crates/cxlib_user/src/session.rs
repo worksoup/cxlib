@@ -1,10 +1,10 @@
 use crate::{cookies::UserCookies, DefaultLoginSolver, LoginSolverTrait};
-use cxlib_error::LoginError;
+use cxlib_error::{AgentError, CxlibResultUtils, LoginError};
 use cxlib_protocol::ProtocolItem;
 use cxlib_store::Dir;
 use log::info;
 use std::{hash::Hash, ops::Deref, path::Path};
-use ureq::{Agent, AgentBuilder};
+use ureq::Agent;
 
 #[derive(Debug, Clone)]
 pub struct Session {
@@ -46,14 +46,14 @@ impl Session {
         Ok(session)
     }
     pub fn load_cookies_raw<P: AsRef<Path>>(cookies_file: P) -> Result<Agent, std::io::Error> {
-        let cookie_store = {
-            let file = std::fs::File::open(cookies_file).map(std::io::BufReader::new)?;
-            cookie_store::serde::json::load(file).unwrap()
-        };
-        Ok(AgentBuilder::new()
-            .user_agent(&ProtocolItem::UserAgent.to_string())
-            .cookie_store(cookie_store)
-            .build())
+        let file = std::fs::File::open(cookies_file).map(std::io::BufReader::new)?;
+        let agent = Agent::new_with_config(
+            Agent::config_builder()
+                .user_agent(ProtocolItem::UserAgent.to_string())
+                .build(),
+        );
+        agent.cookie_jar_lock().load_json(file).log_unwrap();
+        Ok(agent)
     }
     /// 加载本地 Cookies 并返回 [`Session`].
     pub fn load_cookies(uid: &str, uname: &str) -> Result<Session, LoginError> {
@@ -110,8 +110,10 @@ impl Session {
     pub fn store_cookies(agent: &Agent, file_name_without_ext: &str) -> Result<(), LoginError> {
         let store_path = Dir::get_json_file_path(file_name_without_ext);
         let mut writer = std::fs::File::create(store_path).map(std::io::BufWriter::new)?;
-        cookie_store::serde::json::save(&agent.cookie_store(), &mut writer)
-            .map_err(LoginError::CookiesStoreError)
+        agent
+            .cookie_jar_lock()
+            .save_json(&mut writer)
+            .map_err(|e| LoginError::CookiesStoreError(AgentError::from(e)))
     }
     pub fn get_uid(&self) -> &str {
         self.cookies.get_uid()

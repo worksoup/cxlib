@@ -210,7 +210,7 @@ impl Activity {
     }
     pub fn get_list_from_course(session: &Session, c: &Course) -> Result<Vec<Self>, ActivityError> {
         let r = protocol::active_list(session, (c.get_id(), c.get_class_id()))?;
-        let r: GetActivityR = r.into_json().unwrap();
+        let r: GetActivityR = r.into_body().read_json().log_unwrap();
         let activities = Arc::new(Mutex::new(Vec::new()));
         if let Some(data) = r.data {
             let thread_count = 1;

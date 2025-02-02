@@ -5,16 +5,19 @@ pub use ureq::*;
 mod debug;
 mod interact;
 mod ureq {
+
     pub fn ureq_get_bytes(
         agent: &ureq::Agent,
         url: &str,
         referer: &str,
     ) -> Result<Vec<u8>, Box<ureq::Error>> {
+        use std::io::Read;
         let mut img = Vec::new();
         agent
             .get(url)
-            .set("Referer", referer)
+            .header("Referer", referer)
             .call()?
+            .into_body()
             .into_reader()
             .read_to_end(&mut img)
             .unwrap();

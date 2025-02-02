@@ -1,7 +1,7 @@
-use std::ops::{Deref, DerefMut};
-use log::debug;
-use ureq::{Agent, Response};
 use cxlib_error::AgentError;
+use log::debug;
+use std::ops::{Deref, DerefMut};
+use ureq::{http::Response, Agent, Body};
 
 pub struct PPTSignHelper {
     url: String,
@@ -10,7 +10,7 @@ impl PPTSignHelper {
     pub fn url(&self) -> &str {
         &self.url
     }
-    pub fn get(&self, agent: &Agent) -> Result<Response, AgentError> {
+    pub fn get(&self, agent: &Agent) -> Result<Response<Body>, AgentError> {
         Ok(agent.get(self.url()).call()?)
     }
     pub fn with_enc2(mut self, enc2: &str) -> Self {

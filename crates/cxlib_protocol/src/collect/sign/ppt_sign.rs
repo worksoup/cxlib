@@ -1,7 +1,7 @@
 use crate::utils::PPTSignHelper;
 use crate::ProtocolItem;
 use cxlib_error::AgentError;
-use ureq::{Agent, Response};
+use ureq::{http::Response, Agent, Body};
 
 // 签到
 pub fn general_sign_url(
@@ -68,7 +68,7 @@ pub fn general_sign(
     agent: &Agent,
     session: (&str, &str, &str),
     active_id: &str,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     general_sign_url(session, active_id).get(agent)
 }
 
@@ -77,7 +77,7 @@ pub fn photo_sign(
     session: (&str, &str, &str),
     active_id: &str,
     object_id: &str,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     photo_sign_url(session, active_id, object_id).get(agent)
 }
 pub fn qrcode_sign(
@@ -86,7 +86,7 @@ pub fn qrcode_sign(
     enc: &str,
     active_id: &str,
     location: Option<(&str, &str, &str, &str)>,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     qrcode_sign_url(session, enc, active_id, location).get(agent)
 }
 pub fn location_sign(
@@ -95,7 +95,7 @@ pub fn location_sign(
     location: (&str, &str, &str),
     active_id: &str,
     is_auto_location: bool,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     location_sign_url(session, location, active_id, is_auto_location).get(agent)
 }
 pub fn signcode_sign(
@@ -103,6 +103,6 @@ pub fn signcode_sign(
     session: (&str, &str, &str),
     active_id: &str,
     signcode: &str,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     signcode_sign_url(session, active_id, signcode).get(agent)
 }

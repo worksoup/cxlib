@@ -27,6 +27,7 @@ onceinit.workspace = true
 rand.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }
 serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 captcha_solver_ui = { git = "https://github.com/worksoup/captcha_solver_ui.git", optional = true }

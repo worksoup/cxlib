@@ -1,3 +1,4 @@
+pub use cxlib_error::CourseError;
 use cxlib_error::{CxlibResultUtils, MaybeFatalError};
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::LoginError;
@@ -9,9 +10,7 @@ use std::{
     fmt::Display,
     ops::Deref,
 };
-use ureq::serde_json;
-
-pub use cxlib_error::CourseError;
+use ureq::{http::Response, Body};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Course {
@@ -81,8 +80,8 @@ impl Course {
         info!("用户[{}]已获取课程列表。", session.get_stu_name());
         Ok(courses)
     }
-    fn get_list_from_response(r: ureq::Response) -> Result<Vec<Course>, CourseError> {
-        let r: GetCoursesR = r.into_json().log_unwrap();
+    fn get_list_from_response(r: Response<Body>) -> Result<Vec<Course>, CourseError> {
+        let r: GetCoursesR = r.into_body().read_json().log_unwrap();
         let mut arr = Vec::new();
         if let Some(channel_list) = r.channel_list {
             for c in channel_list {

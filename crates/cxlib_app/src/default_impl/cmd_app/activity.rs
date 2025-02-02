@@ -1,4 +1,4 @@
-use crate::{AppTrait, CmdApp, CmdAppContext, CmdMetaAppTrait};
+use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
 use clap::{ArgMatches, FromArgMatches, Parser};
 use cxlib_internal::default_impl::signner::LocationInfoGetterTrait;
 use cxlib_internal::{

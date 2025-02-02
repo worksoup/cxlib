@@ -1,6 +1,6 @@
 use cxlib_error::AgentError;
 use log::warn;
-use ureq::{Agent, Response};
+use ureq::{http::Response, Agent, Body};
 
 static PPT_SIGN: &str = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax";
 // // web 聊天页
@@ -14,7 +14,7 @@ pub fn chat_group_pre_sign(
     uid: &str,
     chat_id: &str,
     tuid: &str,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     let url = CHAT_GROUP_PRE_SIGN;
     let url = format!("{url}?activeId={active_id}&code=&uid={uid}&courseId=null&classId=0&general=0&chatId={chat_id}&appType=0&tid={tuid}&atype=null&sys=0");
     Ok(client.get(&url).call()?)
@@ -25,7 +25,7 @@ pub fn chat_group_general_sign(
     client: &Agent,
     active_id: &str,
     uid: &str,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     let url = CHAT_GROUP_SIGN;
     let url = format!("{url}?activeId={active_id}&uid={uid}&clientip=");
     Ok(client.get(&url).call()?)
@@ -36,7 +36,7 @@ pub fn chat_group_photo_sign(
     active_id: &str,
     uid: &str,
     object_id: &str,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     let url = CHAT_GROUP_SIGN;
     let url = format!("{url}?activeId={active_id}&uid={uid}&clientip=&useragent=&latitude=-1&longitude=-1&fid=0&objectId={object_id}");
     Ok(client.get(&url).call()?)
@@ -48,7 +48,7 @@ pub fn chat_group_location_sign(
     uid: &str,
     lat: &str,
     lon: &str,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     let address =
         percent_encoding::utf8_percent_encode(address, percent_encoding::NON_ALPHANUMERIC)
             .to_string();
@@ -57,18 +57,18 @@ pub fn chat_group_location_sign(
     );
     Ok(client
         .post(PPT_SIGN)
-        .set(
+        .header(
             "Content-Type",
             "application/x-www-form-urlencoded; charset=UTF-8",
         )
-        .send_string(&body)?)
+        .send(body)?)
 }
 pub fn chat_group_signcode_sign(
     client: &Agent,
     active_id: &str,
     uid: &str,
     signcode: &str,
-) -> Result<Response, AgentError> {
+) -> Result<Response<Body>, AgentError> {
     warn!("`chat_group_signcode_sign` 该函数需要测试！");
     let url =
         format!("{CHAT_GROUP_SIGN}?activeId={active_id}&uid={uid}&clientip=&signCode={signcode}");
@@ -77,7 +77,7 @@ pub fn chat_group_signcode_sign(
 
 static AUTO_REFRESH_SIGN_LIST: &str =
     "https://mobilelearn.chaoxing.com/pptSign/autoRefeashSignList4Json2";
-pub fn get_signed_list(client: &Agent, active_id: &str) -> Result<Response, AgentError> {
+pub fn get_signed_list(client: &Agent, active_id: &str) -> Result<Response<Body>, AgentError> {
     let url = format!("{AUTO_REFRESH_SIGN_LIST}?activeId={active_id}");
     Ok(client.get(&url).call()?)
 }

@@ -8,13 +8,14 @@ use cxlib_error::{AgentError, CaptchaError, CxlibResultUtils, InitError, MaybeFa
 use cxlib_protocol::collect::captcha as protocol;
 use log::{debug, warn};
 use onceinit::{OnceInit, OnceInitError, StaticDefault};
-use serde::de::DeserializeOwned;
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
-use std::sync::{Arc, RwLock};
-use ureq::{serde_json, Agent};
+use serde::{de::DeserializeOwned, Deserialize};
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+    str::FromStr,
+    sync::{Arc, RwLock},
+};
+use ureq::Agent;
 
 #[derive(Debug)]
 pub struct GetCaptchaResult {
@@ -316,7 +317,8 @@ impl CaptchaType {
             referer,
         )?;
         let r_data = trim_response_to_json(
-            &r.into_string()
+            &r.into_body()
+                .read_to_string()
                 .expect("CaptchaResponse into String failed."),
         )
         .expect("Failed trim_response_to_json");
@@ -338,7 +340,8 @@ impl CaptchaType {
             iv,
             server_time_mills + 2,
         )?;
-        let v: ValidateResult = trim_response_to_json(&r.into_string().log_unwrap()).log_unwrap();
+        let v: ValidateResult =
+            trim_response_to_json(&r.into_body().read_to_string().log_unwrap()).log_unwrap();
         debug!("验证结果：{v:?}");
         v.get_validate_info()
     }
@@ -398,7 +401,7 @@ mod tests {
     const REFERER: &str = "https%3A%2F%2Fmobilelearn.chaoxing.com";
     #[test]
     fn auto_solve_captcha_test() {
-        let agent = ureq::Agent::new();
+        let agent = ureq::Agent::new_with_defaults();
         let r = CaptchaType::Rotate.solve_captcha(
             &agent,
             &ProtocolItem::CaptchaId.to_string(),
@@ -432,7 +435,7 @@ mod tests {
     #[test]
     fn get_captcha_test() {
         fn get_captcha_(captcha_type: CaptchaType) {
-            let agent = ureq::Agent::new();
+            let agent = ureq::Agent::new_with_defaults();
             let local_time = get_now_timestamp_mills();
             let captcha_id = ProtocolItem::CaptchaId.get();
             let server_time = get_server_time(&agent, captcha_id.as_ref(), local_time).unwrap();

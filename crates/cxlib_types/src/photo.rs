@@ -1,9 +1,8 @@
-use cxlib_error::AgentError;
+use cxlib_error::{AgentError, CxlibResultUtils};
 use cxlib_protocol::collect::types as protocol;
 use cxlib_user::Session;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::path::Path;
+use std::{fs::File, path::Path};
 
 // TODO: 删除 unwrap
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
@@ -19,7 +18,7 @@ impl Photo {
             #[serde(rename = "_token")]
             token: String,
         }
-        let r: Tmp = r.into_json().unwrap();
+        let r: Tmp = r.into_body().read_json().log_unwrap();
         Ok(r.token)
     }
 
@@ -31,7 +30,7 @@ impl Photo {
             #[serde(rename = "objectId")]
             object_id: String,
         }
-        let tmp: Tmp = r.into_json().unwrap();
+        let tmp: Tmp = r.into_body().read_json().log_unwrap();
         Ok(Self {
             object_id: tmp.object_id,
         })
@@ -47,7 +46,7 @@ impl Photo {
         p: impl Fn(&str) -> bool,
     ) -> Result<Option<Self>, AgentError> {
         let r = protocol::pan_chaoxing(session)?;
-        let r_text = r.into_string().unwrap();
+        let r_text = r.into_body().read_to_string().log_unwrap();
         let start_of_enc = r_text.find("enc =\"").unwrap() + 6;
         let end_of_enc = r_text[start_of_enc..r_text.len()].find('"').unwrap() + start_of_enc;
         let enc = &r_text[start_of_enc..end_of_enc];
@@ -66,7 +65,7 @@ impl Photo {
         struct TmpR {
             list: Vec<CloudFile>,
         }
-        let r: TmpR = r.into_json().map_err(ureq::Error::from)?;
+        let r: TmpR = r.into_body().read_json().map_err(ureq::Error::from)?;
         for item in r.list {
             if p(&item.name) {
                 return Ok(item.object_id.map(|object_id| Self { object_id }));
