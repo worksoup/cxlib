@@ -4,9 +4,10 @@ use clap_complete_command::Shell;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "completions")]
-#[clap(about = "生成命令补全文件。")]
-pub struct CompletionsParser {
+// TODO: build.rs 中通过环境变量设置 alias.
+#[command(name = "completion", alias = "c")]
+/// 生成命令补全文件。
+pub struct CompletionParser {
     /// 补全的 Shell 类型。
     #[arg(value_enum)]
     shell: Shell,
@@ -14,24 +15,24 @@ pub struct CompletionsParser {
     output: Option<PathBuf>,
 }
 
-pub struct CompletionsCmdApp {
+pub struct CompletionCmdApp {
     command: Command,
 }
-impl CompletionsCmdApp {
+impl CompletionCmdApp {
     pub fn new() -> Self {
-        let command = CompletionsParser::command();
+        let command = CompletionParser::command();
         Self { command }
     }
 }
-impl Default for CompletionsCmdApp {
+impl Default for CompletionCmdApp {
     fn default() -> Self {
         Self::new()
     }
 }
-impl<Context: AsRef<Command>> AppTrait<Context> for CompletionsCmdApp {
-    type OwnedData = CompletionsParser;
+impl<Context: AsRef<Command>> AppTrait<Context> for CompletionCmdApp {
+    type OwnedData = CompletionParser;
 
-    fn run(&self, command: &Context, CompletionsParser { shell, output }: Self::OwnedData) {
+    fn run(&self, command: &Context, CompletionParser { shell, output }: Self::OwnedData) {
         let command: &Command = command.as_ref();
         let mut command = command.clone();
         if let Some(output) = output {
@@ -45,7 +46,7 @@ impl<Context: AsRef<Command>> AppTrait<Context> for CompletionsCmdApp {
     }
 }
 impl<Context: AsRef<Command> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context>
-    for CompletionsCmdApp
+    for CompletionCmdApp
 {
     fn subcommand(&self) -> Option<&Command> {
         Some(&self.command)
@@ -56,6 +57,6 @@ impl<Context: AsRef<Command> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context
         _: &Context,
         matches: &[&ArgMatches],
     ) -> <Self as AppTrait<Context, ()>>::OwnedData {
-        CompletionsParser::from_arg_matches(matches.last().unwrap()).unwrap()
+        CompletionParser::from_arg_matches(matches.last().unwrap()).unwrap()
     }
 }

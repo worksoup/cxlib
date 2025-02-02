@@ -3,11 +3,10 @@ mod table;
 pub use cxlib_error::StoreError;
 pub use table::*;
 
-use cxlib_activity::CourseExcludeInfoTrait;
 use cxlib_store::{Dir, StorageTableCommandTrait, StorageTrait};
 use log::info;
 use sqlite::Connection;
-use std::{collections::HashSet, fs::File, ops::Deref};
+use std::{fs::File, ops::Deref};
 
 pub trait DataBaseTableTrait: StorageTableCommandTrait<DataBase> {
     const TABLE_ARGS: &'static str;
@@ -74,26 +73,5 @@ impl DataBase {
 impl Default for DataBase {
     fn default() -> Self {
         Self::new()
-    }
-}
-impl CourseExcludeInfoTrait for DataBase {
-    fn is_excluded(&self, id: i64) -> bool {
-        ExcludeTable::has_exclude(self, id)
-    }
-
-    fn get_excludes(&self) -> HashSet<i64> {
-        ExcludeTable::get_excludes(self)
-    }
-
-    fn exclude(&self, id: i64) {
-        ExcludeTable::add_exclude(self, id)
-    }
-
-    fn cancel_exclude(&self, id: i64) {
-        ExcludeTable::delete_exclude(self, id)
-    }
-
-    fn update_excludes<'a, I: IntoIterator<Item = &'a i64>>(&self, excludes: I) {
-        ExcludeTable::update_excludes(self, excludes)
     }
 }

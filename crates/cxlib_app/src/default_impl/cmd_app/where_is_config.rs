@@ -1,8 +1,9 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
 use clap::{ArgMatches, Command, CommandFactory, Parser};
 #[derive(Debug, Parser, Clone)]
-#[command(name = "where-is-config")]
-#[clap(about = "显示配置文件夹位置。")]
+// TODO: build.rs 中通过环境变量设置 alias.
+#[command(name = "where-is-config", alias = "w")]
+/// 显示配置文件夹位置。
 pub struct WhereIsConfigParser;
 pub struct WhereIsConfigCmdApp {
     command: Command,

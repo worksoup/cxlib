@@ -1,10 +1,8 @@
 use crate::{protocol, PreSignResult, SignResult, SignTrait};
-use cxlib_activity::RawSign;
 use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
 use cxlib_error::{CxlibResultUtils, SignError};
 use cxlib_protocol::{utils::PPTSignHelper, ProtocolItem, ProtocolItemTrait};
-use cxlib_types::{Dioption, LocationWithRange};
-use cxlib_user::Session;
+use cxlib_types::{LocationWithRange, OptionPair, RawSign, Session};
 use log::{debug, trace, warn};
 use ureq::{http::Response, Agent, Body, ResponseExt};
 
@@ -30,7 +28,7 @@ pub fn analysis_after_presign(
             return Ok(PreSignResult::Susses);
         }
     }
-    let captcha_id_and_location = Dioption::from((
+    let captcha_id_and_location = OptionPair::from((
         find_captcha(session, &html),
         LocationWithRange::find_in_html(&html),
     ));
@@ -92,7 +90,7 @@ pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
         SignResult::Fail { msg } => {
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。
-                let url = url.path_enc_by_pre_sign_result_msg(msg);
+                let url = url.patch_enc_by_pre_sign_result_msg(msg);
                 secondary_verification(agent, url, captcha_id, referer)
             } else {
                 Ok(SignResult::Fail { msg })

@@ -3,8 +3,9 @@ use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
 use cxlib_internal::default_impl::store::{AliasTable, DataBase, LocationTable};
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "locations")]
-#[clap(about = "列出所有位置。")]
+// TODO: build.rs 中通过环境变量设置 alias.
+#[command(name = "locations", alias = "lsl")]
+/// 列出所有位置。
 pub struct LocationsParser {
     /// 列出全局位置。
     #[arg(short, long)]

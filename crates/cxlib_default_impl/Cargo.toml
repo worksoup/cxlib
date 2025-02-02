@@ -5,14 +5,14 @@ version.workspace = true
 authors.workspace = true
 
 [dependencies]
-cxlib_activity = { path = "../cxlib_activity" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
+cxlib_login = { path = "../cxlib_login" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["default_impl"] }
 cxlib_sign = { path = "../cxlib_sign" }
 cxlib_store = { path = "../cxlib_store" }
 cxlib_types = { path = "../cxlib_types" }
-cxlib_user = { path = "../cxlib_user" }
+cxlib_types_ext = { path = "../cxlib_types_ext" }
 cxlib_utils = { path = "../cxlib_utils" }
 image.workspace = true
 log.workspace = true

@@ -1,8 +1,20 @@
-use cxlib_types::Course;
-use cxlib_utils::get_width_str_should_be;
+use crate::{Course, Session, SignDetail};
+use cxlib_error::{CxlibResultUtils, SignError};
+use cxlib_protocol::collect::types as protocol;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::time::{Duration, SystemTime};
+use std::{
+    fmt::{Display, Formatter},
+    time::{Duration, SystemTime},
+};
+
+pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
+    use unicode_width::UnicodeWidthStr;
+    if UnicodeWidthStr::width(s) > width {
+        width
+    } else {
+        UnicodeWidthStr::width(s) + 12 - s.len()
+    }
+}
 
 /// # RawSign
 ///
@@ -19,6 +31,7 @@ pub struct RawSign {
     pub status_code: i32,
 }
 fn time_string_from_mills(mills: u64) -> String {
+    #[inline]
     pub fn time_string(t: SystemTime) -> String {
         chrono::DateTime::<chrono::Local>::from(t)
             .format("%+")
@@ -37,8 +50,8 @@ impl Display for RawSign {
             self.name,
             self.status_code,
             time_string_from_mills(self.start_time_mills),
-            self.course.get_id(),
-            self.course.get_name(),
+            self.course.id(),
+            self.course.name(),
             width = name_width,
         )
     }
@@ -55,6 +68,28 @@ impl RawSign {
             time_string_from_mills(self.start_time_mills),
             width = name_width,
         )
+    }
+    pub fn get_sign_detail(active_id: &str, session: &Session) -> Result<SignDetail, SignError> {
+        #[derive(Deserialize)]
+        struct GetSignDetailR {
+            #[serde(rename = "ifPhoto")]
+            is_photo_sign: i64,
+            #[serde(rename = "ifRefreshEwm")]
+            is_refresh_qrcode: i64,
+            #[serde(rename = "signCode")]
+            sign_code: Option<String>,
+        }
+        let r = protocol::sign_detail(session, active_id)?;
+        let GetSignDetailR {
+            is_photo_sign,
+            is_refresh_qrcode,
+            sign_code,
+        } = r.into_body().read_json().log_unwrap();
+        Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
+    }
+    #[inline]
+    pub fn get_detail(&self, session: &Session) -> Result<SignDetail, SignError> {
+        Self::get_sign_detail(&self.active_id, session)
     }
 }
 impl RawSign {

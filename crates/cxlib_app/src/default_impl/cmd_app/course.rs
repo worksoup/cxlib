@@ -5,8 +5,9 @@ use cxlib_internal::{
     types::Course,
 };
 #[derive(Parser, Debug, Clone)]
-#[command(name = "courses")]
-#[clap(about = "获取课程信息。")]
+// TODO: build.rs 中通过环境变量设置 alias.
+#[command(name = "courses", alias = "lsc")]
+/// 获取课程信息。
 pub struct CoursesParser {
     /// 待操作账号，格式为以半角逗号隔开的 uid (可通过 accounts 子命令查看).
     #[arg(short, long)]

@@ -1,10 +1,8 @@
 use crate::utils::try_secondary_verification;
-use cxlib_activity::RawSign;
 use cxlib_captcha::CaptchaId;
 use cxlib_error::CxlibResultUtils;
 use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
-use cxlib_types::{Course, Dioption, LocationWithRange};
-use cxlib_user::Session;
+use cxlib_types::{Course, LocationWithRange, OptionPair, RawSign, Session};
 use log::info;
 use serde::Deserialize;
 use std::{collections::HashMap, ops::Add};
@@ -111,7 +109,7 @@ pub trait SignTrait: Ord {
         &self,
         session: &Session,
         pre_sign_url: &str,
-        pre_sign_result_data: &Dioption<CaptchaId, LocationWithRange>,
+        pre_sign_result_data: &OptionPair<CaptchaId, LocationWithRange>,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
     ) -> Result<SignResult, SignError> {
@@ -152,7 +150,7 @@ impl SignTrait for RawSign {
 
     fn sign_url(&self, session: &Session, _: &(), _: &()) -> PPTSignHelper {
         protocol::general_sign_url(
-            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (session.uid(), session.fid(), session.name()),
             &self.active_id,
         )
     }
@@ -162,14 +160,14 @@ impl SignTrait for RawSign {
     }
     fn pre_sign(&self, session: &Session, _: &()) -> Result<PreSignResult, SignError> {
         let active_id = self.active_id.as_str();
-        let uid = session.get_uid();
+        let uid = session.uid();
         let response_of_pre_sign = protocol::pre_sign(
             session,
-            (self.course.get_id(), self.course.get_class_id()),
+            (self.course.id(), self.course.class_id()),
             active_id,
             uid,
         )?;
-        info!("用户[{}]预签到已请求。", session.get_stu_name());
+        info!("用户[{}]预签到已请求。", session.name());
         utils::analysis_after_presign(active_id, session, response_of_pre_sign)
     }
 }
@@ -180,7 +178,7 @@ pub enum PreSignResult {
     Susses,
     Data {
         url: String,
-        data: Dioption<CaptchaId, LocationWithRange>,
+        data: OptionPair<CaptchaId, LocationWithRange>,
     },
 }
 impl PreSignResult {
@@ -250,35 +248,6 @@ pub struct SignActivityRaw {
     pub status: i32,
     pub start_time_secs: i64,
 }
-/// 区分签到类型时获取的一些签到的信息。
-#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SignDetail {
-    is_photo: bool,
-    is_refresh_qrcode: bool,
-    c: Option<String>,
-}
-impl SignDetail {
-    pub fn new(
-        is_photo_value: i64,
-        is_refresh_qrcode_value: i64,
-        sign_code: Option<String>,
-    ) -> SignDetail {
-        SignDetail {
-            is_photo: is_photo_value > 0,
-            is_refresh_qrcode: is_refresh_qrcode_value > 0,
-            c: sign_code,
-        }
-    }
-    pub fn is_photo(&self) -> bool {
-        self.is_photo
-    }
-    pub fn is_refresh_qrcode(&self) -> bool {
-        self.is_refresh_qrcode
-    }
-    pub fn sign_code(&self) -> Option<&str> {
-        self.c.as_deref()
-    }
-}
 /// 针对同一个签到，但不同 Session 的处理程序。
 pub trait SignnerTrait<T: SignTrait> {
     type ExtData<'e>;
@@ -342,7 +311,7 @@ impl<T: GestureOrSigncodeSignTrait> SignTrait for T {
         data: &Self::Data,
     ) -> PPTSignHelper {
         protocol::signcode_sign_url(
-            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (session.uid(), session.fid(), session.name()),
             &self.as_inner().active_id,
             data,
         )

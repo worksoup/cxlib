@@ -1,5 +1,5 @@
 [package]
-name = "cxlib_user"
+name = "cxlib_login"
 edition = "2021"
 version.workspace = true
 authors.workspace = true

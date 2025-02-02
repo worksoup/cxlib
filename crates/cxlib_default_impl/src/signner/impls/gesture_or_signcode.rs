@@ -1,6 +1,6 @@
 use crate::sign::{GestureSign, SigncodeSign};
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
-use cxlib_user::Session;
+use cxlib_types::Session;
 use std::collections::HashMap;
 
 pub struct DefaultGestureOrSigncodeSignner(String);

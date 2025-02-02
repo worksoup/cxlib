@@ -1,19 +1,18 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
 use clap::{ArgMatches, FromArgMatches, Parser};
-use cxlib_internal::default_impl::signner::LocationInfoGetterTrait;
 use cxlib_internal::{
-    activity::{Activity, RawSign},
     default_impl::{
         sign::Sign,
         signner::{
             DefaultGestureOrSigncodeSignner, DefaultLocationInfoGetter, DefaultLocationSignner,
             DefaultNormalOrRawSignner, DefaultPhotoSignner, DefaultQrCodeSignner,
+            LocationInfoGetterTrait,
         },
         store::{AccountTable, DataBase},
     },
     error::Error,
     sign::{SignResult, SignTrait, SignnerTrait},
-    user::Session,
+    types::{Activity, RawSign, Session},
 };
 use log::{error, info, warn};
 use std::{collections::HashMap, path::PathBuf, time::Duration};
@@ -32,7 +31,6 @@ pub struct CliArgs {
 #[command(
     author,
     version,
-    about = "进行签到。",
     long_about = r#"
 进行签到。
 
@@ -45,7 +43,7 @@ pub struct CliArgs {
 手势或签到码签到须指定 `-c, --code` 选项，提供签到码。
 "#
 )]
-#[clap(about = "列出有效签到。")]
+/// 进行签到。
 pub struct SignParser {
     /// 签到 ID.
     /// 默认以最近起对所有有效签到顺序进行签到，且缺少参数时会跳过并继续。
@@ -71,13 +69,14 @@ pub struct SignParser {
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     /// 精确地截取二维码。
     /// 如果二维码识别过慢可以尝试添加添加此选项。
-    #[arg(long)]
+    #[arg(short, long)]
     pub precisely: bool,
     /// 签到码。
     /// 签到码签到时需要提供。
     #[arg(short, long)]
     pub code: Option<String>,
 }
+
 impl SignParser {
     pub const NOTICE: &'static str = r#"
 
@@ -180,13 +179,9 @@ impl SignParser {
             info!("签到活动[{}]签到结果：", sign.as_raw().name);
             for (session, sign_result) in sign_results {
                 if let SignResult::Fail { msg } = sign_result {
-                    warn!(
-                        "\t用户[{}]签到失败！失败信息：[{:?}]",
-                        session.get_stu_name(),
-                        msg
-                    );
+                    warn!("\t用户[{}]签到失败！失败信息：[{:?}]", session.name(), msg);
                 } else {
-                    info!("\t用户[{}]签到成功！", session.get_stu_name(),);
+                    info!("\t用户[{}]签到成功！", session.name(),);
                 }
             }
         }
@@ -273,13 +268,13 @@ impl SignParser {
                 )
                 .format("%+")
                 .to_string(),
-                sign.course.get_class_id(),
-                sign.course.get_id(),
-                sign.course.get_name()
+                sign.course.class_id(),
+                sign.course.id(),
+                sign.course.name()
             );
             let mut names = Vec::new();
             for s in sessions.iter() {
-                names.push(s.get_stu_name().to_string())
+                names.push(s.name().to_string())
             }
             info!("签到者：{names:?}");
             Self::match_signs(sign, location_getter, &sessions, &arg)

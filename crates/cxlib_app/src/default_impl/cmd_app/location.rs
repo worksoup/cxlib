@@ -3,20 +3,21 @@ use crate::{
     AppTrait,
 };
 use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser, Subcommand};
-use cxlib_internal::types::LocationWithRange;
 use cxlib_internal::{
     default_impl::store::{AccountTable, AliasTable, DataBase, DataBaseTableTrait, LocationTable},
     store::AppInfo,
-    types::{Course, Location},
+    types::{ext::CourseExt, Course, Location},
 };
 use log::{error, warn};
 use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "location")]
-#[clap(about = "位置相关操作（添加、删除、批量删除、导入、导出）。")]
+// TODO: build.rs 中通过环境变量设置 alias.
+#[command(name = "location", alias = "l")]
+/// 位置相关操作（添加、删除、批量删除、导入、导出）。
 pub enum LocationParser {
     /// 添加位置或别名。
+    #[command(alias = "+")]
     Add {
         /// 地址名称、经纬度与海拔。
         /// 格式为：`addr,lon,lat,alt`.
@@ -29,6 +30,7 @@ pub enum LocationParser {
         #[arg(short, long)]
         course: Option<i64>,
     },
+    #[command(alias = "rm")]
     /// 删除位置。
     Remove {
         #[command(subcommand)]
@@ -37,6 +39,7 @@ pub enum LocationParser {
         #[arg(short, long)]
         yes: bool,
     },
+    #[command(alias = "rd")]
     /// 批量删除位置。
     Reduce {
         #[command(subcommand)]
@@ -54,6 +57,7 @@ pub enum LocationParser {
         #[arg(short, long)]
         global: bool,
     },
+    #[command(alias = "i")]
     /// 导入位置。
     Import {
         /// 导入位置。
@@ -65,6 +69,7 @@ pub enum LocationParser {
         #[arg(short, long)]
         course: Option<i64>,
     },
+    #[command(alias = "e")]
     /// 导出位置。
     Export {
         /// 导出位置。
@@ -327,14 +332,16 @@ impl LocationParser {
                 }
                 course.and_then(|course_id| {
                     let courses =
-                        Course::get_courses(AccountTable::get_sessions(db).values()).ok()?;
+                        Course::get_from_sessions(AccountTable::get_sessions(db).values()).ok()?;
                     let course = courses
                         .into_iter()
-                        .find(|(course, _)| course.get_id() == course_id)?
+                        .find(|(course, _)| course.id() == course_id)?
                         .0;
                     let sessions = AccountTable::get_sessions(db);
-                    sessions.values().next().map(|session| {
-                        match LocationWithRange::from_log(session, &course) {
+                    sessions
+                        .values()
+                        .next()
+                        .map(|session| match course.get_locations(session) {
                             Ok(locations) => {
                                 if locations.is_empty() {
                                     warn!("没有从该课程中获取到位置信息。");
@@ -352,8 +359,7 @@ impl LocationParser {
                             Err(e) => {
                                 warn!("遇到了问题：{e}");
                             }
-                        }
-                    })
+                        })
                 });
                 if !do_something {
                     warn!("未指定任何参数，不做任何事情。")
@@ -365,15 +371,15 @@ impl LocationParser {
                     course
                         .and_then(|course_id| {
                             let sessions = AccountTable::get_sessions(db);
-                            let courses = Course::get_courses(sessions.values())
+                            let courses = Course::get_from_sessions(sessions.values())
                                 .unwrap_or_default()
                                 .into_keys()
-                                .map(|c| (c.get_id(), c))
+                                .map(|c| (c.id(), c))
                                 .collect::<HashMap<_, _>>();
                             courses.get(&course_id).and_then(|course| {
                                 sessions.values().next().map(|session| {
                                     let mut contents = Vec::new();
-                                    match LocationWithRange::from_log(session, course) {
+                                    match course.get_locations(session) {
                                         Ok(locations) => {
                                             if locations.is_empty() {
                                                 warn!("没有从该课程中获取到位置信息。");

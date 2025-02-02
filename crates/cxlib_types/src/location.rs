@@ -1,29 +1,38 @@
-use crate::Course;
-use cxlib_error::{AgentError, CxlibResultUtils, InitError};
-use cxlib_protocol::collect::types as protocol;
-use cxlib_user::Session;
+use cxlib_error::InitError;
 use onceinit::{OnceInit, StaticDefault};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, f64::consts::PI, ops::Deref, str::FromStr};
+use std::{ops::Deref, str::FromStr};
 
+/// [`LocationPreprocessorTrait`]
+/// 用来对位置作预处理。该特型试图解决如下问题：
+///
+/// 教师设置签到的位置的“可视地址”并非该位置的真实名称。
+/// 例如，程序获取到的名称为“青-692”，但实际签到时，该地点应为“中国浙江省杭州市西湖区柑普洱街太平南路”。
+///
+/// 可以借助该特型的[`do_preprocess`](LocationPreprocessorTrait::do_preprocess)方法，对该位置进行一定地处理，使之更符合真实情况。
 pub trait LocationPreprocessorTrait: Send + Sync {
-    fn do_preprocess(&self, location: Location) -> Location;
-}
-struct DefaultLocationPreprocessor;
-impl LocationPreprocessorTrait for DefaultLocationPreprocessor {
+    /// 方法，消费一个 [`Location`], 生产一个新的 [`Location`].
+    /// 默认直接返回入参。
+    ///
+    /// 注意，该函数不会作用于 [`FromStr`] 和与 `[String; 4]` 间的转换当中。
+    #[inline]
     fn do_preprocess(&self, location: Location) -> Location {
         location
     }
 }
+struct DefaultLocationPreprocessor;
+static NULL_LOCATION_PREPROCESSOR: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
+impl LocationPreprocessorTrait for DefaultLocationPreprocessor {}
 unsafe impl StaticDefault for dyn LocationPreprocessorTrait {
     fn static_default() -> &'static Self {
-        static NOP: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
-        &NOP
+        &NULL_LOCATION_PREPROCESSOR
     }
 }
-
 static LOCATION_PREPROCESSOR: OnceInit<dyn LocationPreprocessorTrait> = OnceInit::uninit();
+
+/// # [`Location`]
+/// 签到位置，由显示地址（一般可在签到完成界面查看）、经纬度、海拔高度组成。
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct Location {
     addr: String,
@@ -32,24 +41,35 @@ pub struct Location {
     alt: String,
 }
 impl Location {
+    /// 参见 [`LocationPreprocessorTrait`].
+    #[inline]
     pub fn get_location_preprocessor() -> &'static dyn LocationPreprocessorTrait {
         LOCATION_PREPROCESSOR.deref()
     }
-    pub fn to_preprocessed(self) -> Location {
+    /// 参见 [`LocationPreprocessorTrait`], [`do_preprocess`](LocationPreprocessorTrait::do_preprocess)方法不会作用于 [`FromStr`] 和与 `[String; 4]` 间的转换当中。
+    ///
+    /// 另外，[`get_none_location`](Self::get_none_location) 内部通过 `[const { String::new() }; 4]` 构造自身，故不会调用 `do_preprocess`, 如需预处理后的结果，可手动调用本函数。
+    #[inline]
+    pub fn into_preprocessed(self) -> Location {
         Self::get_location_preprocessor().do_preprocess(self)
     }
-
+    /// 参见 [`LocationPreprocessorTrait`].
+    #[inline]
     pub fn set_location_preprocessor(
         preprocessor: &'static dyn LocationPreprocessorTrait,
     ) -> Result<(), InitError> {
         Ok(LOCATION_PREPROCESSOR.init(preprocessor)?)
     }
+    /// 参见 [`LocationPreprocessorTrait`].
+    #[inline]
     pub fn set_boxed_location_preprocessor(
         preprocessor: Box<dyn LocationPreprocessorTrait>,
     ) -> Result<(), InitError> {
         Ok(LOCATION_PREPROCESSOR.init_boxed(preprocessor)?)
     }
-    pub fn to_owned_fields(self) -> [String; 4] {
+    /// 将 self 转为 `[String; 4]`, 顺序为显示地址、经度、纬度、海拔（单位应该为米，在本程序中该字段无实际用途）。
+    #[inline]
+    pub fn into_owned_fields(self) -> [String; 4] {
         let Location {
             addr,
             lon,
@@ -58,6 +78,10 @@ impl Location {
         } = self;
         [addr, lon, lat, alt]
     }
+    /// 以 `[String; 4]` 构造自身，顺序为显示地址、经度、纬度、海拔（单位应该为米，在本程序中该字段无实际用途，可随意）。
+    ///
+    /// 注意，该函数不会对 [`Location`] 进行预处理。
+    #[inline]
     pub fn from_owned_fields([addr, lon, lat, alt]: [String; 4]) -> Self {
         Location {
             addr,
@@ -66,15 +90,76 @@ impl Location {
             alt,
         }
     }
+    /// Eq to `Self::from_owned_fields([const { String::new() }; 4])`.
+    ///
+    /// 注意，该函数不会对 [`Location`] 进行预处理。
+    #[inline]
     pub fn get_none_location() -> Self {
-        Location {
-            addr: "".to_string(),
-            lon: "".to_string(),
-            lat: "".to_string(),
-            alt: "".to_string(),
-        }
+        Self::from_owned_fields([const { String::new() }; 4])
     }
-    pub fn parse(location_str: &str) -> Result<Self, String> {
+    /// 构造函数，顺序为显示地址、经度、纬度、海拔（单位应该为米，在本程序中该字段无实际用途，可随意）。
+    #[inline]
+    pub fn new(addr: &str, lon: &str, lat: &str, alt: &str) -> Location {
+        let location = Location {
+            addr: addr.into(),
+            lon: lon.into(),
+            lat: lat.into(),
+            alt: alt.into(),
+        };
+        location.into_preprocessed()
+    }
+    /// 地址。
+    #[inline]
+    pub fn addr(&self) -> &str {
+        &self.addr
+    }
+    /// 经度。
+    #[inline]
+    pub fn lon(&self) -> &str {
+        &self.lon
+    }
+    /// 纬度。
+    #[inline]
+    pub fn lat(&self) -> &str {
+        &self.lat
+    }
+    /// 海拔。
+    #[inline]
+    pub fn alt(&self) -> &str {
+        &self.alt
+    }
+    /// 地址。
+    #[inline]
+    pub fn set_addr(&mut self, addr: &str) {
+        addr.clone_into(&mut self.addr)
+    }
+    /// 经度。
+    #[inline]
+    pub fn set_lon(&mut self, lon: &str) {
+        lon.clone_into(&mut self.lon)
+    }
+    /// 纬度。
+    #[inline]
+    pub fn set_lat(&mut self, lat: &str) {
+        lat.clone_into(&mut self.lat)
+    }
+    /// 海拔。
+    #[inline]
+    pub fn set_alt(&mut self, alt: &str) {
+        alt.clone_into(&mut self.alt)
+    }
+}
+
+impl std::fmt::Display for Location {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{},{},{},{}", self.addr, self.lon, self.lat, self.alt)
+    }
+}
+impl FromStr for Location {
+    type Err = String;
+
+    fn from_str(location_str: &str) -> Result<Self, Self::Err> {
         let location_str: Vec<&str> = location_str.split(',').map(|item| item.trim()).collect();
         if location_str.len() == 4 {
             Ok(Self::new(
@@ -86,60 +171,6 @@ impl Location {
         } else {
             Err("位置信息格式错误！格式为：`地址,经度,纬度,海拔`.".to_string())
         }
-    }
-    pub fn new(addr: &str, lon: &str, lat: &str, alt: &str) -> Location {
-        let location = Location {
-            addr: addr.into(),
-            lon: lon.into(),
-            lat: lat.into(),
-            alt: alt.into(),
-        };
-        location.to_preprocessed()
-    }
-    /// 地址。
-    pub fn get_addr(&self) -> &str {
-        &self.addr
-    }
-    /// 经度。
-    pub fn get_lon(&self) -> &str {
-        &self.lon
-    }
-    /// 纬度。
-    pub fn get_lat(&self) -> &str {
-        &self.lat
-    }
-    /// 海拔。
-    pub fn get_alt(&self) -> &str {
-        &self.alt
-    }
-    /// 地址。
-    pub fn set_addr(&mut self, addr: &str) {
-        addr.clone_into(&mut self.addr)
-    }
-    /// 经度。
-    pub fn set_lon(&mut self, lon: &str) {
-        lon.clone_into(&mut self.lon)
-    }
-    /// 纬度。
-    pub fn set_lat(&mut self, lat: &str) {
-        lat.clone_into(&mut self.lat)
-    }
-    /// 海拔。
-    pub fn set_alt(&mut self, alt: &str) {
-        alt.clone_into(&mut self.alt)
-    }
-}
-
-impl std::fmt::Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{},{},{},{}", self.addr, self.lon, self.lat, self.alt)
-    }
-}
-impl FromStr for Location {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Location::parse(s)
     }
 }
 
@@ -159,6 +190,10 @@ impl FromStr for Location {
 //     位置id
 // }
 
+/// #[`LocationWithRange`]
+/// 带范围的签到位置。参见 [`Location`], 包含额外的签到范围（半径，单位为米），但不包含海拔信息。
+///
+/// 使用 [`to_shifted_location`](LocationWithRange::to_shifted_location) 转换为偏移后的 `Location`.
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct LocationWithRange {
     #[serde(rename = "address")]
@@ -172,45 +207,14 @@ pub struct LocationWithRange {
 }
 
 impl LocationWithRange {
-    pub fn from_log(
-        session: &Session,
-        course: &Course,
-    ) -> Result<HashMap<String, Self>, AgentError> {
-        #[derive(Debug, Clone, Deserialize, Serialize)]
-        struct LocationWithRangeAndActiveId {
-            #[serde(rename = "activeid")]
-            active_id: i64,
-            #[serde(rename = "address")]
-            addr: String,
-            #[serde(rename = "longitude")]
-            lon: f64,
-            #[serde(rename = "latitude")]
-            lat: f64,
-            #[serde(rename = "locationrange")]
-            range: String,
+    #[inline]
+    pub fn new(addr: String, lon: String, lat: String, range: u32) -> Self {
+        Self {
+            addr,
+            lon,
+            lat,
+            range,
         }
-        impl LocationWithRangeAndActiveId {
-            pub fn to_location_with_range(&self) -> LocationWithRange {
-                LocationWithRange {
-                    addr: self.addr.clone(),
-                    lon: self.lon.to_string(),
-                    lat: self.lat.to_string(),
-                    range: self.range.trim().parse().unwrap_or(100),
-                }
-            }
-        }
-        #[derive(Debug, Clone, Deserialize, Serialize)]
-        struct Data {
-            #[serde(rename = "data")]
-            data: Vec<LocationWithRangeAndActiveId>,
-        }
-        let r = protocol::get_location_log(session, (course.get_id(), course.get_class_id()))?;
-        let data: Data = r.into_body().read_json().log_unwrap();
-        let mut map = HashMap::new();
-        for l in data.data {
-            map.insert(l.active_id.to_string(), l.to_location_with_range());
-        }
-        Ok(map)
     }
     pub fn find_in_html(html: &str) -> Option<LocationWithRange> {
         let p = [
@@ -262,6 +266,11 @@ impl LocationWithRange {
             },
         })
     }
+    /// 本类型的数据一般直接从签到信息内获取，为避免与预设位置完全一致，本程序将默认以随机偏移一定距离后的位置作为签到位置，使之符合真实情况。
+    ///
+    /// 偏移距离在范围的百分之五以内，即 0--5 米到 0--100 米不等，但绝不会超出范围。
+    ///
+    /// 由于本类型不包含海拔数据，海拔将被设置为 `1108`(米).
     pub fn to_shifted_location(&self) -> Location {
         const R: f64 = 6371393.0;
         let LocationWithRange {
@@ -272,8 +281,12 @@ impl LocationWithRange {
         } = self;
         let lat: f64 = lat.parse().unwrap();
         let lon: f64 = lon.parse().unwrap();
-        let mut r = rand::rng().random_range(0..range * 3) as f64 / (*range as f64) / 60.0;
-        let theta = rand::rng().random_range(0..360) as f64 * PI / 180.0;
+        let mut rng = rand::rng();
+        // r | [0.0..0.05].
+        let mut r: f64 = rng.random_range(0.0..0.05);
+        use std::f64::consts::{PI, TAU};
+        // theta | [0.0..TAU].
+        let theta = rng.random_range(0.0..TAU);
         r *= (*range as f64)
             / R
             / (1.0 - theta.cos().powi(2) * (lat * PI / 180.0).sin().powi(2)).sqrt();

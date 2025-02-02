@@ -7,12 +7,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono.workspace = true
 cxlib_error = { path = "../cxlib_error" }
+cxlib_login = { path = "../cxlib_login" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["types"] }
-cxlib_user = { path = "../cxlib_user" }
+cxlib_store = { path = "../cxlib_store" }
 log.workspace = true
 onceinit.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+unicode-width.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }

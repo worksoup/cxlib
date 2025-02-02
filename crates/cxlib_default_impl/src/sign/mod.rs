@@ -7,20 +7,15 @@ mod signcode;
 
 pub use gesture::*;
 pub use location::*;
-use log::{error, warn};
 pub use normal::*;
 pub use photo::*;
 pub use qrcode::*;
 pub use signcode::*;
 
-use cxlib_activity::RawSign;
-use cxlib_error::CxlibResultUtils;
-use cxlib_protocol::collect::default_impl as protocol;
-use cxlib_sign::{PreSignResult, SignDetail, SignError, SignTrait};
-use cxlib_types::LocationWithRange;
-use cxlib_user::Session;
-use serde::Deserialize;
+use cxlib_sign::{PreSignResult, SignError, SignTrait};
+use cxlib_types::{RawSign, Session, SignDetail};
 use std::collections::HashMap;
+use log::{error, warn};
 
 pub type CaptchaId = String;
 
@@ -43,29 +38,14 @@ pub enum Sign {
     Unknown(RawSign),
 }
 impl Sign {
-    pub fn get_sign_detail(active_id: &str, session: &Session) -> Result<SignDetail, SignError> {
-        #[derive(Deserialize)]
-        struct GetSignDetailR {
-            #[serde(rename = "ifPhoto")]
-            is_photo_sign: i64,
-            #[serde(rename = "ifRefreshEwm")]
-            is_refresh_qrcode: i64,
-            #[serde(rename = "signCode")]
-            sign_code: Option<String>,
-        }
-        let r = protocol::sign_detail(session, active_id)?;
-        let GetSignDetailR {
-            is_photo_sign,
-            is_refresh_qrcode,
-            sign_code,
-        } = r.into_body().read_json().log_unwrap();
-        Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
+    pub fn detail(&self, session: &Session) -> Result<SignDetail, SignError> {
+        self.as_raw().get_detail(session)
     }
     pub fn from_raw(raw: RawSign, session: &Session) -> Self {
-        if let Ok(sign_detail) = Sign::get_sign_detail(raw.active_id.as_str(), session) {
+        if let Ok(sign_detail) = raw.get_detail(session) {
             let r#else = |e| {
                 error!("{}", raw.other_id);
-                error!("{}", raw.course.get_name());
+                error!("{}", raw.course.name());
                 panic!("{e}")
             };
             match raw.other_id.parse::<u8>().unwrap_or_else(r#else) {
@@ -78,8 +58,8 @@ impl Sign {
                 }
                 1 => Sign::Unknown(raw),
                 2 => {
-                    let mut preset_locations = LocationWithRange::from_log(session, &raw.course)
-                        .unwrap_or_else(|e| {
+                    let mut preset_locations =
+                        raw.course.get_locations(session).unwrap_or_else(|e| {
                             warn!("获取预设位置失败！错误信息：{e}.");
                             HashMap::new()
                         });
@@ -99,8 +79,8 @@ impl Sign {
                 }
                 3 => Sign::Gesture(GestureSign { raw_sign: raw }),
                 4 => {
-                    let mut preset_locations = LocationWithRange::from_log(session, &raw.course)
-                        .unwrap_or_else(|e| {
+                    let mut preset_locations =
+                        raw.course.get_locations(session).unwrap_or_else(|e| {
                             warn!("获取预设位置失败！错误信息：{e}.");
                             HashMap::new()
                         });

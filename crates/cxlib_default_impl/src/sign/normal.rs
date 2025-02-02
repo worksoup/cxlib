@@ -1,6 +1,6 @@
 use crate::sign::{RawSign, SignTrait};
 use cxlib_protocol::utils::PPTSignHelper;
-use cxlib_user::Session;
+use cxlib_types::Session;
 use serde::{Deserialize, Serialize};
 
 /// 普通签到。

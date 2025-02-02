@@ -23,7 +23,7 @@ impl PPTSignHelper {
         self.url += validate;
         self
     }
-    pub fn path_enc_by_pre_sign_result_msg(self, msg: String) -> Self {
+    pub fn patch_enc_by_pre_sign_result_msg(self, msg: String) -> Self {
         if msg.len() > 9 {
             let enc2 = &msg[9..msg.len()];
             debug!("enc2: {enc2:?}");

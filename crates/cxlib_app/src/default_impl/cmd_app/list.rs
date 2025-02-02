@@ -1,18 +1,17 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait, SignParser};
 use clap::{ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
 use cxlib_internal::{
-    activity::{Activity, RawSign},
     default_impl::store::{AccountTable, DataBase},
     sign::SignTrait,
-    types::Course,
-    user::Session,
+    types::{Activity, Course, RawSign, Session},
 };
 use log::warn;
 use std::collections::HashMap;
 
 #[derive(Debug, Parser, Clone)]
-#[command(name = "list")]
-#[clap(about = "列出有效签到。")]
+// TODO: build.rs 中通过环境变量设置 alias.
+#[command(name = "list", alias = "ls")]
+/// 列出有效签到。
 pub struct ListParser {
     /// 列出指定课程的签到。
     #[arg(short, long)]

@@ -1,8 +1,7 @@
 use crate::sign::{LocationSign, PreSignResult, RawSign, SignTrait};
 use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
 use cxlib_sign::SignError;
-use cxlib_types::Location;
-use cxlib_user::Session;
+use cxlib_types::{Location, Session};
 use log::info;
 use serde::{Deserialize, Serialize};
 
@@ -29,12 +28,12 @@ impl SignTrait for QrCodeSign {
 
     fn sign_url(&self, session: &Session, enc: &str, location: &Option<Location>) -> PPTSignHelper {
         protocol::qrcode_sign_url(
-            (session.get_uid(), session.get_fid(), session.get_stu_name()),
+            (session.uid(), session.fid(), session.name()),
             enc,
             self.as_inner().active_id.as_str(),
             location
                 .as_ref()
-                .map(|l| (l.get_addr(), l.get_lat(), l.get_lon(), l.get_alt())),
+                .map(|l| (l.addr(), l.lat(), l.lon(), l.alt())),
         )
     }
 
@@ -44,16 +43,16 @@ impl SignTrait for QrCodeSign {
     fn pre_sign(&self, session: &Session, enc: &str) -> Result<PreSignResult, SignError> {
         let raw = self.as_inner();
         let active_id = raw.active_id.as_str();
-        let uid = session.get_uid();
+        let uid = session.uid();
         let response_of_presign = protocol::pre_sign_for_qrcode_sign(
             session,
-            (raw.course.get_id(), raw.course.get_class_id()),
+            (raw.course.id(), raw.course.class_id()),
             active_id,
             uid,
             &self.c,
             enc,
         )?;
-        info!("用户[{}]预签到已请求。", session.get_stu_name());
+        info!("用户[{}]预签到已请求。", session.name());
         cxlib_sign::utils::analysis_after_presign(active_id, session, response_of_presign)
     }
 }

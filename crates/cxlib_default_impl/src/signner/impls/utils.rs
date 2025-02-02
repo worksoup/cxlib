@@ -2,8 +2,7 @@
 //! 好，还有 2 行调侃。
 use crate::sign::{LocationSign, QrCodeSign};
 use cxlib_sign::{PreSignResult, SignError, SignResult, SignTrait};
-use cxlib_types::Location;
-use cxlib_user::Session;
+use cxlib_types::{Location, Session};
 use log::warn;
 use std::borrow::Borrow;
 pub(crate) trait SignRetry<I, O: Borrow<<Self as SignTrait>::Data>>: SignTrait {

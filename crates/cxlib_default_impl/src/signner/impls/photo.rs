@@ -1,10 +1,8 @@
 use crate::sign::PhotoSign;
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
-use cxlib_types::Photo;
-use cxlib_user::Session;
+use cxlib_types::{Photo, Session};
 use log::warn;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 pub struct DefaultPhotoSignner {
     path: Option<PathBuf>,
@@ -54,7 +52,7 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
                 } else {
                     warn!(
                         "用户[{}]在拍照签到时未能获取到照片，将尝试使用其他用户的照片！",
-                        session.get_stu_name(),
+                        session.name(),
                     );
                 }
             }

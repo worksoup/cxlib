@@ -2,12 +2,14 @@ use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
 use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
 use cxlib_internal::{
     default_impl::store::{AccountTable, DataBase},
-    user::{LoginSolverWrapper, Session},
+    login::LoginSolverWrapper,
+    types::Session,
 };
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "accounts")]
-#[clap(about = "列出所有账号。")]
+// TODO: build.rs 中通过环境变量设置 alias.
+#[command(name = "accounts", alias = "lsa")]
+/// 列出所有账号。
 pub struct AccountsParser {
     /// 重新获取账号信息并缓存。
     #[arg(short, long)]
@@ -51,12 +53,7 @@ impl<Context: AsRef<DataBase>> AppTrait<Context> for AccountsCmdApp {
                 .collect()
         };
         for session in sessions {
-            println!(
-                "{}, {}, {}",
-                session.get_uname(),
-                session.get_stu_name(),
-                session.get_uid()
-            );
+            println!("{}, {}, {}", session.uname(), session.name(), session.uid());
         }
     }
 }

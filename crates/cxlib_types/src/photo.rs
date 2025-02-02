@@ -1,6 +1,6 @@
+use crate::session::Session;
 use cxlib_error::{AgentError, CxlibResultUtils};
 use cxlib_protocol::collect::types as protocol;
-use cxlib_user::Session;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, path::Path};
 
@@ -24,7 +24,7 @@ impl Photo {
 
     pub fn new(session: &Session, file: &File, file_name: &str) -> Result<Self, AgentError> {
         let token = Self::get_pan_token(session)?;
-        let r = protocol::pan_upload(session, file, session.get_uid(), &token, file_name)?;
+        let r = protocol::pan_upload(session, file, session.uid(), &token, file_name)?;
         #[derive(Deserialize)]
         struct Tmp {
             #[serde(rename = "objectId")]
@@ -38,6 +38,7 @@ impl Photo {
     pub fn get_object_id(&self) -> &str {
         &self.object_id
     }
+    #[inline]
     pub fn default(session: &Session) -> Option<Self> {
         Self::find_in_cxpan(session, |a| a == "1.png" || a == "1.jpg").unwrap()
     }
@@ -73,6 +74,7 @@ impl Photo {
         }
         Ok(None)
     }
+    #[inline]
     pub fn get_from_file(session: &Session, file_path: impl AsRef<Path>) -> Self {
         let f = File::open(&file_path).unwrap();
         let file_name = file_path.as_ref().file_name().unwrap().to_str().unwrap();

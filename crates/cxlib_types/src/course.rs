@@ -1,176 +1,204 @@
 pub use cxlib_error::CourseError;
-use cxlib_error::{CxlibResultUtils, MaybeFatalError};
+
+use crate::{
+    Activity, ClassId, ClassInfo, LocationWithRange, OtherActivity, RawCourse, RawSign, Session,
+};
+use cxlib_error::{ActivityError, AgentError, CxlibResultUtils};
 use cxlib_protocol::collect::types as protocol;
-use cxlib_user::LoginError;
-use cxlib_user::Session;
-use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::HashMap,
     fmt::Display,
-    ops::Deref,
+    sync::{Arc, Mutex},
 };
-use ureq::{http::Response, Body};
+use ureq::Agent;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Course {
-    id: i64,
-    class_id: i64,
-    teacher: String,
-    image_url: String,
-    name: String,
+    raw: RawCourse,
+    class_info: ClassInfo,
 }
-
 impl Display for Course {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "班级号：{}, 课程号: {}, 课程名: {}, 任课教师: {}",
-            self.class_id, self.id, self.name, self.teacher
+            "班级号:{}, 课程号: {}, 课程名: {}, 任课教师: {}",
+            self.class_id(),
+            self.id(),
+            self.name(),
+            self.teacher()
         )
+    }
+}
+impl Course {
+    #[inline]
+    pub fn new(raw: RawCourse, class_info: ClassInfo) -> Course {
+        Course { raw, class_info }
+    }
+    #[inline]
+    pub fn id(&self) -> i64 {
+        self.raw.id()
+    }
+    #[inline]
+    pub fn teacher(&self) -> &str {
+        self.raw.teacher()
+    }
+    #[inline]
+    pub fn image_url(&self) -> Option<&str> {
+        self.raw.image_url()
+    }
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.raw.name()
+    }
+    #[inline]
+    pub fn class_id(&self) -> ClassId {
+        self.class_info.id()
+    }
+    #[inline]
+    pub fn class_ended(&self) -> bool {
+        self.class_info.ended()
     }
 }
 
 impl Course {
-    pub fn get_courses<'a, Sessions: Iterator<Item = &'a Session>>(
-        sessions: Sessions,
-    ) -> Result<HashMap<Course, Vec<Session>>, CourseError> {
-        let mut handles = Vec::new();
-        for session in sessions {
-            let session_ = session.clone();
-            let handle = std::thread::spawn(move || -> Result<Vec<Course>, CourseError> {
-                Course::get_session_courses(&session_)
-            });
-            handles.push((handle, session));
+    pub fn get_locations(
+        &self,
+        session: &Agent,
+    ) -> Result<HashMap<String, LocationWithRange>, AgentError> {
+        #[derive(Debug, Clone, Deserialize, Serialize)]
+        struct LocationWithRangeAndActiveId {
+            #[serde(rename = "activeid")]
+            active_id: i64,
+            #[serde(rename = "address")]
+            addr: String,
+            #[serde(rename = "longitude")]
+            lon: f64,
+            #[serde(rename = "latitude")]
+            lat: f64,
+            #[serde(rename = "locationrange")]
+            range: String,
         }
-        let mut courses = HashMap::<_, Vec<_>>::new();
-        for (handle, session) in handles {
-            let r = handle.join().unwrap();
-            let courses_ = match r {
-                Ok(c) => c,
-                Err(e) => {
-                    if e.is_fatal() {
-                        return Err(e);
-                    } else {
-                        warn!(
-                            "未能获取用户[{}]的课程，错误信息：{e}.",
-                            session.get_stu_name()
-                        );
-                        Default::default()
-                    }
-                }
-            };
-            for course in courses_ {
-                let entry = courses.entry(course);
-                match entry {
-                    Entry::Occupied(mut entry) => {
-                        entry.get_mut().push(session.clone());
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(vec![session.clone()]);
-                    }
-                }
+        impl LocationWithRangeAndActiveId {
+            #[inline]
+            pub fn into_location_with_range(self) -> LocationWithRange {
+                LocationWithRange::new(
+                    self.addr,
+                    self.lon.to_string(),
+                    self.lat.to_string(),
+                    self.range.trim().parse().unwrap_or(100),
+                )
             }
         }
-        Ok(courses)
-    }
-    pub fn get_session_courses(session: &Session) -> Result<Vec<Course>, CourseError> {
-        let r = protocol::back_clazz_data(session.deref())?;
-        let courses = Course::get_list_from_response(r)?;
-        info!("用户[{}]已获取课程列表。", session.get_stu_name());
-        Ok(courses)
-    }
-    fn get_list_from_response(r: Response<Body>) -> Result<Vec<Course>, CourseError> {
-        let r: GetCoursesR = r.into_body().read_json().log_unwrap();
-        let mut arr = Vec::new();
-        if let Some(channel_list) = r.channel_list {
-            for c in channel_list {
-                if let Some(data) = c.content.course {
-                    for course in data.data {
-                        if c.id.is_i64() {
-                            arr.push(Course::new(
-                                course.id,
-                                c.id.as_i64().unwrap(),
-                                course.teacher.as_str(),
-                                course.image_url.unwrap_or("".into()).as_str(),
-                                course.name.as_str(),
-                            ))
-                        }
-                    }
-                }
-            }
-            Ok(arr)
-        } else {
-            Err(LoginError::LoginExpired(
-                "`channelList` 字段为空!".to_string(),
-            ))?
+        #[derive(Debug, Clone, Deserialize, Serialize)]
+        struct Data {
+            #[serde(rename = "data")]
+            data: Vec<LocationWithRangeAndActiveId>,
         }
-    }
-
-    pub fn new(id: i64, class_id: i64, teacher: &str, image_url: &str, name: &str) -> Course {
-        Course {
-            id,
-            class_id,
-            teacher: teacher.into(),
-            image_url: image_url.into(),
-            name: name.into(),
+        let r = protocol::get_location_log(session, (self.id(), self.class_id()))?;
+        let data: Data = r.into_body().read_json().log_unwrap();
+        let mut map = HashMap::new();
+        for l in data.data {
+            map.insert(l.active_id.to_string(), l.into_location_with_range());
         }
-    }
-    // fn from_raw(raw: &CourseRaw, class_id: i64) -> Course {
-    //     Self {
-    //         id: raw.id,
-    //         class_id,
-    //         teacher: raw.teacher.clone(),
-    //         image_url: raw.image_url.clone(),
-    //         name: raw.name.clone(),
-    //     }
-    // }
-    pub fn get_id(&self) -> i64 {
-        self.id
-    }
-    pub fn get_class_id(&self) -> i64 {
-        self.class_id
-    }
-    pub fn get_teacher(&self) -> &str {
-        &self.teacher
-    }
-    pub fn get_image_url(&self) -> &str {
-        &self.image_url
-    }
-    pub fn get_name(&self) -> &str {
-        &self.name
+        Ok(map)
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-struct CourseRaw {
+/// # ActivityRaw
+///
+/// 未分类的活动类型，仅用于内部反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
+#[derive(Deserialize, Serialize, Clone)]
+struct ActivityRaw {
+    #[serde(rename = "nameOne")]
+    name_one: String,
     id: i64,
-    #[serde(rename = "teacherfactor")]
-    teacher: String,
-    #[serde(rename = "imageurl")]
-    image_url: Option<String>,
-    name: String,
+    #[serde(rename = "otherId")]
+    other_id: Option<String>,
+    status: i32,
+    #[serde(rename = "startTime")]
+    start_time_mills: u64,
+}
+/// 内部类型，用于反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
+#[derive(Deserialize, Serialize)]
+struct Data {
+    #[serde(rename = "activeList")]
+    active_list: Vec<ActivityRaw>,
+}
+/// 内部类型，用于反序列化。
+///
+/// 请参考 [`protocol::active_list`] 的响应数据。
+#[derive(Deserialize, Serialize)]
+struct GetActivityR {
+    data: Option<Data>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-struct Courses {
-    data: Vec<CourseRaw>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct CourseContent {
-    course: Option<Courses>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct ClassRaw {
-    #[serde(rename = "key")]
-    id: serde_json::Value,
-    content: CourseContent,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct GetCoursesR {
-    #[serde(rename = "channelList")]
-    channel_list: Option<Vec<ClassRaw>>,
+impl Course {
+    /// 获取该课程的活动。
+    pub fn get_activities(&self, session: &Session) -> Result<Vec<Activity>, ActivityError> {
+        let r = protocol::active_list(session, (self.id(), self.class_id()))?;
+        let r: GetActivityR = r.into_body().read_json().log_unwrap();
+        let activities = Arc::new(Mutex::new(Vec::new()));
+        if let Some(data) = r.data {
+            let thread_count = 1;
+            let len = data.active_list.len();
+            let chunk_rest = len % thread_count;
+            let chunk_count = len / thread_count + if chunk_rest == 0 { 0 } else { 1 };
+            for i in 0..chunk_count {
+                let ars = &data.active_list[i * thread_count..if i != chunk_count - 1 {
+                    (i + 1) * thread_count
+                } else {
+                    len
+                }];
+                let mut handles = Vec::new();
+                for ar in ars {
+                    let ar = ar.clone();
+                    let c = self.clone();
+                    let activities = activities.clone();
+                    let handle = std::thread::spawn(move || {
+                        if ar.other_id.as_ref().is_some_and(|oid| {
+                            let other_id_i64: i64 = oid.parse().unwrap();
+                            (0..=5).contains(&other_id_i64)
+                        }) {
+                            let other_id = unsafe { ar.other_id.unwrap_unchecked() };
+                            let active_id = ar.id.to_string();
+                            let base_sign = RawSign {
+                                active_id,
+                                name: ar.name_one,
+                                course: c.clone(),
+                                other_id,
+                                status_code: ar.status,
+                                start_time_mills: ar.start_time_mills,
+                            };
+                            activities
+                                .lock()
+                                .unwrap()
+                                .push(Activity::RawSign(base_sign))
+                        } else {
+                            activities
+                                .lock()
+                                .unwrap()
+                                .push(Activity::Other(OtherActivity {
+                                    id: ar.id.to_string(),
+                                    name: ar.name_one,
+                                    course: c.clone(),
+                                    status: ar.status,
+                                    start_time_mills: ar.start_time_mills,
+                                }))
+                        }
+                    });
+                    handles.push(handle);
+                }
+                for h in handles {
+                    h.join().unwrap();
+                }
+            }
+        }
+        let activities = Arc::into_inner(activities).unwrap().into_inner().unwrap();
+        Ok(activities)
+    }
 }

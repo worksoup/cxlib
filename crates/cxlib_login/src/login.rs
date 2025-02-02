@@ -146,7 +146,7 @@ unsafe impl StaticDefault for LoginSolvers {
 /// # [`LoginSolverWrapper`]
 /// [`LoginSolverTrait`] 的包装，需要从字符串构造 LoginSolver 时请使用该类型。
 /// ``` rust
-/// use cxlib_user::LoginSolverWrapper;
+/// use cxlib_login::LoginSolverWrapper;
 /// let solver = LoginSolverWrapper::new("login_type");
 /// ```
 pub struct LoginSolverWrapper<'s>(&'s str);

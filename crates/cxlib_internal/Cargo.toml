@@ -12,16 +12,15 @@ icon_click_ui_solver = ["cxlib_captcha/icon_click_ui_solver"]
 text_click_ui_solver = ["cxlib_captcha/text_click_ui_solver"]
 
 [dependencies]
-cxlib_activity = { path = "../cxlib_activity" }
 cxlib_captcha = { path = "../cxlib_captcha" }
 cxlib_default_impl = { path = "../cxlib_default_impl" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
+cxlib_login = { path = "../cxlib_login" }
 cxlib_protocol = { path = "../cxlib_protocol" }
 cxlib_sign = { path = "../cxlib_sign" }
 cxlib_store = { path = "../cxlib_store" }
 cxlib_types = { path = "../cxlib_types" }
-#cxlib_unused = { path = "../cxlib_unused" }
-cxlib_user = { path = "../cxlib_user" }
+cxlib_types_ext = { path = "../cxlib_types_ext" }
 cxlib_utils = { path = "../cxlib_utils" }
 thiserror.workspace = true

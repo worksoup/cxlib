@@ -5,15 +5,16 @@ use crate::{
 use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
 use cxlib_internal::{
     default_impl::store::{AccountTable, DataBase},
-    user::{DefaultLoginSolver, LoginSolverTrait},
+    login::{DefaultLoginSolver, LoginSolverTrait},
 };
 use log::{info, warn};
-
+// TODO: build.rs 中通过环境变量设置 alias.
 #[derive(Parser, Debug, Clone)]
-#[command(name = "account")]
-#[clap(about = "账号相关操作（添加、删除）。")]
+#[command(name = "account", alias = "a")]
+/// 账号相关操作（添加、删除）。
 pub enum AccountParser {
     /// 添加账号。
+    #[command(alias = "+")]
     Add {
         /// 账号（手机号）。
         uname: String,
@@ -22,6 +23,7 @@ pub enum AccountParser {
         passwd: Option<String>,
     },
     /// 删除账号。
+    #[command(alias = "rm")]
     Remove {
         /// uid (可通过 accounts 子命令查看).
         uid: String,
@@ -65,10 +67,7 @@ impl<Context: AsRef<DataBase>> AppTrait<Context> for AccountCmdApp {
                 // 添加账号。
                 match session {
                     Ok(session) => {
-                        info!(
-                            "添加账号[{uname}]（用户名：{}）成功！",
-                            session.get_stu_name()
-                        )
+                        info!("添加账号[{uname}]（用户名：{}）成功！", session.name())
                     }
                     Err(e) => warn!("添加账号[{uname}]失败：{e}."),
                 };

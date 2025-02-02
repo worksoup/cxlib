@@ -1,7 +1,8 @@
 use crate::store::{DataBase, DataBaseTableTrait};
 use cxlib_error::StoreError;
 use cxlib_store::{Dir, StorageTableCommandTrait};
-use cxlib_user::{DefaultLoginSolver, LoginError, LoginSolverTrait, LoginSolverWrapper, Session};
+use cxlib_types::Session;
+use cxlib_login::{DefaultLoginSolver, LoginError, LoginSolverTrait, LoginSolverWrapper};
 use log::{info, warn};
 use std::{
     collections::{HashMap, HashSet},
@@ -65,7 +66,7 @@ impl FromStr for AccountData {
             .collect::<Vec<_>>();
         if s.len() < 2 {
             Err(StoreError::ParseError(
-                "登录所需信息解析出错！格式为 `uname,enc_pwd[, login_typ]`.".to_string(),
+                "登录所需信息解析出错！格式为 `uname, enc_pwd[, login_typ]`.".to_string(),
             ))?
         } else {
             let uname = s[0].to_string();
@@ -77,9 +78,9 @@ impl FromStr for AccountData {
             };
             let (agent, cookies) =
                 Session::relogin_raw(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;
-            Session::store_cookies(&agent, cookies.get_uid())?;
+            Session::store_cookies(&agent, cookies.uid())?;
             Ok(Self {
-                uid: cookies.get_uid().to_owned(),
+                uid: cookies.uid().to_owned(),
                 uname,
                 enc_pwd,
                 login_type,
@@ -269,7 +270,7 @@ impl AccountTable {
         let session = Session::relogin(&uname, &enc_pwd, &LoginSolverWrapper::new(&login_type))?;
         Self::add_account_or(
             db,
-            &AccountData::new(session.get_uid().to_owned(), uname, enc_pwd, login_type),
+            &AccountData::new(session.uid().to_owned(), uname, enc_pwd, login_type),
             AccountTable::update_account,
         );
         Ok(session)
@@ -324,7 +325,7 @@ impl DataBaseTableTrait for AccountTable {
                     info!(
                         "账号 [{}]（用户名：{}）导入成功！",
                         account.uname(),
-                        session.get_stu_name()
+                        session.name()
                     );
                     Self::add_account_or(db, &account, AccountTable::update_account);
                 }

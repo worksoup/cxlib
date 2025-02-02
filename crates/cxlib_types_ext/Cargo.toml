@@ -1,12 +1,10 @@
 [package]
-name = "cxlib_utils"
+name = "cxlib_types_ext"
 edition = "2021"
 version.workspace = true
 authors.workspace = true
 
-[features]
-
 [dependencies]
-inquire.workspace = true
+cxlib_error = { path = "../cxlib_error" }
+cxlib_types = { path = "../cxlib_types" }
 log.workspace = true
-ureq.workspace = true

@@ -1,11 +1,12 @@
 use crate::ProtocolItem;
 use cxlib_error::AgentError;
+use std::fmt::Display;
 use ureq::{http::Response, Agent, Body};
 
 // 预签到
 pub fn pre_sign(
     client: &Agent,
-    (course_id, class_id): (i64, i64),
+    (course_id, class_id): (i64, impl Display),
     active_id: &str,
     uid: &str,
 ) -> Result<Response<Body>, AgentError> {
@@ -16,7 +17,7 @@ pub fn pre_sign(
 }
 pub fn pre_sign_for_qrcode_sign(
     client: &Agent,
-    (course_id, class_id): (i64, i64),
+    (course_id, class_id): (i64, impl Display),
     active_id: &str,
     uid: &str,
     c: &str,
