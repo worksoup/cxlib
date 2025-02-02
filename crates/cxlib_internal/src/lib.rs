@@ -12,7 +12,7 @@ pub mod types {
 pub use cxlib_utils as utils;
 
 pub mod error {
-    use cxlib_error::*;
+    pub use cxlib_error::*;
     pub type CxlibResult<T> = Result<T, Error>;
     #[derive(thiserror::Error, Debug)]
     pub enum Error {

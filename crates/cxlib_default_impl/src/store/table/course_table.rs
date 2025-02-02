@@ -17,6 +17,21 @@ pub struct CourseData {
     uid_list: String,
 }
 impl CourseData {
+    pub fn new(course: Course, uid_list: String, recently_used_timestamp_secs: u64) -> Self {
+        Self {
+            inner: course,
+            recently_used_timestamp_secs,
+            uid_list,
+        }
+    }
+    pub fn get_uid_list(&self) -> HashSet<&str> {
+        self.uid_list
+            .split(',')
+            .map(|s| s.trim())
+            .collect::<HashSet<&str>>()
+    }
+}
+impl CourseData {
     pub fn as_inner(&self) -> &Course {
         &self.inner
     }
