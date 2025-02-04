@@ -419,32 +419,16 @@ impl LocationParser {
     }
 }
 
-pub struct LocationCmdApp {
-    command: Command,
-}
-impl LocationCmdApp {
-    pub fn new() -> LocationCmdApp {
-        let command = LocationParser::command();
-        LocationCmdApp { command }
-    }
-}
-impl Default for LocationCmdApp {
-    fn default() -> LocationCmdApp {
-        LocationCmdApp::new()
-    }
-}
+pub struct LocationCmdApp;
 impl<Context: AsRef<DataBase>> AppTrait<Context> for LocationCmdApp {
     type OwnedData = LocationParser;
     fn run(&self, db: &Context, command: LocationParser) {
         command.parse(db.as_ref())
     }
 }
-impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context>
+impl<Context: AsRef<DataBase> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
     for LocationCmdApp
 {
-    fn subcommand(&self) -> Option<&Command> {
-        Some(&self.command)
-    }
     fn read_owned_data(
         &self,
         _: &Context,

@@ -1,5 +1,8 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
-use clap::{ArgMatches, FromArgMatches, Parser};
+use clap::{ArgMatches, Args, Command, FromArgMatches, Parser};
+use cxlib_internal::captcha::utils::get_now_timestamp_mills;
+use cxlib_internal::default_impl::store::CourseTable;
+use cxlib_internal::types::ext::ActivityExt;
 use cxlib_internal::{
     default_impl::{
         sign::Sign,
@@ -15,7 +18,7 @@ use cxlib_internal::{
     types::{Activity, RawSign, Session},
 };
 use log::{error, info, warn};
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{cmp, collections::HashMap, path::PathBuf, time::Duration};
 
 #[derive(Clone)]
 pub struct CliArgs {
@@ -214,14 +217,34 @@ impl SignParser {
         } else {
             (AccountTable::get_sessions(db), false)
         };
-        let activities = Activity::get_all_activities(db, sessions.values(), false)?;
+        let mut courses = CourseTable::get_courses_with_current_sessions(db, sessions)
+            .into_iter()
+            .collect::<Vec<_>>();
+        courses.sort_by(|(a, _), (b, _)| {
+            let a = a.recently_used_timestamp();
+            let b = b.recently_used_timestamp();
+            let now = (get_now_timestamp_mills() / 1000) as u64;
+            let da = (now - a) / (24 * 60 * 60);
+            let db = (now - b) / (24 * 60 * 60);
+            let da = da == 7;
+            let db = db == 7;
+            if da == db {
+                b.cmp(a)
+            } else if da {
+                cmp::Ordering::Greater
+            } else {
+                cmp::Ordering::Less
+            }
+        });
+        let activities_receiver =
+            Activity::get_from_courses(courses.into_iter().map(|(c, s)| (c.into_inner(), s)));
         let (valid_signs, other_signs): (
             HashMap<RawSign, Vec<Session>>,
             HashMap<RawSign, Vec<Session>>,
-        ) = activities
+        ) = activities_receiver
             .into_iter()
-            .filter_map(|(k, v)| match k {
-                Activity::RawSign(k) => Some((k, v)),
+            .filter_map(|(a, _c, s)| match a {
+                Activity::RawSign(k) => Some((k, s)),
                 Activity::Other(_) => None,
             })
             .partition(|(k, _)| k.is_valid());
@@ -284,11 +307,6 @@ impl SignParser {
     }
 }
 pub struct SignMainApp;
-impl Default for SignMainApp {
-    fn default() -> SignMainApp {
-        SignMainApp
-    }
-}
 impl<Context: AsRef<DataBase>> AppTrait<Context> for SignMainApp {
     type OwnedData = SignParser;
 
@@ -299,7 +317,9 @@ impl<Context: AsRef<DataBase>> AppTrait<Context> for SignMainApp {
     }
 }
 
-impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context> for SignMainApp {
+impl<Context: AsRef<DataBase> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
+    for SignMainApp
+{
     fn read_owned_data(
         &self,
         _: &Context,

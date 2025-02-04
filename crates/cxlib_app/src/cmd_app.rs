@@ -1,22 +1,11 @@
 use crate::{AppTrait, MetaAppTrait};
-use clap::{Arg, ArgMatches, Command};
+use clap::{ArgMatches, Args, Command, CommandFactory, Subcommand};
 use std::collections::HashMap;
 
-pub trait CmdMetaAppTrait<App: CmdAppTrait<Context, Output>, Context = (), Output = ()>:
-    MetaAppTrait<App, Context, Output>
+pub trait CmdMetaAppTrait<Context: 'static = (), OwnedData: 'static = (), Output: 'static = ()>
+where
+    Self: MetaAppTrait<CmdApp<Context, OwnedData, Output>, Context, Output>,
 {
-    fn args(&self) -> Vec<Arg> {
-        vec![]
-    }
-    fn subcommand(&self) -> Option<&Command> {
-        None
-    }
-    fn push_subcommand(&self, mut cmd: Command) -> Command {
-        if let Some(subcommand) = self.subcommand() {
-            cmd = cmd.subcommand(subcommand);
-        }
-        cmd
-    }
     fn read_owned_data(
         &self,
         context: &Context,
@@ -24,23 +13,16 @@ pub trait CmdMetaAppTrait<App: CmdAppTrait<Context, Output>, Context = (), Outpu
     ) -> <Self as AppTrait<Context, Output>>::OwnedData;
 }
 type MetaAppInvoker<Context, Output> = Box<dyn Fn(&Context, &Vec<&ArgMatches>) -> Output>;
-pub trait CmdAppTrait<Context = (), Output = ()>: AppTrait<Context, Output> {
-    fn insert_meta_app<MetaApp: CmdMetaAppTrait<Self, Context, Output> + 'static>(
-        self,
-        meta_app: MetaApp,
-    ) -> Self
-    where
-        Self: Sized;
-    fn get_meta_app(&self, ident: &str) -> Option<&MetaAppInvoker<Context, Output>>;
-}
-impl<
-        App: CmdAppTrait<Context, Output>,
-        Context,
-        Output,
-        T: CmdMetaAppTrait<App, Context, Output> + 'static,
-    > MetaAppTrait<App, Context, Output> for T
+impl<Context, OwnedData, Output, T>
+    MetaAppTrait<CmdApp<Context, OwnedData, Output>, Context, Output> for T
+where
+    Context: 'static,
+    OwnedData: 'static,
+    Output: 'static,
+    T: CmdMetaAppTrait<Context, OwnedData, Output> + 'static,
+    <Self as AppTrait<Context, Output>>::OwnedData: CommandFactory,
 {
-    fn register(self, app: App) -> App
+    fn register(self, app: CmdApp<Context, OwnedData, Output>) -> CmdApp<Context, OwnedData, Output>
     where
         Self: Sized,
     {
@@ -57,18 +39,10 @@ pub struct CmdApp<Context = (), OwnedData = (), Output = ()> {
     meta_app_invokers: HashMap<String, MetaAppInvoker<Context, Output>>,
 }
 
-impl<Context: 'static, OwnedData: 'static, Output: 'static> AppTrait<Context, Output>
-    for CmdApp<Context, OwnedData, Output>
-{
+impl<Context, OwnedData, Output> AppTrait<Context, Output> for CmdApp<Context, OwnedData, Output> {
     type OwnedData = OwnedData;
     fn run(&self, data: &Context, owned_data: OwnedData) -> Output {
-        let command = <CmdApp<Context, OwnedData, Output> as CmdMetaAppTrait<
-            Self,
-            Context,
-            Output,
-        >>::subcommand(self)
-        .cloned()
-        .unwrap();
+        let command = self.command.clone();
         let matches = command.get_matches();
         let mut matches_vec = vec![&matches];
         let subcommand = matches.subcommand();
@@ -82,43 +56,13 @@ impl<Context: 'static, OwnedData: 'static, Output: 'static> AppTrait<Context, Ou
     }
 }
 
-impl<Context: 'static, OwnedData: 'static, Output: 'static> CmdAppTrait<Context, Output>
+impl<Context, OwnedData, Output> CmdMetaAppTrait<Context, OwnedData, Output>
     for CmdApp<Context, OwnedData, Output>
+where
+    Context: 'static,
+    OwnedData: CommandFactory + 'static,
+    Output: 'static,
 {
-    fn insert_meta_app<MetaApp: CmdMetaAppTrait<Self, Context, Output> + 'static>(
-        mut self,
-        meta_app: MetaApp,
-    ) -> Self {
-        let command = meta_app.subcommand();
-        let args = meta_app.args();
-        for arg in args {
-            self.command = self.command.arg(arg);
-        }
-        if let Some(command) = command {
-            self.command = self.command.subcommand(command);
-            let key = command.get_name().to_owned();
-            let run_meta_app = move |data: &Context, matches: &Vec<&ArgMatches>| -> Output {
-                let owned_data = meta_app.read_owned_data(data, matches);
-                meta_app.run(data, owned_data)
-            };
-            self.meta_app_invokers.insert(key, Box::new(run_meta_app));
-        }
-        self
-    }
-
-    fn get_meta_app(&self, ident: &str) -> Option<&MetaAppInvoker<Context, Output>> {
-        self.meta_app_invokers.get(ident)
-    }
-}
-impl<App: CmdAppTrait<Context, Output>, Context: 'static, OwnedData: 'static, Output: 'static>
-    CmdMetaAppTrait<App, Context, Output> for CmdApp<Context, OwnedData, Output>
-{
-    fn args(&self) -> Vec<Arg> {
-        self.command.get_arguments().cloned().collect()
-    }
-    fn subcommand(&self) -> Option<&Command> {
-        Some(&self.command)
-    }
     fn read_owned_data(
         &self,
         context: &Context,
@@ -150,9 +94,9 @@ impl<Context, OwnedData, Output> CmdApp<Context, OwnedData, Output> {
             meta_app_invokers: Default::default(),
         }
     }
-    pub fn main_cmd_app(
+    fn insert_main_app_invoker<C: CmdMetaAppTrait<Context, OwnedData, Output> + 'static>(
         mut self,
-        main_app: impl CmdMetaAppTrait<Self, Context, Output> + 'static,
+        main_app: C,
     ) -> Self
     where
         OwnedData: 'static,
@@ -166,6 +110,57 @@ impl<Context, OwnedData, Output> CmdApp<Context, OwnedData, Output> {
             };
         self.app = Box::new(main_app_invoker);
         self
+    }
+    pub fn main_app<C: CmdMetaAppTrait<Context, OwnedData, Output> + 'static>(
+        mut self,
+        main_app: C,
+    ) -> Self
+    where
+        OwnedData: 'static,
+        Output: 'static,
+        Context: 'static,
+        <C as AppTrait<Context, Output>>::OwnedData: clap::Args,
+    {
+        self.command = <C as AppTrait<Context, Output>>::OwnedData::augment_args(self.command);
+        self.insert_main_app_invoker(main_app)
+    }
+    pub fn main_app_with_subcommand<C: CmdMetaAppTrait<Context, OwnedData, Output> + 'static>(
+        mut self,
+        main_app: C,
+    ) -> Self
+    where
+        OwnedData: 'static,
+        Output: 'static,
+        Context: 'static,
+        <C as AppTrait<Context, Output>>::OwnedData: clap::Subcommand,
+    {
+        self.command =
+            <C as AppTrait<Context, Output>>::OwnedData::augment_subcommands(self.command);
+        self.insert_main_app_invoker(main_app)
+    }
+    fn insert_meta_app<MetaApp: CmdMetaAppTrait<Context, OwnedData, Output> + 'static>(
+        mut self,
+        meta_app: MetaApp,
+    ) -> Self
+    where
+        <MetaApp as AppTrait<Context, Output>>::OwnedData: CommandFactory,
+        Context: 'static,
+        OwnedData: 'static,
+        Output: 'static,
+    {
+        let command = <MetaApp as AppTrait<Context, Output>>::OwnedData::command();
+        let name = command.get_name().to_owned();
+        self.command = self.command.subcommand(command);
+        let run_meta_app = move |data: &Context, matches: &Vec<&ArgMatches>| -> Output {
+            let owned_data = meta_app.read_owned_data(data, matches);
+            meta_app.run(data, owned_data)
+        };
+        self.meta_app_invokers.insert(name, Box::new(run_meta_app));
+        self
+    }
+
+    fn get_meta_app(&self, ident: &str) -> Option<&MetaAppInvoker<Context, Output>> {
+        self.meta_app_invokers.get(ident)
     }
     pub fn owned_data_builder(
         mut self,
@@ -185,5 +180,19 @@ impl<Context, OwnedData, Output> CmdApp<Context, OwnedData, Output> {
     }
     pub fn command(&self) -> &Command {
         &self.command
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::AccountParser;
+    use clap::CommandFactory;
+
+    #[test]
+    fn test() {
+        let command = AccountParser::command();
+        let matches = command.get_matches_from(["a", "+", "145"]);
+        let subcommand = matches.subcommand();
+        println!("{:?}", subcommand);
     }
 }

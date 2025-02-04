@@ -1,5 +1,5 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
-use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
+use clap::{arg, ArgMatches, Args, Command, CommandFactory, FromArgMatches, Parser};
 use cxlib_internal::{
     default_impl::store::{AccountTable, DataBase},
     login::LoginSolverWrapper,
@@ -15,21 +15,7 @@ pub struct AccountsParser {
     #[arg(short, long)]
     fresh: bool,
 }
-pub struct AccountsCmdApp {
-    command: Command,
-}
-
-impl AccountsCmdApp {
-    pub fn new() -> Self {
-        let command = AccountsParser::command();
-        Self { command }
-    }
-}
-impl Default for AccountsCmdApp {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub struct AccountsCmdApp;
 impl<Context: AsRef<DataBase>> AppTrait<Context> for AccountsCmdApp {
     type OwnedData = AccountsParser;
 
@@ -57,12 +43,9 @@ impl<Context: AsRef<DataBase>> AppTrait<Context> for AccountsCmdApp {
         }
     }
 }
-impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context>
+impl<Context: AsRef<DataBase> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
     for AccountsCmdApp
 {
-    fn subcommand(&self) -> Option<&Command> {
-        Some(&self.command)
-    }
     fn read_owned_data(&self, _: &Context, matches: &[&ArgMatches]) -> AccountsParser {
         AccountsParser::from_arg_matches(matches.last().unwrap()).unwrap()
     }

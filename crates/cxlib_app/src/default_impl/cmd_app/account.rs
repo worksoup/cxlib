@@ -2,7 +2,7 @@ use crate::{
     cmd_app::{CmdApp, CmdMetaAppTrait},
     AppTrait,
 };
-use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
+use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser, Subcommand};
 use cxlib_internal::{
     default_impl::store::{AccountTable, DataBase},
     login::{DefaultLoginSolver, LoginSolverTrait},
@@ -32,21 +32,8 @@ pub enum AccountParser {
         yes: bool,
     },
 }
-pub struct AccountCmdApp {
-    command: Command,
-}
-impl AccountCmdApp {
-    pub fn new() -> AccountCmdApp {
-        AccountCmdApp {
-            command: AccountParser::command(),
-        }
-    }
-}
-impl Default for AccountCmdApp {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+
+pub struct AccountCmdApp;
 impl<Context: AsRef<DataBase>> AppTrait<Context> for AccountCmdApp {
     type OwnedData = AccountParser;
     fn run(&self, context: &Context, owned_data: Self::OwnedData) {
@@ -92,12 +79,9 @@ impl<Context: AsRef<DataBase>> AppTrait<Context> for AccountCmdApp {
     }
 }
 
-impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context>
+impl<Context: AsRef<DataBase> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
     for AccountCmdApp
 {
-    fn subcommand(&self) -> Option<&Command> {
-        Some(&self.command)
-    }
     fn read_owned_data(
         &self,
         _: &Context,

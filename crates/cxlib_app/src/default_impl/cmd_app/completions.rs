@@ -1,5 +1,5 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
-use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
+use clap::{arg, ArgMatches, Args, Command, CommandFactory, FromArgMatches, Parser};
 use clap_complete_command::Shell;
 use std::path::PathBuf;
 
@@ -15,20 +15,7 @@ pub struct CompletionParser {
     output: Option<PathBuf>,
 }
 
-pub struct CompletionCmdApp {
-    command: Command,
-}
-impl CompletionCmdApp {
-    pub fn new() -> Self {
-        let command = CompletionParser::command();
-        Self { command }
-    }
-}
-impl Default for CompletionCmdApp {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub struct CompletionCmdApp;
 impl<Context: AsRef<Command>> AppTrait<Context> for CompletionCmdApp {
     type OwnedData = CompletionParser;
 
@@ -45,13 +32,9 @@ impl<Context: AsRef<Command>> AppTrait<Context> for CompletionCmdApp {
         }
     }
 }
-impl<Context: AsRef<Command> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context>
+impl<Context: AsRef<Command> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
     for CompletionCmdApp
 {
-    fn subcommand(&self) -> Option<&Command> {
-        Some(&self.command)
-    }
-
     fn read_owned_data(
         &self,
         _: &Context,

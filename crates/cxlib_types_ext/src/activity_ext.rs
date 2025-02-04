@@ -2,7 +2,7 @@ use cxlib_error::MaybeFatalError;
 use cxlib_types::{Activity, Course, Session};
 use log::{debug, error, warn};
 use std::{
-    collections::HashMap,
+    mem,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{Receiver, RecvError},
@@ -11,48 +11,51 @@ use std::{
 };
 
 pub struct ActivitiesReceiver {
-    receiver: Receiver<(Vec<Activity>, Course)>,
-    sessions: Arc<HashMap<i64, Vec<Session>>>,
+    receiver: Receiver<(Vec<Activity>, Course, Vec<Session>)>,
 }
 impl ActivitiesReceiver {
     #[inline]
-    pub fn recv(&self) -> Result<(Vec<Activity>, Course), RecvError> {
+    pub fn recv(&self) -> Result<(Vec<Activity>, Course, Vec<Session>), RecvError> {
         self.receiver.recv()
     }
 }
 pub struct AsyncActivitiesIterator {
     activities: Vec<Activity>,
+    course: Course,
     sessions: Vec<Session>,
     receiver: ActivitiesReceiver,
 }
 impl Iterator for AsyncActivitiesIterator {
-    type Item = (Activity, Vec<Session>);
+    type Item = (Activity, Course, Vec<Session>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.activities.is_empty() {
-            while let Ok((activities, course)) = self.receiver.recv() {
-                if activities.is_empty() {
-                    continue;
-                } else {
-                    self.activities = activities;
-                    self.sessions = self.receiver.sessions[&course.id()].clone();
-                    return Some((self.activities.remove(0), self.sessions.clone()));
-                }
+        while self.activities.is_empty() {
+            if let Ok((activities, course, sessions)) = self.receiver.recv() {
+                self.activities = activities;
+                self.course = course;
+                self.sessions = sessions;
+                continue;
             }
-            None
-        } else {
-            Some((self.activities.remove(0), self.sessions.clone()))
+            return None;
         }
+        let (course, sessions) = if self.activities.len() == 1 {
+            (self.course.take(), mem::take(&mut self.sessions))
+        } else {
+            (self.course.clone(), self.sessions.clone())
+        };
+        let activities = self.activities.remove(0);
+        Some((activities, course, sessions))
     }
 }
 impl IntoIterator for ActivitiesReceiver {
-    type Item = (Activity, Vec<Session>);
+    type Item = (Activity, Course, Vec<Session>);
     type IntoIter = AsyncActivitiesIterator;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         AsyncActivitiesIterator {
             activities: vec![],
+            course: Course::none(),
             sessions: vec![],
             receiver: self,
         }
@@ -61,40 +64,36 @@ impl IntoIterator for ActivitiesReceiver {
 pub trait ActivityExt {
     /// 分块，以便多个线程一同处理。
     #[inline]
-    fn courses_chunks<Iter: Iterator>(courses: Iter, chunk_count: usize) -> Vec<Vec<Iter::Item>>
+    fn courses_chunks<Iter: Iterator>(courses: Iter, chunk_size: usize) -> Vec<Vec<Iter::Item>>
     where
         <Iter as Iterator>::Item: Clone,
     {
-        let mut chunks = vec![vec![]; chunk_count];
+        let mut chunks = vec![vec![]; chunk_size];
         for (index, course) in courses.enumerate() {
-            chunks[index % chunk_count].push(course);
+            chunks[index % chunk_size].push(course);
         }
         chunks
     }
     /// 异步获取指定课程集合的活动。内部使用 [`mpsc::channel`] 实现。
-    fn get_from_courses<'a>(
-        sorted_courses: impl Iterator<Item = &'a Course>,
-        sessions: HashMap<i64, Vec<Session>>,
+    fn get_from_courses(
+        sorted_courses: impl Iterator<Item = (Course, Vec<Session>)>,
     ) -> ActivitiesReceiver {
-        let course_sessions_map = Arc::new(sessions);
         let (sender, receiver) = std::sync::mpsc::channel();
         let fatal_error_occurred = Arc::new(AtomicBool::new(false));
-        let chunks = Self::courses_chunks(sorted_courses.into_iter(), 256);
+        let chunks = Self::courses_chunks(sorted_courses, 256);
         for courses in chunks {
             let fatal_error_occurred = Arc::clone(&fatal_error_occurred);
             let sender = sender.clone();
-            let course_sessions_map = Arc::clone(&course_sessions_map);
-            let courses = courses.into_iter().cloned().collect::<Vec<_>>();
             std::thread::spawn(move || {
-                for course in courses {
+                for (course, sessions) in courses {
                     if fatal_error_occurred.load(Ordering::Relaxed) {
                         break;
                     }
                     debug!("加载课程 [{course}] 的签到。");
-                    if let Some(session) = course_sessions_map[&course.id()].first() {
+                    if let Some(session) = sessions.first() {
                         let activities = course.get_activities(session);
                         match activities {
-                            Ok(activities) => match sender.send((activities, course)) {
+                            Ok(activities) => match sender.send((activities, course, sessions)) {
                                 Ok(_) => {}
                                 Err(e) => {
                                     warn!("Receiver is dropped: `{e}`.",);
@@ -120,10 +119,7 @@ pub trait ActivityExt {
                 drop(sender);
             });
         }
-        ActivitiesReceiver {
-            receiver,
-            sessions: course_sessions_map,
-        }
+        ActivitiesReceiver { receiver }
     }
 }
 impl ActivityExt for Activity {}

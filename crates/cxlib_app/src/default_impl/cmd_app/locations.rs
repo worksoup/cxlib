@@ -1,5 +1,5 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
-use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
+use clap::{arg, ArgMatches, Args, Command, CommandFactory, FromArgMatches, Parser};
 use cxlib_internal::default_impl::store::{AliasTable, DataBase, LocationTable};
 
 #[derive(Parser, Debug, Clone)]
@@ -21,21 +21,7 @@ pub struct LocationsParser {
     short: bool,
 }
 
-pub struct LocationsCmdApp {
-    command: Command,
-}
-impl Default for LocationsCmdApp {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl LocationsCmdApp {
-    pub fn new() -> LocationsCmdApp {
-        let command = LocationsParser::command();
-        LocationsCmdApp { command }
-    }
-}
+pub struct LocationsCmdApp;
 
 impl<Context: AsRef<DataBase>> AppTrait<Context> for LocationsCmdApp {
     type OwnedData = LocationsParser;
@@ -113,13 +99,9 @@ impl<Context: AsRef<DataBase>> AppTrait<Context> for LocationsCmdApp {
         }
     }
 }
-impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context>
+impl<Context: AsRef<DataBase> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
     for LocationsCmdApp
 {
-    fn subcommand(&self) -> Option<&Command> {
-        Some(&self.command)
-    }
-
     fn read_owned_data(&self, _: &Context, matches: &[&ArgMatches]) -> Self::OwnedData {
         let matches = matches.last().unwrap();
         LocationsParser::from_arg_matches(matches).unwrap()

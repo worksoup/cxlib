@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fmt::Display,
+    mem,
     sync::{Arc, Mutex},
 };
 use ureq::Agent;
@@ -31,6 +32,23 @@ impl Display for Course {
     }
 }
 impl Course {
+    #[inline]
+    pub fn none() -> Self {
+        Self {
+            raw: RawCourse::none(),
+            class_info: ClassInfo::none(),
+        }
+    }
+    #[inline]
+    pub fn take(&mut self) -> Self {
+        mem::replace(
+            self,
+            Self {
+                raw: RawCourse::none(),
+                class_info: ClassInfo::none(),
+            },
+        )
+    }
     #[inline]
     pub fn new(raw: RawCourse, class_info: ClassInfo) -> Course {
         Course { raw, class_info }

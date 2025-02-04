@@ -5,7 +5,7 @@ pub use table::*;
 
 use cxlib_store::{Dir, StorageTableCommandTrait, StorageTrait};
 use log::info;
-use sqlite::Connection;
+use sqlite::{Connection, ConnectionThreadSafe};
 use std::{fs::File, ops::Deref};
 
 pub trait DataBaseTableTrait: StorageTableCommandTrait<DataBase> {
@@ -46,11 +46,11 @@ pub trait DataBaseTableTrait: StorageTableCommandTrait<DataBase> {
     }
 }
 pub struct DataBase {
-    connection: Connection,
+    connection: ConnectionThreadSafe,
 }
 impl StorageTrait for DataBase {}
 impl Deref for DataBase {
-    type Target = Connection;
+    type Target = ConnectionThreadSafe;
 
     fn deref(&self) -> &Self::Target {
         &self.connection
@@ -63,7 +63,7 @@ impl DataBase {
         if db_dir.metadata().is_err() {
             File::create(db_dir.clone()).unwrap();
         }
-        let connection = Connection::open(db_dir.to_str().unwrap()).unwrap();
+        let connection = Connection::open_thread_safe(db_dir.to_str().unwrap()).unwrap();
         Self { connection }
     }
     pub fn add_table<T: DataBaseTableTrait>(&self) {

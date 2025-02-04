@@ -1,5 +1,6 @@
 use crate::{AppTrait, CmdApp, CmdMetaAppTrait, SignParser};
-use clap::{ArgMatches, Command, CommandFactory, FromArgMatches, Parser};
+use clap::{ArgMatches, Args, Command, CommandFactory, FromArgMatches, Parser};
+use cxlib_internal::types::ext::{ActivityExt, CourseExt};
 use cxlib_internal::{
     default_impl::store::{AccountTable, DataBase},
     sign::SignTrait,
@@ -19,6 +20,9 @@ pub struct ListParser {
     /// 列出所有签到（包括无效签到）。
     #[arg(short, long)]
     all: bool,
+    /// 从有限的课程中获取。若设置 `-a, --all` 标志则该选项无效。
+    #[arg(short, long)]
+    limit: Option<u64>,
 }
 impl ListParser {
     pub fn list_course_activities(
@@ -27,17 +31,18 @@ impl ListParser {
         all: bool,
         sessions: HashMap<String, Session>,
     ) {
-        let courses = Course::get_courses(sessions.values())
+        let courses = Course::get_from_sessions(sessions.values())
             .unwrap_or_default()
             .into_keys()
-            .map(|c| (c.get_id(), c))
+            .map(|c| (c.id(), c))
             .collect::<HashMap<_, _>>();
         let (a, n) = courses
             .get(&course)
             .and_then(|course| {
-                sessions.values().next().and_then(|session| {
-                    Activity::get_course_activities(db, session, course, true).ok()
-                })
+                sessions
+                    .values()
+                    .next()
+                    .and_then(|session| Activity::get_from_courses(db, session, course, true).ok())
             })
             .map(|a| {
                 a.into_iter()
@@ -50,14 +55,14 @@ impl ListParser {
             .unwrap_or_else(|| (vec![], vec![]));
         // 列出指定课程的有效签到。
         for a in a {
-            if a.course.get_id() == course {
+            if a.course.id() == course {
                 println!("{}", a.fmt_without_course_info());
             }
         }
         if all {
             // 列出指定课程的所有签到。
             for a in n {
-                if a.course.get_id() == course {
+                if a.course.id() == course {
                     println!("{}", a.fmt_without_course_info());
                 }
             }
@@ -65,8 +70,8 @@ impl ListParser {
     }
     pub fn list_all_activities(db: &DataBase, all: bool) {
         let sessions = AccountTable::get_sessions(db);
-        let activities =
-            Activity::get_all_activities(db, sessions.values(), all).unwrap_or_else(|e| {
+        let activities: HashMap<Activity, Vec<Session>> =
+            Activity::get_from_courses(db, sessions.values(), all).unwrap_or_else(|e| {
                 warn!("未能获取签到列表，错误信息：{e}.",);
                 Default::default()
             });
@@ -92,24 +97,11 @@ impl ListParser {
         }
     }
 }
-pub struct ListCmdApp {
-    command: Command,
-}
-impl ListCmdApp {
-    pub fn new() -> ListCmdApp {
-        let command = ListParser::command();
-        ListCmdApp { command }
-    }
-}
-impl Default for ListCmdApp {
-    fn default() -> ListCmdApp {
-        ListCmdApp::new()
-    }
-}
+pub struct ListCmdApp;
 impl<Context: AsRef<DataBase>> AppTrait<Context> for ListCmdApp {
     type OwnedData = ListParser;
 
-    fn run(&self, context: &Context, ListParser { course, all }: Self::OwnedData) {
+    fn run(&self, context: &Context, ListParser { course, all, limit }: Self::OwnedData) {
         let sessions = AccountTable::get_sessions(context.as_ref());
         if let Some(course) = course {
             ListParser::list_course_activities(context.as_ref(), course, all, sessions)
@@ -118,11 +110,9 @@ impl<Context: AsRef<DataBase>> AppTrait<Context> for ListCmdApp {
         }
     }
 }
-impl<Context: AsRef<DataBase> + 'static> CmdMetaAppTrait<CmdApp<Context>, Context> for ListCmdApp {
-    fn subcommand(&self) -> Option<&Command> {
-        Some(&self.command)
-    }
-
+impl<Context: AsRef<DataBase> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
+    for ListCmdApp
+{
     fn read_owned_data(
         &self,
         _: &Context,

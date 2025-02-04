@@ -17,6 +17,9 @@ pub struct CourseData {
     uid_list: String,
 }
 impl CourseData {
+    pub fn recently_used_timestamp(&self) -> &u64 {
+        &self.recently_used_timestamp_secs
+    }
     pub fn new(course: Course, uid_list: String, recently_used_timestamp_secs: u64) -> Self {
         Self {
             inner: course,
@@ -34,6 +37,9 @@ impl CourseData {
 impl CourseData {
     pub fn as_inner(&self) -> &Course {
         &self.inner
+    }
+    pub fn into_inner(self) -> Course {
+        self.inner
     }
 }
 impl Deref for CourseData {

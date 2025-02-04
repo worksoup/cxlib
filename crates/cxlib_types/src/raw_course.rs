@@ -13,6 +13,15 @@ pub struct RawCourse {
 
 impl RawCourse {
     #[inline]
+    pub fn none() -> Self {
+        Self {
+            id: -1,
+            teacher: "".to_string(),
+            image_url: None,
+            name: "".to_string(),
+        }
+    }
+    #[inline]
     pub fn into_course(self, info: ClassInfo) -> Course {
         Course::new(self, info)
     }

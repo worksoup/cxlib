@@ -36,6 +36,13 @@ pub struct ClassInfo {
 }
 impl ClassInfo {
     #[inline]
+    pub fn none() -> Self {
+        Self {
+            id: ClassId::Id(-1),
+            ended: true,
+        }
+    }
+    #[inline]
     pub fn new(id: ClassId, ended: bool) -> ClassInfo {
         ClassInfo { id, ended }
     }
