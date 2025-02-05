@@ -56,28 +56,37 @@ impl Deref for CourseData {
 impl CourseTable {
     /// 从缓存中获取课程与会话。
     #[inline]
-    pub fn get_courses_with_sessions(db: &DataBase) -> HashMap<CourseData, Vec<Session>> {
+    pub fn get_courses_with_sessions(
+        db: &DataBase,
+    ) -> impl Iterator<Item = (CourseData, Vec<Session>)> {
         let sessions = AccountTable::get_sessions(db);
         Self::get_courses_with_current_sessions(db, sessions)
+    }
+    #[inline]
+    pub fn courses_to_course_sessions_map_with_current_sessions(
+        courses: impl Iterator<Item = CourseData>,
+        sessions: HashMap<String, Session>,
+    ) -> impl Iterator<Item = (CourseData, Vec<Session>)> {
+        courses.map(move |course| {
+            let sessions = course
+                .uid_list
+                .split(",")
+                .filter_map(|uid| sessions.get(uid))
+                .cloned()
+                .collect::<Vec<_>>();
+            (course, sessions)
+        })
     }
     /// 从缓存中获取课程与会话。
     #[inline]
     pub fn get_courses_with_current_sessions(
         db: &DataBase,
         sessions: HashMap<String, Session>,
-    ) -> HashMap<CourseData, Vec<Session>> {
-        Self::get_courses(db)
-            .into_values()
-            .map(|course| {
-                let sessions = course
-                    .uid_list
-                    .split(",")
-                    .filter_map(|uid| sessions.get(uid))
-                    .cloned()
-                    .collect::<Vec<_>>();
-                (course, sessions)
-            })
-            .collect()
+    ) -> impl Iterator<Item = (CourseData, Vec<Session>)> {
+        Self::courses_to_course_sessions_map_with_current_sessions(
+            Self::get_courses(db).into_values(),
+            sessions,
+        )
     }
     pub fn insert_course(db: &DataBase, course: &CourseData) -> Result<(), StoreError> {
         let id: i64 = course.id();
@@ -119,6 +128,30 @@ impl CourseTable {
         query
             .bind::<&[(_, sqlite::Value)]>(
                 &[(":id", course_id.into()), (":users", users.into())][..],
+            )
+            .unwrap();
+        query
+            .next()
+            .map_err(|e| StoreError::ParseError(e.to_string()))
+            .map(|_| ())
+    }
+    pub fn update_recently_used_time(
+        db: &DataBase,
+        course_id: i64,
+        recently_used_timestamp_secs: u64,
+    ) -> Result<(), StoreError> {
+        let mut query = db
+            .prepare(format!(
+                "UPDATE {} SET RU=:RU WHERE id=:id;",
+                Self::TABLE_NAME
+            ))
+            .unwrap();
+        query
+            .bind::<&[(_, sqlite::Value)]>(
+                &[
+                    (":id", course_id.into()),
+                    (":RU", recently_used_timestamp_secs.to_string().into()),
+                ][..],
             )
             .unwrap();
         query

@@ -1,76 +1,50 @@
 use cxlib_error::MaybeFatalError;
 use cxlib_types::{Activity, Course, Session};
 use log::{debug, error, warn};
-use std::{
-    mem,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::{Receiver, RecvError},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc::{Receiver, RecvError},
+    Arc,
 };
-
 pub struct ActivitiesReceiver {
-    receiver: Receiver<(Vec<Activity>, Course, Vec<Session>)>,
+    receiver: Receiver<(Vec<Activity>, Vec<Session>)>,
 }
 impl ActivitiesReceiver {
     #[inline]
-    pub fn recv(&self) -> Result<(Vec<Activity>, Course, Vec<Session>), RecvError> {
+    pub fn recv(&self) -> Result<(Vec<Activity>, Vec<Session>), RecvError> {
         self.receiver.recv()
     }
 }
-pub struct AsyncActivitiesIterator {
-    activities: Vec<Activity>,
-    course: Course,
-    sessions: Vec<Session>,
-    receiver: ActivitiesReceiver,
-}
-impl Iterator for AsyncActivitiesIterator {
-    type Item = (Activity, Course, Vec<Session>);
+impl IntoIterator for ActivitiesReceiver {
+    type Item = (Vec<Activity>, Vec<Session>);
+    type IntoIter = <Receiver<(Vec<Activity>, Vec<Session>)> as IntoIterator>::IntoIter;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        while self.activities.is_empty() {
-            if let Ok((activities, course, sessions)) = self.receiver.recv() {
-                self.activities = activities;
-                self.course = course;
-                self.sessions = sessions;
-                continue;
-            }
-            return None;
-        }
-        let (course, sessions) = if self.activities.len() == 1 {
-            (self.course.take(), mem::take(&mut self.sessions))
-        } else {
-            (self.course.clone(), self.sessions.clone())
-        };
-        let activities = self.activities.remove(0);
-        Some((activities, course, sessions))
+    fn into_iter(self) -> Self::IntoIter {
+        self.receiver.into_iter()
     }
 }
-impl IntoIterator for ActivitiesReceiver {
-    type Item = (Activity, Course, Vec<Session>);
-    type IntoIter = AsyncActivitiesIterator;
+impl<'a> IntoIterator for &'a ActivitiesReceiver {
+    type Item = (Vec<Activity>, Vec<Session>);
+    type IntoIter = <&'a Receiver<(Vec<Activity>, Vec<Session>)> as IntoIterator>::IntoIter;
 
-    #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        AsyncActivitiesIterator {
-            activities: vec![],
-            course: Course::none(),
-            sessions: vec![],
-            receiver: self,
-        }
+        self.receiver.iter()
     }
 }
 pub trait ActivityExt {
     /// 分块，以便多个线程一同处理。
     #[inline]
-    fn courses_chunks<Iter: Iterator>(courses: Iter, chunk_size: usize) -> Vec<Vec<Iter::Item>>
-    where
-        <Iter as Iterator>::Item: Clone,
-    {
-        let mut chunks = vec![vec![]; chunk_size];
+    fn courses_chunks<Iter: Iterator>(
+        courses: Iter,
+        max_chunk_size: usize,
+    ) -> Vec<Vec<Iter::Item>> {
+        let mut chunks: Vec<Vec<_>> = Vec::new();
         for (index, course) in courses.enumerate() {
-            chunks[index % chunk_size].push(course);
+            if let Some(chunk) = chunks.get_mut(index % max_chunk_size) {
+                chunk.push(course);
+            } else {
+                chunks.push(vec![course]);
+            }
         }
         chunks
     }
@@ -93,14 +67,19 @@ pub trait ActivityExt {
                     if let Some(session) = sessions.first() {
                         let activities = course.get_activities(session);
                         match activities {
-                            Ok(activities) => match sender.send((activities, course, sessions)) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    warn!("Receiver is dropped: `{e}`.",);
-                                    fatal_error_occurred.store(true, Ordering::Relaxed);
-                                    return;
+                            Ok(activities) => {
+                                // 有活动才发送。
+                                if !activities.is_empty() {
+                                    match sender.send((activities, sessions)) {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            warn!("Receiver is dropped: `{e}`.",);
+                                            fatal_error_occurred.store(true, Ordering::Relaxed);
+                                            return;
+                                        }
+                                    }
                                 }
-                            },
+                            }
                             Err(e) => {
                                 if e.is_fatal() {
                                     error!("`{e}`.");

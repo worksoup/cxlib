@@ -1,5 +1,5 @@
-use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
-use clap::{arg, ArgMatches, Args, Command, CommandFactory, FromArgMatches, Parser};
+use crate::{AppTrait, CmdMetaAppTrait};
+use clap::{arg, ArgMatches, FromArgMatches, Parser};
 use cxlib_internal::{
     default_impl::store::{AccountTable, DataBase},
     login::LoginSolverWrapper,

@@ -1,8 +1,5 @@
-use crate::{
-    cmd_app::{CmdApp, CmdMetaAppTrait},
-    AppTrait,
-};
-use clap::{arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser, Subcommand};
+use crate::{cmd_app::CmdMetaAppTrait, AppTrait};
+use clap::{arg, ArgMatches, FromArgMatches, Parser, Subcommand};
 use cxlib_internal::{
     default_impl::store::{AccountTable, AliasTable, DataBase, DataBaseTableTrait, LocationTable},
     store::AppInfo,

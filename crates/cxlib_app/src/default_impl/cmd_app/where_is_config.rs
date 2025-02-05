@@ -1,5 +1,5 @@
 use crate::{AppTrait, CmdMetaAppTrait};
-use clap::{ArgMatches, Args, Command, CommandFactory, Parser};
+use clap::{ArgMatches, Parser};
 #[derive(Debug, Parser, Clone)]
 // TODO: build.rs 中通过环境变量设置 alias.
 #[command(name = "where-is-config", alias = "w")]

@@ -1,8 +1,8 @@
-use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
-use clap::{ArgMatches, Args, Command, FromArgMatches, Parser};
-use cxlib_internal::captcha::utils::get_now_timestamp_mills;
-use cxlib_internal::default_impl::store::CourseTable;
-use cxlib_internal::types::ext::ActivityExt;
+use crate::{
+    AppTrait, CmdMetaAppTrait, CourseDataFilterAndSorterTrait, CoursesCmdApp,
+    DefaultCourseDataSorter,
+};
+use clap::{ArgMatches, FromArgMatches, Parser};
 use cxlib_internal::{
     default_impl::{
         sign::Sign,
@@ -11,13 +11,14 @@ use cxlib_internal::{
             DefaultNormalOrRawSignner, DefaultPhotoSignner, DefaultQrCodeSignner,
             LocationInfoGetterTrait,
         },
-        store::{AccountTable, DataBase},
+        store::{AccountTable, CourseData, CourseTable, DataBase},
     },
     error::Error,
     sign::{SignResult, SignTrait, SignnerTrait},
-    types::{Activity, RawSign, Session},
+    types::{ext::ActivityExt, Activity, RawSign, Session},
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
+use std::marker::PhantomData;
 use std::{cmp, collections::HashMap, path::PathBuf, time::Duration};
 
 #[derive(Clone)]
@@ -50,34 +51,46 @@ pub struct CliArgs {
 pub struct SignParser {
     /// 签到 ID.
     /// 默认以最近起对所有有效签到顺序进行签到，且缺少参数时会跳过并继续。
-    pub id: Option<i64>,
+    id: Option<i64>,
     /// 签到账号，格式为以半角逗号隔开的 uid (可通过 accounts 子命令查看).
     /// 默认以一定顺序对所有用户进行签到。
     #[arg(short, long)]
-    pub uid: Option<String>,
+    uid: Option<String>,
     /// 指定位置。
     /// 教师未指定位置的位置签到或需要位置的二维码签到需要提供。
     /// 格式为：`地址,经度,纬度,海拔`, 不满足格式的字符串将被视为别名。
     /// 如果该别名不存在，则视为位置 ID.
     /// 其余情况将视为自动获取位置时指定的地址名。
     /// 如未指定或错误指定则按照先课程位置后全局位置的顺序依次尝试。
-    #[arg(short, long)]
-    pub location: Option<String>,
+    #[arg(short = 'L', long)]
+    location: Option<String>,
     /// 本地图片路径。
     /// 拍照签到需要提供，二维码签到可选提供。
     /// 如果是文件，则直接使用该文件作为拍照签到图片或二维码图片文件。
     /// 如果是目录，则会选择在该目录下修改日期最新的图片作为拍照签到图片或二维码图片。
     #[arg(short, long)]
-    pub image: Option<PathBuf>,
+    image: Option<PathBuf>,
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     /// 精确地截取二维码。
     /// 如果二维码识别过慢可以尝试添加添加此选项。
     #[arg(short, long)]
-    pub precisely: bool,
+    precisely: bool,
     /// 签到码。
     /// 签到码签到时需要提供。
+    #[arg(short = 'C', long)]
+    code: Option<String>,
+    /// 获取签到时限制课程数量。默认无限制。该数量限制作用在初步过滤无效课程后。
     #[arg(short, long)]
-    pub code: Option<String>,
+    limit: Option<usize>,
+    /// 列出签到而不处理。
+    #[arg(short, long)]
+    just_list: bool,
+    /// 处理或列出指定课程的签到。
+    #[arg(short, long)]
+    course: Option<i64>,
+    /// 处理或列出所有签到（包括无效签到）。
+    #[arg(short, long)]
+    all: bool,
 }
 
 impl SignParser {
@@ -194,6 +207,8 @@ impl SignParser {
         self,
         db: &DataBase,
         location_getter: T,
+        mut filter: impl FnMut(&CourseData) -> bool,
+        mut sorter: impl FnMut(&CourseData, &CourseData) -> cmp::Ordering,
     ) -> Result<(), Error> {
         let Self {
             id: active_id,
@@ -202,6 +217,10 @@ impl SignParser {
             image,
             precisely,
             code,
+            limit,
+            just_list,
+            course,
+            all,
         } = self;
         let arg = CliArgs {
             location_str: location,
@@ -209,116 +228,152 @@ impl SignParser {
             precisely,
             signcode: code,
         };
-        let (sessions, has_uid_arg) = if let Some(uid_list_str) = &uid_list_str {
-            (
-                AccountTable::get_sessions_by_uid_list_str(db, uid_list_str),
-                true,
-            )
+        let has_uid_arg = uid_list_str.is_some();
+        let sessions = if let Some(uid_list_str) = &uid_list_str {
+            AccountTable::get_sessions_by_uid_list_str(db, uid_list_str)
         } else {
-            (AccountTable::get_sessions(db), false)
+            AccountTable::get_sessions(db)
         };
-        let mut courses = CourseTable::get_courses_with_current_sessions(db, sessions)
+        let mut courses = CoursesCmdApp::update_course_table(db);
+        let courses = if let Some(course) = course {
+            Some((course, courses.remove(&course).unwrap()))
+                .into_iter()
+                .collect()
+        } else {
+            courses
+        };
+        let mut courses = CourseTable::courses_to_course_sessions_map_with_current_sessions(
+            courses.into_values(),
+            sessions,
+        )
+        .filter(|(c, _s)| filter(c))
+        .collect::<Vec<_>>();
+        courses.sort_by(|(a, _), (b, _)| sorter(a, b));
+        debug!("{courses:?}");
+        let iter = courses.into_iter().map(|(c, s)| (c.into_inner(), s));
+        let activities_receiver = if let Some(limit) = limit {
+            Activity::get_from_courses(iter.take(limit))
+        } else {
+            Activity::get_from_courses(iter)
+        };
+        let signs: HashMap<Vec<RawSign>, Vec<Session>> = activities_receiver
             .into_iter()
-            .collect::<Vec<_>>();
-        courses.sort_by(|(a, _), (b, _)| {
-            let a = a.recently_used_timestamp();
-            let b = b.recently_used_timestamp();
-            let now = (get_now_timestamp_mills() / 1000) as u64;
-            let da = (now - a) / (24 * 60 * 60);
-            let db = (now - b) / (24 * 60 * 60);
-            let da = da == 7;
-            let db = db == 7;
-            if da == db {
-                b.cmp(a)
-            } else if da {
-                cmp::Ordering::Greater
-            } else {
-                cmp::Ordering::Less
-            }
-        });
-        let activities_receiver =
-            Activity::get_from_courses(courses.into_iter().map(|(c, s)| (c.into_inner(), s)));
-        let (valid_signs, other_signs): (
-            HashMap<RawSign, Vec<Session>>,
-            HashMap<RawSign, Vec<Session>>,
-        ) = activities_receiver
-            .into_iter()
-            .filter_map(|(a, _c, s)| match a {
-                Activity::RawSign(k) => Some((k, s)),
-                Activity::Other(_) => None,
+            .map(|(a, s)| {
+                let max = a.iter().max_by_key(|a| a.start_time_mills()).unwrap();
+                let _ = CourseTable::update_recently_used_time(
+                    db,
+                    max.course().id(),
+                    max.start_time_mills(),
+                );
+                (
+                    a.into_iter()
+                        .filter_map(|a| match a {
+                            Activity::RawSign(k) => Some(k),
+                            Activity::Other(_) => None,
+                        })
+                        .collect(),
+                    s,
+                )
             })
-            .partition(|(k, _)| k.is_valid());
-        let signs = if let Some(active_id) = active_id {
-            let (sign, sessions) = {
-                if let Some(s1) = valid_signs
-                    .into_iter()
-                    .find(|kv| kv.0.as_inner().active_id == active_id.to_string())
+            .collect();
+        let signs: HashMap<_, _> = if let Some(active_id) = active_id {
+            Some(
+                if let Some(s1) = signs
+                    .iter()
+                    .flat_map(|(a, s)| a.iter().map(move |a| (a, s)))
+                    .find(|(raw_sign, _sessions)| raw_sign.active_id == active_id.to_string())
                 {
                     s1
-                } else if let Some(s2) = other_signs
-                    .into_iter()
-                    .find(|kv| kv.0.as_inner().active_id == active_id.to_string())
-                {
-                    s2
                 } else if has_uid_arg {
                     panic!(
-                        "没有该签到活动！请检查签到活动 ID 是否正确或所指定的账号是否存在该签到活动！"
-                    );
+                    "没有该签到活动！请检查签到活动 ID 是否正确或所指定的账号是否存在该签到活动！"
+                );
                 } else {
                     panic!("没有该签到活动！请检查签到活动 ID 是否正确！");
-                }
-            };
-            let mut map = HashMap::new();
-            map.insert(sign, sessions);
-            map
+                },
+            )
+            .into_iter()
+            .collect()
         } else {
-            let mut signs = HashMap::new();
-            for (sign, sessions) in valid_signs {
-                signs.insert(sign, sessions);
+            let iter = signs.iter();
+            if all {
+                iter.flat_map(|(a, s)| a.iter().map(move |a| (a, s)))
+                    .collect()
+            } else {
+                iter.flat_map(|(a, s)| a.iter().filter(|s| s.is_valid()).map(move |a| (a, s)))
+                    .collect()
             }
-            signs
         };
         if signs.is_empty() {
             warn!("签到列表为空。");
         }
-        for (sign, sessions) in signs {
-            info!(
-                "即将处理签到：[{}], id 为 {}, 开始时间为 {}, 课程为 {} / {} / {}",
-                sign.name,
-                sign.active_id,
-                chrono::DateTime::<chrono::Local>::from(
-                    std::time::UNIX_EPOCH + Duration::from_millis(sign.start_time_mills)
-                )
-                .format("%+")
-                .to_string(),
-                sign.course.class_id(),
-                sign.course.id(),
-                sign.course.name()
-            );
-            let mut names = Vec::new();
-            for s in sessions.iter() {
-                names.push(s.name().to_string())
+        if just_list {
+            if active_id.is_none() {
+                warn!("指定了活动 ID, 将只列出一个签到。")
             }
-            info!("签到者：{names:?}");
-            Self::match_signs(sign, location_getter, &sessions, &arg)
-                .unwrap_or_else(|e| warn!("{e}"));
+            for (sign, sessions) in signs {
+                let mut names = Vec::new();
+                for s in sessions.iter() {
+                    names.push(s.name().to_string())
+                }
+                println!("{names:?}:{sign}");
+            }
+            Ok(())
+        } else {
+            for (sign, sessions) in signs {
+                info!(
+                    "即将处理签到：[{}], id 为 {}, 开始时间为 {}, 课程为 {} / {} / {}",
+                    sign.name,
+                    sign.active_id,
+                    chrono::DateTime::<chrono::Local>::from(
+                        std::time::UNIX_EPOCH + Duration::from_millis(sign.start_time_mills)
+                    )
+                    .format("%+")
+                    .to_string(),
+                    sign.course.class_id(),
+                    sign.course.id(),
+                    sign.course.name()
+                );
+                let mut names = Vec::new();
+                for s in sessions.iter() {
+                    names.push(s.name().to_string())
+                }
+                info!("签到者：{names:?}");
+                Self::match_signs(sign.clone(), location_getter, sessions, &arg)
+                    .unwrap_or_else(|e| warn!("{e}"));
+            }
+            Ok(())
         }
-        Ok(())
     }
 }
-pub struct SignMainApp;
-impl<Context: AsRef<DataBase>> AppTrait<Context> for SignMainApp {
+#[derive(Default)]
+pub struct SignMainApp<T = DefaultCourseDataSorter> {
+    _t: PhantomData<T>,
+}
+impl<Context, T> AppTrait<Context> for SignMainApp<T>
+where
+    Context: AsRef<DataBase>,
+    T: CourseDataFilterAndSorterTrait,
+{
     type OwnedData = SignParser;
 
     fn run(&self, db: &Context, data: Self::OwnedData) {
         warn!("{}", SignParser::NOTICE);
-        data.do_sign(db.as_ref(), DefaultLocationInfoGetter::from(db.as_ref()))
-            .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
+        data.do_sign(
+            db.as_ref(),
+            DefaultLocationInfoGetter::from(db.as_ref()),
+            T::filter,
+            T::sorter,
+        )
+        .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
     }
 }
 
-impl<Context: AsRef<DataBase> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
-    for SignMainApp
+impl<Context, OwnedData, T> CmdMetaAppTrait<Context, OwnedData> for SignMainApp<T>
+where
+    Context: AsRef<DataBase> + 'static,
+    OwnedData: 'static,
+    T: CourseDataFilterAndSorterTrait + 'static,
 {
     fn read_owned_data(
         &self,

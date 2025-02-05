@@ -1,9 +1,7 @@
-use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
-use clap::{ArgMatches, Args, Command, CommandFactory, FromArgMatches, Parser};
-use cxlib_internal::default_impl::store::DataBaseTableTrait;
+use crate::{AppTrait, CmdMetaAppTrait};
+use clap::{ArgMatches, FromArgMatches, Parser};
 use cxlib_internal::{
-    captcha::utils::get_now_timestamp_mills,
-    default_impl::store::{AccountTable, CourseData, CourseTable, DataBase},
+    default_impl::store::{AccountTable, CourseData, CourseTable, DataBase, DataBaseTableTrait},
     error::CxlibResultUtils,
     types::{ext::CourseExt, Course},
 };
@@ -25,6 +23,7 @@ pub struct CoursesParser {
 pub struct CoursesCmdApp;
 impl CoursesCmdApp {
     pub fn update_course_table(db: &DataBase) -> HashMap<i64, CourseData> {
+        let cached_courses = CourseTable::get_courses(db);
         // 列出所有账号的课程，避免 course.uid_list 不完整。
         let sessions = AccountTable::get_sessions(db);
         // 获取课程信息。
@@ -41,13 +40,17 @@ impl CoursesCmdApp {
                             .map(|s| s.uid())
                             .collect::<Vec<_>>()
                             .join(","),
-                        (get_now_timestamp_mills() / 1000) as u64,
+                        // TODO: 应该是没有问题，但是就是有点别扭。
+                        // 未出现过的课程时间为 `u64::MAX`.
+                        cached_courses
+                            .get(&c.id())
+                            .map(|c| *c.recently_used_timestamp())
+                            .unwrap_or(u64::MAX),
                     ),
                 )
             })
             .collect::<HashMap<_, _>>();
         CourseTable::delete(db);
-        // 列出所有课程。
         for (_id, c) in courses.iter() {
             CourseTable::insert_course(db, c).log_unwrap()
         }

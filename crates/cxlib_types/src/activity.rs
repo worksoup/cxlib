@@ -20,3 +20,18 @@ pub struct OtherActivity {
     pub status: i32,
     pub start_time_mills: u64,
 }
+
+impl Activity {
+    pub fn course(&self) -> &Course {
+        match self {
+            Activity::RawSign(a) => &a.course,
+            Activity::Other(a) => &a.course,
+        }
+    }
+    pub fn start_time_mills(&self) -> u64 {
+        match self {
+            Activity::RawSign(a) => a.start_time_mills,
+            Activity::Other(a) => a.start_time_mills,
+        }
+    }
+}
