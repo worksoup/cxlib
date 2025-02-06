@@ -62,10 +62,8 @@ impl CourseDataFilterAndSorterTrait for DefaultCourseDataSorter {
         let a = a.recently_used_timestamp();
         let b = b.recently_used_timestamp();
         let now = (get_now_timestamp_mills() / 1000) as u64;
-        let da = (now - a) / (24 * 60 * 60);
-        let db = (now - b) / (24 * 60 * 60);
-        let da = da == 7;
-        let db = db == 7;
+        let da = now > *a && (now - a) / (24 * 60 * 60) == 7;
+        let db = now > *b && (now - b) / (24 * 60 * 60) == 7;
         if da == db {
             b.cmp(a)
         } else if da {
