@@ -1,5 +1,5 @@
-use crate::{AppTrait, CmdApp, CmdMetaAppTrait};
-use clap::{arg, ArgMatches, Args, Command, CommandFactory, FromArgMatches, Parser};
+use crate::{AppTrait, CmdMetaAppTrait};
+use clap::{arg, ArgMatches, Command, FromArgMatches, Parser};
 use clap_complete_command::Shell;
 use std::path::PathBuf;
 
