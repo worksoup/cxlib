@@ -256,94 +256,86 @@ impl SignParser {
         } else {
             Activity::get_from_courses(iter)
         };
-        let signs: HashMap<Vec<RawSign>, Vec<Session>> = activities_receiver
-            .into_iter()
-            .map(|(a, s)| {
-                let max = a.iter().max_by_key(|a| a.start_time_mills()).unwrap();
-                let _ = CourseTable::update_recently_used_time(
-                    db,
-                    max.course().id(),
-                    max.start_time_mills(),
-                );
-                (
-                    a.into_iter()
-                        .filter_map(|a| match a {
-                            Activity::RawSign(k) => Some(k),
-                            Activity::Other(_) => None,
-                        })
-                        .collect(),
-                    s,
-                )
-            })
-            .collect();
-        let signs: HashMap<_, _> = if let Some(active_id) = active_id {
-            Some(
-                if let Some(s1) = signs
-                    .iter()
-                    .flat_map(|(a, s)| a.iter().map(move |a| (a, s)))
-                    .find(|(raw_sign, _sessions)| raw_sign.active_id == active_id.to_string())
-                {
-                    s1
-                } else if has_uid_arg {
-                    panic!(
-                    "没有该签到活动！请检查签到活动 ID 是否正确或所指定的账号是否存在该签到活动！"
-                );
-                } else {
-                    panic!("没有该签到活动！请检查签到活动 ID 是否正确！");
-                },
+        let signs = activities_receiver.into_iter().map(|(a, s)| {
+            let max = a.iter().max_by_key(|a| a.start_time_mills()).unwrap();
+            let _ = CourseTable::update_recently_used_time(
+                db,
+                max.course().id(),
+                max.start_time_mills(),
+            );
+            (
+                a.into_iter().filter_map(|a| match a {
+                    Activity::RawSign(k) => Some(k),
+                    Activity::Other(_) => None,
+                }),
+                s,
             )
-            .into_iter()
-            .collect()
-        } else {
-            let iter = signs.iter();
-            if all {
-                iter.flat_map(|(a, s)| a.iter().map(move |a| (a, s)))
-                    .collect()
-            } else {
-                iter.flat_map(|(a, s)| a.iter().filter(|s| s.is_valid()).map(move |a| (a, s)))
-                    .collect()
-            }
-        };
-        if signs.is_empty() {
-            warn!("签到列表为空。");
-        }
+        });
         if just_list {
-            if active_id.is_none() {
-                warn!("指定了活动 ID, 将只列出一个签到。")
+            if let Some(active_id) = active_id {
+                warn!("将忽略活动 ID 参数（{active_id}）。")
             }
-            for (sign, sessions) in signs {
-                let mut names = Vec::new();
-                for s in sessions.iter() {
-                    names.push(s.name().to_string())
+            let signs = signs.flat_map(|(activities, sessions)| {
+                activities.map(move |a| {
+                    let s = sessions
+                        .iter()
+                        .map(|s| s.name().to_owned())
+                        .collect::<Vec<_>>();
+                    (a, s)
+                })
+            });
+            for (sign, names) in signs {
+                if !all && sign.is_valid() {
+                    continue;
                 }
                 println!("{names:?}:{sign}");
             }
-            Ok(())
         } else {
-            for (sign, sessions) in signs {
-                info!(
-                    "即将处理签到：[{}], id 为 {}, 开始时间为 {}, 课程为 {} / {} / {}",
-                    sign.name,
-                    sign.active_id,
-                    chrono::DateTime::<chrono::Local>::from(
-                        std::time::UNIX_EPOCH + Duration::from_millis(sign.start_time_mills)
-                    )
-                    .format("%+")
-                    .to_string(),
-                    sign.course.class_id(),
-                    sign.course.id(),
-                    sign.course.name()
-                );
-                let mut names = Vec::new();
-                for s in sessions.iter() {
-                    names.push(s.name().to_string())
+            let mut have = false;
+            for (raw_signs, sessions) in signs {
+                for raw_sign in raw_signs {
+                    // 相信分支预测。
+                    if !all && raw_sign.is_valid() {
+                        continue;
+                    }
+                    if active_id.is_none_or(|id| raw_sign.active_id == id.to_string()) {
+                        have = true;
+                        info!(
+                            "即将处理签到：[{}], id 为 {}, 开始时间为 {}, 课程为 {} / {} / {}",
+                            raw_sign.name,
+                            raw_sign.active_id,
+                            chrono::DateTime::<chrono::Local>::from(
+                                std::time::UNIX_EPOCH
+                                    + Duration::from_millis(raw_sign.start_time_mills)
+                            )
+                            .format("%+")
+                            .to_string(),
+                            raw_sign.course.class_id(),
+                            raw_sign.course.id(),
+                            raw_sign.course.name()
+                        );
+                        let names = sessions.iter().map(|s| s.name()).collect::<Vec<_>>();
+                        info!("签到者：{names:?}");
+                        Self::match_signs(raw_sign, location_getter, &sessions, &arg)
+                            .unwrap_or_else(|e| warn!("{e}"));
+                    }
                 }
-                info!("签到者：{names:?}");
-                Self::match_signs(sign.clone(), location_getter, sessions, &arg)
-                    .unwrap_or_else(|e| warn!("{e}"));
             }
-            Ok(())
+            if !have {
+                if active_id.is_some() {
+                    if has_uid_arg {
+                        panic!(
+                            "没有该签到活动！请检查签到活动 ID 是否正确或所指定的账号是否存在该签到活动！"
+                        );
+                    } else {
+                        panic!("没有该签到活动！请检查签到活动 ID 是否正确！");
+                    }
+                } else {
+                    warn!("签到列表为空。");
+                }
+            }
         }
+        Ok(())
     }
 }
 #[derive(Default)]
