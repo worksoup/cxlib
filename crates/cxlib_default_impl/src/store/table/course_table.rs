@@ -109,7 +109,7 @@ impl CourseTable {
                         ":RU",
                         course.recently_used_timestamp_secs.to_string().into(),
                     ),
-                    (":FU", course.uid_list.as_str().into()),
+                    (":users", course.uid_list.as_str().into()),
                 ][..],
             )
             .unwrap();
