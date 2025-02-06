@@ -166,9 +166,12 @@ impl Session {
         #[derive(Deserialize, Serialize, Debug)]
         struct CourseContent {
             course: Option<Courses>,
-            // TODO: 需要使用该字段。
+            // TODO: 该字段不应为 Option.
+            // TODO: 深层原因为，Class 与 Course 并非一对多的关系。
+            // TODO: 而是多对多的关系。
+            // TODO: 同时，当前实现混淆了两者的 ID, 可能会出现一些错误。
             // 0 | 1, 代表班级开课或结束。
-            state: u8,
+            state: Option<u8>,
         }
 
         #[derive(Deserialize, Serialize, Debug)]
@@ -198,7 +201,7 @@ impl Session {
                 };
                 let CourseContent { course, state } = content;
                 let courses = course.unwrap_or_default().data;
-                let ended = state == 0;
+                let ended = state.is_none_or(|state| state == 0);
                 Class::new(courses, ClassInfo::new(id, ended))
             }
         }
