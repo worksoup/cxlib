@@ -338,10 +338,18 @@ impl SignParser {
         Ok(())
     }
 }
-#[derive(Default)]
 pub struct SignMainApp<T = DefaultCourseDataSorter> {
     _t: PhantomData<T>,
 }
+impl<T> Default for SignMainApp<T> {
+    #[inline]
+    fn default() -> SignMainApp<T> {
+        SignMainApp {
+            _t: Default::default(),
+        }
+    }
+}
+
 impl<Context, T> AppTrait<Context> for SignMainApp<T>
 where
     Context: AsRef<DataBase>,
