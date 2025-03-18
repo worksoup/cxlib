@@ -3,6 +3,7 @@ use crate::{
     DefaultCourseDataSorter,
 };
 use clap::{ArgMatches, FromArgMatches, Parser};
+use cxlib_internal::store::AppInfo;
 use cxlib_internal::{
     default_impl::{
         sign::Sign,
@@ -94,23 +95,28 @@ pub struct SignParser {
 }
 
 impl SignParser {
-    pub const NOTICE: &'static str = r#"
+    pub fn notice_content() -> String {
+        let app = AppInfo::get_instance().application();
+        format!(
+            r#"
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
     列出签到时会默认排除从未发过签到或最后一次签到在 160 天
     之前的课程。
 
-    如有需要，请使用 `cxsign list -a` 命令强制列出所有签到
-    或使用 `cxsign list -c <COURSE_ID>` 列出特定课程的签
+    如有需要，请使用 `{app} list -a` 命令强制列出所有签到
+    或使用 `{app} list -c <COURSE_ID>` 列出特定课程的签
     到，此时将会刷新排除列表。
 
-    注意，`cxsign list -a` 耗时十几秒到数分钟不等。不过后者
+    注意，`{app} list -a` 耗时十几秒到数分钟不等。不过后者
     耗时较短。
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-"#;
+"#
+        )
+    }
     pub fn match_signs<T: LocationInfoGetterTrait>(
         raw_sign: RawSign,
         location_getter: T,
@@ -358,7 +364,7 @@ where
     type OwnedData = SignParser;
 
     fn run(&self, db: &Context, data: Self::OwnedData) {
-        warn!("{}", SignParser::NOTICE);
+        warn!("{}", SignParser::notice_content());
         data.do_sign(
             db.as_ref(),
             DefaultLocationInfoGetter::from(db.as_ref()),
