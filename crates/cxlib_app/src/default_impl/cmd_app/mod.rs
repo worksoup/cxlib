@@ -55,7 +55,8 @@ impl CourseDataFilterAndSorterTrait for DefaultCourseDataSorter {
         !a.class_ended()
             && (*a.recently_used_timestamp() == u64::MAX || {
                 let now = (get_now_timestamp_mills() / 1000) as u64;
-                now - a.recently_used_timestamp() < 160 * 24 * 60 * 60
+                *a.recently_used_timestamp() > now
+                    || now - a.recently_used_timestamp() < 160 * 24 * 60 * 60
             })
     }
     fn sorter(a: &CourseData, b: &CourseData) -> cmp::Ordering {
