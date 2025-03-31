@@ -81,11 +81,11 @@ pub struct SignParser {
     #[arg(short = 'C', long)]
     code: Option<String>,
     /// 获取签到时限制课程数量。默认无限制。该数量限制作用在初步过滤无效课程后。
-    #[arg(short, long)]
+    #[arg(short = 'N', long)]
     limit: Option<usize>,
     /// 列出签到而不处理。
     #[arg(short, long)]
-    just_list: bool,
+    list: bool,
     /// 处理或列出指定课程的签到。
     #[arg(short, long)]
     course: Option<i64>,
@@ -224,7 +224,7 @@ impl SignParser {
             precisely,
             code,
             limit,
-            just_list,
+            list,
             course,
             all,
         } = self;
@@ -277,7 +277,7 @@ impl SignParser {
                 s,
             )
         });
-        if just_list {
+        if list {
             if let Some(active_id) = active_id {
                 warn!("将忽略活动 ID 参数（{active_id}）。")
             }

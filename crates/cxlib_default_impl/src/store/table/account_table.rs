@@ -1,8 +1,8 @@
 use crate::store::{DataBase, DataBaseTableTrait};
 use cxlib_error::StoreError;
+use cxlib_login::{DefaultLoginSolver, LoginError, LoginSolverTrait, LoginSolverWrapper};
 use cxlib_store::{Dir, StorageTableCommandTrait};
 use cxlib_types::Session;
-use cxlib_login::{DefaultLoginSolver, LoginError, LoginSolverTrait, LoginSolverWrapper};
 use log::{info, warn};
 use std::{
     collections::{HashMap, HashSet},
@@ -119,15 +119,18 @@ impl AccountTable {
         let mut s = HashMap::new();
         for account in accounts {
             if Self::has_account(db, &account.uid) {
-                if let Ok(session) = Session::load_cookies_or_relogin(
+                match Session::load_cookies_or_relogin(
                     account.uname(),
                     account.uid(),
                     account.enc_pwd(),
                     &LoginSolverWrapper::new(account.login_type()),
                 ) {
-                    s.insert(account.uid.clone(), session);
-                } else {
-                    warn!("账号加载失败：[`{}`]，跳过。", account.uname);
+                    Ok(session) => {
+                        s.insert(account.uid.clone(), session);
+                    }
+                    Err(e) => {
+                        warn!("账号加载失败：`{}`, `{e}`, 跳过。", account.uname);
+                    }
                 }
             } else {
                 warn!(
