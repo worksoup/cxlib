@@ -255,7 +255,10 @@ impl SignParser {
         .filter(|(c, _s)| filter(c))
         .collect::<Vec<_>>();
         courses.sort_by(|(a, _), (b, _)| sorter(a, b));
-        debug!("{courses:?}");
+        {
+            let debug_courses = courses.iter().map(|(a, _b)| a).collect::<Vec<_>>();
+            debug!("{debug_courses:?}");
+        }
         let iter = courses.into_iter().map(|(c, s)| (c.into_inner(), s));
         let activities_receiver = if let Some(limit) = limit {
             Activity::get_from_courses(iter.take(limit))
