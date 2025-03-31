@@ -291,20 +291,18 @@ impl SignParser {
                 })
             });
             for (sign, names) in signs {
-                if !all && sign.is_valid() {
-                    continue;
+                if all || sign.is_valid() {
+                    println!("{names:?}:{sign}");
                 }
-                println!("{names:?}:{sign}");
             }
         } else {
             let mut have = false;
             for (raw_signs, sessions) in signs {
                 for raw_sign in raw_signs {
                     // 相信分支预测。
-                    if !all && raw_sign.is_valid() {
-                        continue;
-                    }
-                    if active_id.is_none_or(|id| raw_sign.active_id == id.to_string()) {
+                    if (all || raw_sign.is_valid())
+                        && active_id.is_none_or(|id| raw_sign.active_id == id.to_string())
+                    {
                         have = true;
                         info!(
                             "即将处理签到：[{}], id 为 {}, 开始时间为 {}, 课程为 {} / {} / {}",
