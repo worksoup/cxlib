@@ -312,8 +312,7 @@ impl SignParser {
                                 std::time::UNIX_EPOCH
                                     + Duration::from_millis(raw_sign.start_time_mills)
                             )
-                            .format("%+")
-                            .to_string(),
+                            .format("%+"),
                             raw_sign.course.class_id(),
                             raw_sign.course.id(),
                             raw_sign.course.name()

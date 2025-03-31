@@ -66,7 +66,7 @@ impl Photo {
         struct TmpR {
             list: Vec<CloudFile>,
         }
-        let r: TmpR = r.into_body().read_json().map_err(ureq::Error::from)?;
+        let r: TmpR = r.into_body().read_json()?;
         for item in r.list {
             if p(&item.name) {
                 return Ok(item.object_id.map(|object_id| Self { object_id }));

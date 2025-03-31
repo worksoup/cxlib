@@ -316,7 +316,7 @@ where
                     File::create(protocol_config_path).ok()
                 }
                 _ => {
-                    warn!("无法打开配置文件 `protocol.toml`: {}.", e.to_string());
+                    warn!("无法打开配置文件 `protocol.toml`: {}.", e);
                     None
                 }
             },
