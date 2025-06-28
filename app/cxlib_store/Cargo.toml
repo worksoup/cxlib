@@ -1,0 +1,8 @@
+[package]
+name = "cxlib_store"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+directories.workspace = true

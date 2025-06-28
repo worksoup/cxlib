@@ -2,7 +2,7 @@
 //! 此文件存在的意义是为了避免 rust 的警告。
 //! TODO: 需要测试。
 use log::debug;
-use mime_guess::{mime, Mime};
+use mime_guess::{Mime, mime};
 use rand::Rng;
 use std::{
     borrow::Cow,
@@ -76,16 +76,15 @@ impl<'d> PreparedFields<'d> {
 
             write!(
                 header,
-                "{}\r\nContent-Disposition: form-data; name=\"{}\"",
-                boundary, name
+                "{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"",
             )
             .unwrap();
 
             if let Some(filename) = filename {
-                write!(header, "; filename=\"{}\"", filename).unwrap();
+                write!(header, "; filename=\"{filename}\"",).unwrap();
             }
 
-            write!(header, "\r\nContent-Type: {}\r\n\r\n", content_type).unwrap();
+            write!(header, "\r\nContent-Type: {content_type}\r\n\r\n",).unwrap();
 
             PreparedField {
                 header: Cursor::new(header),

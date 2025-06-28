@@ -1,23 +1,28 @@
 use crate::sign::{RawSign, SignTrait};
-use cxlib_protocol::utils::PPTSignHelper;
+use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
 use cxlib_types::Session;
-use serde::{Deserialize, Serialize};
+use derive_where::derive_where;
+use serde::Serialize;
 
 /// 普通签到。
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
-pub struct NormalSign {
-    pub(crate) raw_sign: RawSign,
+#[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+#[derive(Serialize)]
+pub struct NormalSign<SignProtocol> {
+    pub(crate) raw_sign: RawSign<SignProtocol>,
 }
 
-impl SignTrait for NormalSign {
+impl<SignProtocol> SignTrait<SignProtocol> for NormalSign<SignProtocol> {
     type PreSignData = ();
     type Data = ();
 
-    fn sign_url(&self, session: &Session, _: &(), runtime_data: &Self::Data) -> PPTSignHelper {
+    fn sign_url<U>(&self, session: &Session<U>, _: &(), runtime_data: &Self::Data) -> PPTSignHelper
+    where
+        SignProtocol: SignProtocolTrait,
+    {
         self.as_inner().sign_url(session, &(), runtime_data)
     }
 
-    fn as_inner(&self) -> &RawSign {
+    fn as_inner(&self) -> &RawSign<SignProtocol> {
         &self.raw_sign
     }
 }

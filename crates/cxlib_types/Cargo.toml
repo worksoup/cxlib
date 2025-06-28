@@ -2,20 +2,27 @@
 name = "cxlib_types"
 version.workspace = true
 authors.workspace = true
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bincode.workspace = true
 chrono.workspace = true
+cx_enc_utils = { path = "../../gizmos/cx_enc_utils" }
+cxlib_base_types = { path = "../cxlib_base_types" }
 cxlib_error = { path = "../cxlib_error" }
-cxlib_login = { path = "../cxlib_login" }
-cxlib_protocol = { path = "../cxlib_protocol", features = ["types"] }
-cxlib_store = { path = "../cxlib_store" }
+cxlib_error_utils = { path = "../cxlib_error_utils" }
+cxlib_protocol = { path = "../cxlib_protocol", features = ["types", "user"] }
+derive-where.workspace = true
+des.workspace = true
+getset2.workspace = true
+hex.workspace = true
 log.workspace = true
-onceinit.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+thiserror.workspace = true
+try_from_with_context = { path = "../../gizmos/try_from_with_context" }
 unicode-width.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }

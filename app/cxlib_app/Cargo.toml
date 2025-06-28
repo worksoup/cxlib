@@ -1,0 +1,33 @@
+[package]
+name = "cxlib_app"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[features]
+completion = ["dep:clap_complete_command"]
+completion-nu = ["completion", "clap_complete_command/nushell"]
+completion-carapace = ["completion", "clap_complete_command/carapace"]
+completion-fig = ["completion", "clap_complete_command/fig"]
+
+[dependencies]
+bincode.workspace = true
+chrono.workspace = true
+clap = { workspace = true, features = ["derive", "cargo"] }
+clap_complete_command = { workspace = true, optional = true }
+cx_gizmo_types = { path = "../../gizmos/cx_gizmo_types" }
+cx_interact = { path = "../../gizmos/cx_interact" }
+cxlib_error_utils = { path = "../../crates/cxlib_error_utils" }
+cxlib_error = { path = "../../crates/cxlib_error" }
+cxlib_store = { path = "../cxlib_store" }
+cxlib_internal = { path = "../../crates/cxlib_internal" }
+derive-where.workspace = true
+inquire.workspace = true
+log.workspace = true
+redb.workspace = true
+ref_wrapper = { path = "../../gizmos/ref_wrapper" }
+serde.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+try_from_with_context = { path = "../../gizmos/try_from_with_context" }
+ureq.workspace = true

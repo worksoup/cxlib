@@ -1,0 +1,7 @@
+[package]
+name = "cx_debug_utils"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]

@@ -1,6 +1,6 @@
 [package]
 name = "cxlib_protocol"
-edition = "2021"
+edition = "2024"
 version.workspace = true
 authors.workspace = true
 [features]
@@ -13,13 +13,12 @@ unused = ["ureq"]
 user = ["ureq", "rand"]
 multipart = ["rand"]
 [dependencies]
-cxlib_store = { path = "../cxlib_store" }
+cxlib_base_types = { path = "../cxlib_base_types" }
 cxlib_error = { path = "../cxlib_error" }
-onceinit.workspace = true
+cxlib_error_utils = { path = "../cxlib_error_utils" }
 log.workspace = true
 mime_guess = { workspace = true, optional = true }
 percent-encoding = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
-serde = { workspace = true, features = ["derive"] }
-toml.workspace = true
+thiserror.workspace = true
 ureq = { workspace = true, optional = true }

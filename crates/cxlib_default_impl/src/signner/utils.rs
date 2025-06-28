@@ -13,7 +13,7 @@ pub fn find_latest_pic(pic_dir: &PathBuf) -> Result<PathBuf, SignError> {
                         file_name.to_str().is_some_and(|file_name| {
                             file_name
                                 .split('.')
-                                .last()
+                                .next_back()
                                 .is_some_and(|file_ext| file_ext == "png" || file_ext == "jpg")
                         })
                     } {

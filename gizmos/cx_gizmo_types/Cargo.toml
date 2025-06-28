@@ -1,0 +1,8 @@
+[package]
+name = "cx_gizmo_types"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+thiserror.workspace = true

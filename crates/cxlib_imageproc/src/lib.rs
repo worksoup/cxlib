@@ -2,8 +2,8 @@ pub mod map;
 
 use crate::map::map_colors;
 use image::{
-    buffer::ConvertBuffer, DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer,
-    ImageError, Luma, LumaA, Pixel, Primitive, Rgba, SubImage,
+    DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, ImageError, Luma, LumaA,
+    Pixel, Primitive, Rgba, SubImage, buffer::ConvertBuffer,
 };
 use imageproc::contours::find_contours;
 use num_traits::ToPrimitive;
@@ -62,29 +62,26 @@ pub fn image_sum<Pixel: image::Pixel, Image: GenericImageView<Pixel = Pixel>>(
         (mut acc, count): (Vec<f64>, usize),
         p: (usize, (u32, u32, P)),
     ) -> (Vec<f64>, usize) {
-        let channels = p.1 .2.channels();
+        let channels = p.1.2.channels();
         for (index, acc) in acc.iter_mut().enumerate() {
             *acc = acc.add(channels[index].to_f64().expect("Can't convert to f64"));
         }
         (acc, count + 1)
     }
     let zero = vec![0_f64; Pixel::CHANNEL_COUNT as usize];
-    let sum =
-        if mask.len() < (image.width() * image.width()) as usize {
-            image
-                .pixels()
-                .enumerate()
-                .fold((zero, 0_usize), |acc, p| add(acc, p))
-        } else {
-            image.pixels().enumerate().fold((zero, 0_usize), |acc, p| {
-                if mask[p.0] {
-                    add(acc, p)
-                } else {
-                    acc
-                }
-            })
-        };
-    sum
+    if mask.len() < (image.width() * image.width()) as usize {
+        image
+            .pixels()
+            .enumerate()
+            .fold((zero, 0_usize), |acc, p| add(acc, p))
+    } else {
+        image.pixels().enumerate().fold(
+            (zero, 0_usize),
+            |acc, p| {
+                if mask[p.0] { add(acc, p) } else { acc }
+            },
+        )
+    }
 }
 pub fn image_mean<Pixel: image::Pixel, Image: GenericImageView<Pixel = Pixel>>(
     image: &Image,
@@ -127,7 +124,7 @@ pub mod match_template {
     use image::GrayImage;
     pub use imageproc::template_matching::MatchTemplateMethod;
     use imageproc::template_matching::{
-        find_extremes, match_template_parallel, match_template_with_mask_parallel, Extremes,
+        Extremes, find_extremes, match_template_parallel, match_template_with_mask_parallel,
     };
     fn extremes_to_result(extremes: Extremes<f32>, method: MatchTemplateMethod) -> u32 {
         match method {
@@ -189,8 +186,7 @@ pub fn find_sub_image<F: Fn(&GrayImage, &GrayImage, &GrayImage) -> u32>(
     a(&big_image, &small_image.convert(), &mask)
 }
 pub mod click_captcha_utils {
-    use crate::cut_picture;
-    use crate::map::map_colors;
+    use crate::{cut_picture, map::map_colors};
     use image::{DynamicImage, GrayImage, Luma, Primitive};
     use yapt::point_2d::Point2D;
 
@@ -222,8 +218,8 @@ pub mod click_captcha_utils {
 pub mod rotate_captcha_utils {
     use crate::{map::map_colors2_parallel, rgb_alpha_channel};
     use image::{
-        buffer::ConvertBuffer, DynamicImage, GenericImage, GenericImageView, GrayImage,
-        ImageBuffer, Luma, Rgba,
+        DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, Luma, Rgba,
+        buffer::ConvertBuffer,
     };
     use std::{
         f64::consts::PI,
@@ -246,18 +242,10 @@ pub mod rotate_captcha_utils {
                 let (w, h) = (w as i32, h as i32);
                 let Point { x: ax, y: ay } = (ax, ay).into_point() - (w / 2, h / 2).into_point();
                 let angle = if ax == 0 {
-                    if ay > 0 {
-                        PI / 2.0
-                    } else {
-                        -PI / 2.0
-                    }
+                    if ay > 0 { PI / 2.0 } else { -PI / 2.0 }
                 } else {
                     let tg = (ay as f64) / (ax as f64);
-                    if ax > 0 {
-                        tg.atan()
-                    } else {
-                        tg.atan() + PI
-                    }
+                    if ax > 0 { tg.atan() } else { tg.atan() + PI }
                 };
                 let s = angle / PI * SPLIT_COUNT as f64 / 2.0;
                 let s = (s as isize + SPLIT_COUNT as isize / 4) as usize;

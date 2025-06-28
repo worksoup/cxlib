@@ -1,5 +1,6 @@
 use crate::sign::PhotoSign;
-use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
+use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait, TypesProtocolTrait};
+use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait, utils::CaptchaSolver};
 use cxlib_types::{Photo, Session};
 use log::warn;
 use std::{collections::HashMap, path::PathBuf};
@@ -22,14 +23,22 @@ impl DefaultPhotoSignner {
         Self { path }
     }
 }
-impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
-    type ExtData<'e> = &'e Photo;
+impl<CaptchaProtocol, SignProtocol, TypesProtocol>
+    SignnerTrait<PhotoSign<SignProtocol, TypesProtocol>, CaptchaProtocol, SignProtocol>
+    for DefaultPhotoSignner
+where
+    CaptchaProtocol: CaptchaProtocolTrait,
+    SignProtocol: SignProtocolTrait,
+    TypesProtocol: TypesProtocolTrait + 'static,
+{
+    type ExtData<'e> = &'e Photo<TypesProtocol>;
 
-    fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
+    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
         &mut self,
-        sign: &PhotoSign,
+        sign: &PhotoSign<SignProtocol, TypesProtocol>,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
+        captcha_solver: &CaptchaSolver,
+    ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
         let mut pic_map = HashMap::new();
         #[allow(clippy::mutable_key_type)]
         let mut session_to_index = HashMap::new();
@@ -62,13 +71,17 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
         for session in sessions {
             let index = session_to_index[session];
             if let Some(photo) = pic_map.get(&index).cloned() {
-                let a = Self::sign_single(sign, session, &photo)?;
+                let a = <Self as SignnerTrait<
+                    PhotoSign<SignProtocol, TypesProtocol>,
+                    CaptchaProtocol,
+                    SignProtocol,
+                >>::sign_single(sign, session, captcha_solver, &photo)?;
                 map.insert(session, a);
             } else {
                 map.insert(
                     session,
                     SignResult::Fail {
-                        msg: format!("拍照签到[{}]没有获取到有效的照片！", sign.as_inner().name),
+                        msg: format!("拍照签到[{}]没有获取到有效的照片！", sign.as_inner().name()),
                     },
                 );
             }
@@ -76,11 +89,12 @@ impl SignnerTrait<PhotoSign> for DefaultPhotoSignner {
         Ok(map)
     }
 
-    fn sign_single(
-        sign: &PhotoSign,
-        session: &Session,
-        photo: &Photo,
+    fn sign_single<U>(
+        sign: &PhotoSign<SignProtocol, TypesProtocol>,
+        session: &Session<U>,
+        captcha_solver: &CaptchaSolver,
+        photo: &Photo<TypesProtocol>,
     ) -> Result<SignResult, SignError> {
-        sign.pre_sign_and_sign(session, &(), photo)
+        sign.pre_sign_and_sign::<CaptchaProtocol, U>(session, &(), captcha_solver, photo)
     }
 }

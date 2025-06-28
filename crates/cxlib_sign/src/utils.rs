@@ -1,14 +1,22 @@
-use crate::{protocol, PreSignResult, SignResult, SignTrait};
-use cxlib_captcha::{utils::find_captcha, CaptchaId, DEFAULT_CAPTCHA_TYPE};
-use cxlib_error::{CxlibResultUtils, SignError};
-use cxlib_protocol::{utils::PPTSignHelper, ProtocolItem, ProtocolItemTrait};
-use cxlib_types::{LocationWithRange, OptionPair, RawSign, Session};
+use crate::{PreSignResult, SignError, SignResult, SignTrait};
+use cx_gizmo_types::OptionPair;
+use cxlib_captcha::{CaptchaError, CaptchaId, utils::find_captcha};
+use cxlib_error_utils::CxlibResultUtils;
+use cxlib_protocol::{
+    collect::{CaptchaProtocolTrait, SignProtocolTrait},
+    utils::PPTSignHelper,
+};
+use cxlib_types::{LocationWithRange, RawSign, Session};
 use log::{debug, trace, warn};
-use ureq::{http::Response, Agent, Body, ResponseExt};
+use ureq::{Agent, Body, ResponseExt, http::Response};
 
-pub fn analysis_after_presign(
+pub fn analysis_after_presign<
+    CaptchaProtocol: CaptchaProtocolTrait,
+    SignProtocol: SignProtocolTrait,
+    U,
+>(
     active_id: &str,
-    session: &Session,
+    session: &Session<U>,
     response_of_presign: Response<Body>,
 ) -> Result<PreSignResult, SignError> {
     // TODO
@@ -29,10 +37,10 @@ pub fn analysis_after_presign(
         }
     }
     let captcha_id_and_location = OptionPair::from((
-        find_captcha(session, &html),
+        find_captcha::<CaptchaProtocol>(session, &html),
         LocationWithRange::find_in_html(&html),
     ));
-    let response_of_analysis = protocol::analysis(session, active_id)?;
+    let response_of_analysis = SignProtocol::analysis(session, active_id)?;
     let data = response_of_analysis
         .into_body()
         .read_to_string()
@@ -44,7 +52,7 @@ pub fn analysis_after_presign(
         &data[0..end_of_code]
     };
     debug!("code: {code:?}");
-    let _response_of_analysis2 = protocol::analysis2(session, code)?;
+    let _response_of_analysis2 = SignProtocol::analysis2(session, code)?;
     debug!(
         "analysis 结果：{}",
         _response_of_analysis2
@@ -59,39 +67,55 @@ pub fn analysis_after_presign(
         data: captcha_id_and_location,
     })
 }
-pub fn secondary_verification(
+pub type CaptchaSolver = fn(&Agent, &str, &str) -> Result<String, CaptchaError>;
+pub fn secondary_verification<CaptchaProtocol, S>(
     agent: &Agent,
     url: PPTSignHelper,
     captcha_id: Option<&CaptchaId>,
+    captcha_solver: &CaptchaSolver,
     referer: &str,
-) -> Result<SignResult, SignError> {
+) -> Result<SignResult, SignError>
+where
+    CaptchaProtocol: CaptchaProtocolTrait,
+{
     let captcha_id = if let Some(captcha_id) = captcha_id {
         captcha_id
     } else {
         warn!("未找到 CaptchaId, 使用内建值。");
-        &ProtocolItem::CaptchaId.get()
+        cxlib_protocol::collect::CAPTCHA_ID
     };
-    let url_param = DEFAULT_CAPTCHA_TYPE.solve_captcha(agent, captcha_id, referer)?;
+    let url_param = captcha_solver(agent, captcha_id, referer)?;
     let r = {
         let url = url.with_validate(&url_param);
         let r = url.get(agent)?;
-        RawSign::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap())
+        RawSign::<S>::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap())
     };
     Ok(r)
 }
-pub fn try_secondary_verification<Sign: SignTrait + ?Sized>(
+pub fn try_secondary_verification<CaptchaProtocol, S, Sign>(
     agent: &Agent,
     url: PPTSignHelper,
     captcha_id: Option<&CaptchaId>,
+    captcha_solver: &CaptchaSolver,
     referer: &str,
-) -> Result<SignResult, SignError> {
+) -> Result<SignResult, SignError>
+where
+    CaptchaProtocol: CaptchaProtocolTrait,
+    Sign: SignTrait<S> + ?Sized,
+{
     let r = url.get(agent)?;
     match Sign::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap()) {
         SignResult::Fail { msg } => {
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。
                 let url = url.patch_enc_by_pre_sign_result_msg(msg);
-                secondary_verification(agent, url, captcha_id, referer)
+                secondary_verification::<CaptchaProtocol, S>(
+                    agent,
+                    url,
+                    captcha_id,
+                    captcha_solver,
+                    referer,
+                )
             } else {
                 Ok(SignResult::Fail { msg })
             }

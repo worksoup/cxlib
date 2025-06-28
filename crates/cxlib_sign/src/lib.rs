@@ -1,15 +1,20 @@
-use crate::utils::try_secondary_verification;
+use crate::utils::{CaptchaSolver, try_secondary_verification};
+use cx_gizmo_types::OptionPair;
 use cxlib_captcha::CaptchaId;
-use cxlib_error::CxlibResultUtils;
-use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
-use cxlib_types::{Course, LocationWithRange, OptionPair, RawSign, Session};
+use cxlib_error_utils::CxlibResultUtils;
+use cxlib_protocol::{
+    collect::{CaptchaProtocolTrait, SignProtocolTrait},
+    utils::PPTSignHelper,
+};
+use cxlib_types::{CourseWithInfo, LocationWithRange, RawSign, Session};
 use log::info;
 use serde::Deserialize;
 use std::{collections::HashMap, ops::Add};
 
-pub use cxlib_error::SignError;
-
+mod error;
 pub mod utils;
+
+pub use error::*;
 
 /// # [`SignTrait`]
 /// 所有的签到均实现了该 trait, 方便统一签到的流程。
@@ -27,32 +32,37 @@ pub mod utils;
 /// 签到类型的划分主要依据前人的工作。
 ///
 /// 细节详见各签到的文档。
-pub trait SignTrait: Ord {
+pub trait SignTrait<SignProtocol>: Ord {
     type PreSignData: ?Sized;
     type Data: ?Sized;
-    fn sign_url(
+    fn sign_url<U>(
         &self,
-        session: &Session,
+        session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
-    ) -> PPTSignHelper;
+    ) -> PPTSignHelper
+    where
+        SignProtocol: SignProtocolTrait;
     /// 获取各签到类型内部对原始签到类型的引用。
     /// [`RawSign`] 的各字段均为 `pub`,
     /// 故可以通过本函数获取一些签到通用的信息。
-    fn as_inner(&self) -> &RawSign;
+    fn as_inner(&self) -> &RawSign<SignProtocol>;
     /// 判断签到活动是否有效（目前认定两小时内未结束的签到为有效签到）。
     fn is_valid(&self) -> bool {
-        let time = std::time::Duration::from_millis(self.as_inner().start_time_mills);
+        let time = std::time::Duration::from_millis(*self.as_inner().start_time_mills());
         let two_hours = std::time::Duration::from_secs(7200);
-        self.as_inner().status_code == 1
+        1 == *self.as_inner().status_code()
             && std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH.add(time))
                 .log_unwrap()
                 < two_hours
     }
     /// 获取签到后状态。参见返回类型 [`SignState`].
-    fn get_sign_state(&self, session: &Session) -> Result<SignState, SignError> {
-        let r = crate::protocol::get_attend_info(session, &self.as_inner().active_id)?;
+    fn get_sign_state<U>(&self, session: &Session<U>) -> Result<SignState, SignError>
+    where
+        SignProtocol: SignProtocolTrait,
+    {
+        let r = SignProtocol::get_attend_info(session, self.as_inner().active_id())?;
         #[derive(Deserialize)]
         struct Status {
             status: i64,
@@ -85,17 +95,25 @@ pub trait SignTrait: Ord {
         }
     }
     /// 预签到。
-    fn pre_sign(
+    fn pre_sign<CaptchaProtocol, U>(
         &self,
-        session: &Session,
+        session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
-    ) -> Result<PreSignResult, SignError> {
+    ) -> Result<PreSignResult, SignError>
+    where
+        CaptchaProtocol: CaptchaProtocolTrait,
+        SignProtocol: SignProtocolTrait,
+    {
         let _ = pre_sign_data;
-        self.as_inner().pre_sign(session, &())
+        <RawSign<SignProtocol> as SignTrait<SignProtocol>>::pre_sign::<CaptchaProtocol, _>(
+            self.as_inner(),
+            session,
+            &(),
+        )
     }
-    fn pre_check_data(
+    fn pre_check_data<UserProtocol>(
         &self,
-        session: &Session,
+        session: &Session<UserProtocol>,
         data: &Self::Data,
     ) -> Result<Result<(), SignResult>, SignError> {
         let _ = session;
@@ -105,21 +123,27 @@ pub trait SignTrait: Ord {
     /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
     /// 调用 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 进行判断，如果真，则调用 [`sign_unchecked`](SignTrait::sign_unchecked), 否则返回
     /// [`SignResult::Fail`]{msg: "签到未准备好！".to_string()}
-    fn sign(
+    fn sign<CaptchaProtocol, U>(
         &self,
-        session: &Session,
+        session: &Session<U>,
         pre_sign_url: &str,
         pre_sign_result_data: &OptionPair<CaptchaId, LocationWithRange>,
         pre_sign_data: &Self::PreSignData,
+        captcha_solver: &CaptchaSolver,
         data: &Self::Data,
-    ) -> Result<SignResult, SignError> {
+    ) -> Result<SignResult, SignError>
+    where
+        CaptchaProtocol: CaptchaProtocolTrait,
+        SignProtocol: SignProtocolTrait,
+    {
         match self.pre_check_data(session, data)? {
             Ok(_) => {
                 let url = self.sign_url(session, pre_sign_data, data);
-                try_secondary_verification::<Self>(
+                try_secondary_verification::<CaptchaProtocol, SignProtocol, Self>(
                     session,
                     url,
                     pre_sign_result_data.first(),
+                    captcha_solver,
                     pre_sign_url,
                 )
             }
@@ -127,48 +151,80 @@ pub trait SignTrait: Ord {
         }
     }
     /// 预签到并签到。
-    fn pre_sign_and_sign(
+    fn pre_sign_and_sign<CaptchaProtocol, U>(
         &self,
-        session: &Session,
+        session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
+        captcha_solver: &CaptchaSolver,
         data: &Self::Data,
-    ) -> Result<SignResult, SignError> {
-        let r = self.pre_sign(session, pre_sign_data)?;
+    ) -> Result<SignResult, SignError>
+    where
+        CaptchaProtocol: CaptchaProtocolTrait,
+        SignProtocol: SignProtocolTrait,
+    {
+        let r = self.pre_sign::<CaptchaProtocol, _>(session, pre_sign_data)?;
         match r {
             PreSignResult::Susses => Ok(SignResult::Susses),
             PreSignResult::Data {
                 ref url,
                 data: ref pre_sign_result_data,
-            } => self.sign(session, url, pre_sign_result_data, pre_sign_data, data),
+            } => self.sign::<CaptchaProtocol, _>(
+                session,
+                url,
+                pre_sign_result_data,
+                pre_sign_data,
+                captcha_solver,
+                data,
+            ),
         }
     }
 }
 
-impl SignTrait for RawSign {
+impl<SignProtocol> SignTrait<SignProtocol> for RawSign<SignProtocol> {
     type PreSignData = ();
     type Data = ();
 
-    fn sign_url(&self, session: &Session, _: &(), _: &()) -> PPTSignHelper {
-        protocol::general_sign_url(
+    fn sign_url<UserProtocol>(
+        &self,
+        session: &Session<UserProtocol>,
+        _: &(),
+        _: &(),
+    ) -> PPTSignHelper
+    where
+        SignProtocol: SignProtocolTrait,
+    {
+        SignProtocol::general_sign_url(
             (session.uid(), session.fid(), session.name()),
-            &self.active_id,
+            self.active_id(),
         )
     }
 
-    fn as_inner(&self) -> &RawSign {
+    fn as_inner(&self) -> &RawSign<SignProtocol> {
         self
     }
-    fn pre_sign(&self, session: &Session, _: &()) -> Result<PreSignResult, SignError> {
-        let active_id = self.active_id.as_str();
+    fn pre_sign<CaptchaProtocol, U>(
+        &self,
+        session: &Session<U>,
+        _: &(),
+    ) -> Result<PreSignResult, SignError>
+    where
+        CaptchaProtocol: CaptchaProtocolTrait,
+        SignProtocol: SignProtocolTrait,
+    {
+        let active_id = self.active_id();
         let uid = session.uid();
-        let response_of_pre_sign = protocol::pre_sign(
+        let response_of_pre_sign = SignProtocol::pre_sign(
             session,
-            (self.course.id(), self.course.class_id()),
+            (self.course().id(), self.course().class_id()),
             active_id,
             uid,
         )?;
         info!("用户[{}]预签到已请求。", session.name());
-        utils::analysis_after_presign(active_id, session, response_of_pre_sign)
+        utils::analysis_after_presign::<CaptchaProtocol, SignProtocol, _>(
+            active_id,
+            session,
+            response_of_pre_sign,
+        )
     }
 }
 
@@ -243,81 +299,30 @@ pub enum SignState {
 pub struct SignActivityRaw {
     pub id: String,
     pub name: String,
-    pub course: Course,
+    pub course: CourseWithInfo,
     pub other_id: String,
     pub status: i32,
     pub start_time_secs: i64,
 }
 /// 针对同一个签到，但不同 Session 的处理程序。
-pub trait SignnerTrait<T: SignTrait> {
+pub trait SignnerTrait<T, CaptchaProtocol, SignProtocol>
+where
+    T: SignTrait<SignProtocol>,
+    CaptchaProtocol: CaptchaProtocolTrait,
+    SignProtocol: SignProtocolTrait,
+{
     type ExtData<'e>;
-    fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
+    fn sign<'a, U: Send + 'static, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
         &mut self,
         sign: &T,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, SignError>;
+        captcha_solver: &'static CaptchaSolver,
+    ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError>;
     /// 此处不使用 self, 方便多线程实现。
-    fn sign_single(
+    fn sign_single<U>(
         sign: &T,
-        session: &Session,
+        session: &Session<U>,
+        captcha_solver: &CaptchaSolver,
         extra_data: Self::ExtData<'_>,
     ) -> Result<SignResult, SignError>;
-}
-
-/// 为手势签到和签到码签到实现的一个特型，方便复用代码。
-///
-/// 这两种签到除签到码格式以外没有任何不同之处。
-pub trait GestureOrSigncodeSignTrait: Ord {
-    fn as_inner(&self) -> &RawSign;
-    /// 检查签到码是否正确而不进行签到。
-    ///
-    /// 如果是手势签到，九宫格对应数字如下：
-    /// ``` matlab
-    /// 1 2 3
-    /// 4 5 6
-    /// 7 8 9
-    /// ```
-    fn check_signcode(
-        session: &Session,
-        active_id: &str,
-        signcode: &str,
-    ) -> Result<Result<(), SignResult>, SignError> {
-        #[derive(Deserialize)]
-        struct CheckR {
-            #[allow(unused)]
-            result: i64,
-        }
-        let CheckR { result } = protocol::check_signcode(session, active_id, signcode)?
-            .into_body()
-            .read_json()
-            .log_unwrap();
-        if result == 1 {
-            Ok(Ok(()))
-        } else {
-            Ok(Err(SignResult::Fail {
-                msg: "签到码或手势不正确".into(),
-            }))
-        }
-    }
-}
-impl<T: GestureOrSigncodeSignTrait> SignTrait for T {
-    type PreSignData = ();
-    type Data = str;
-
-    fn sign_url(
-        &self,
-        session: &Session,
-        _: &Self::PreSignData,
-        data: &Self::Data,
-    ) -> PPTSignHelper {
-        protocol::signcode_sign_url(
-            (session.uid(), session.fid(), session.name()),
-            &self.as_inner().active_id,
-            data,
-        )
-    }
-
-    fn as_inner(&self) -> &RawSign {
-        <Self as GestureOrSigncodeSignTrait>::as_inner(self)
-    }
 }

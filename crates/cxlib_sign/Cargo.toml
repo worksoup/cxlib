@@ -1,15 +1,18 @@
 [package]
 name = "cxlib_sign"
-edition = "2021"
+edition = "2024"
 version.workspace = true
 authors.workspace = true
 
 [dependencies]
-cxlib_captcha = { path = "../cxlib_captcha" }
+cx_gizmo_types = { path = "../../gizmos/cx_gizmo_types" }
 cxlib_error = { path = "../cxlib_error" }
+cxlib_error_utils = { path = "../cxlib_error_utils" }
+cxlib_captcha = { path = "../cxlib_captcha" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["sign"] }
 cxlib_types = { path = "../cxlib_types" }
 log.workspace = true
 num_enum.workspace = true
 serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
 ureq = { workspace = true, features = ["cookies", "json"] }

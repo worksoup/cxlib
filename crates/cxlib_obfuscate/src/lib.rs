@@ -135,8 +135,7 @@ mod tests {
         49, 244, 212, 78, 136, 215, 52, 188, 121, 7, 160, 57, 8, 108, 251, 13, 30, 117, 255, 144,
     ];
     fn zlib_encode(text: &str) -> Vec<u8> {
-        use flate2::write::ZlibEncoder;
-        use flate2::Compression;
+        use flate2::{Compression, write::ZlibEncoder};
         use std::io::prelude::*;
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(text.as_bytes()).unwrap();

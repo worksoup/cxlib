@@ -1,6 +1,6 @@
 [package]
 name = "cxlib_captcha"
-edition = "2021"
+edition = "2024"
 version.workspace = true
 authors.workspace = true
 
@@ -15,19 +15,21 @@ ui_solver = ["dep:captcha_solver_ui"]
 [dependencies]
 yapt.workspace = true
 cxlib_error = { path = "../cxlib_error" }
+cxlib_error_utils = { path = "../cxlib_error_utils" }
+cx_debug_utils = { path = "../../gizmos/cx_debug_utils" }
+cx_ureq_utils = { path = "../../gizmos/cx_ureq_utils" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_obfuscate = { path = "../cxlib_obfuscate" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["captcha"] }
-cxlib_utils = { path = "../cxlib_utils" }
 getset2.workspace = true
 hex.workspace = true
 image.workspace = true
 log.workspace = true
-onceinit.workspace = true
 rand.workspace = true
-ureq = { workspace = true, features = ["cookies", "json"] }
+thiserror.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+ureq = { workspace = true, features = ["cookies", "json"] }
 
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 captcha_solver_ui = { git = "https://github.com/worksoup/captcha_solver_ui.git", optional = true }

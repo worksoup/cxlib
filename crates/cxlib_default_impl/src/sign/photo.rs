@@ -1,25 +1,47 @@
 use crate::sign::{RawSign, SignTrait};
-use cxlib_protocol::{collect::sign as protocol, utils::PPTSignHelper};
+use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
 use cxlib_types::{Photo, Session};
-use serde::{Deserialize, Serialize};
+use derive_where::derive_where;
+use serde::Serialize;
+use std::marker::PhantomData;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
-pub struct PhotoSign {
-    pub(crate) raw_sign: RawSign,
+#[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+#[derive(Serialize)]
+pub struct PhotoSign<SignProtocol, TypesProtocol> {
+    raw_sign: RawSign<SignProtocol>,
+    #[serde(skip)]
+    _p: PhantomData<TypesProtocol>,
 }
-impl PhotoSign {}
-impl SignTrait for PhotoSign {
+impl<SignProtocol, TypesProtocol> PhotoSign<SignProtocol, TypesProtocol> {
+    pub fn new(raw_sign: RawSign<SignProtocol>) -> Self {
+        Self {
+            raw_sign,
+            _p: PhantomData,
+        }
+    }
+}
+impl<SignProtocol, TypesProtocol> SignTrait<SignProtocol>
+    for PhotoSign<SignProtocol, TypesProtocol>
+{
     type PreSignData = ();
-    type Data = Photo;
-    fn sign_url(&self, session: &Session, _: &(), runtime_data: &Photo) -> PPTSignHelper {
-        protocol::photo_sign_url(
+    type Data = Photo<TypesProtocol>;
+    fn sign_url<U>(
+        &self,
+        session: &Session<U>,
+        _: &(),
+        runtime_data: &Photo<TypesProtocol>,
+    ) -> PPTSignHelper
+    where
+        SignProtocol: SignProtocolTrait,
+    {
+        SignProtocol::photo_sign_url(
             (session.uid(), session.fid(), session.name()),
-            &self.as_inner().active_id,
+            self.as_inner().active_id(),
             runtime_data.get_object_id(),
         )
     }
 
-    fn as_inner(&self) -> &RawSign {
+    fn as_inner(&self) -> &RawSign<SignProtocol> {
         &self.raw_sign
     }
 }

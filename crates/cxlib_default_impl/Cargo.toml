@@ -1,24 +1,23 @@
 [package]
 name = "cxlib_default_impl"
-edition = "2021"
+edition = "2024"
 version.workspace = true
 authors.workspace = true
 
 [dependencies]
-cxlib_error = { path = "../cxlib_error" }
+cx_interact = { path = "../../gizmos/cx_interact" }
+cxlib_error_utils = { path = "../cxlib_error_utils" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
-cxlib_login = { path = "../cxlib_login" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["default_impl"] }
 cxlib_sign = { path = "../cxlib_sign" }
-cxlib_store = { path = "../cxlib_store" }
 cxlib_types = { path = "../cxlib_types" }
-cxlib_types_ext = { path = "../cxlib_types_ext" }
-cxlib_utils = { path = "../cxlib_utils" }
+derive-where.workspace = true
 image.workspace = true
 log.workspace = true
+ref_wrapper = { path = "../../gizmos/ref_wrapper" }
 rxing.workspace = true
 serde = { workspace = true, features = ["derive"] }
-sqlite.workspace = true
+try_from_with_context = { path = "../../gizmos/try_from_with_context" }
 yapt.workspace = true
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 xcap.workspace = true

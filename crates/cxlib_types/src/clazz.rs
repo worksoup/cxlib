@@ -1,37 +1,12 @@
-use crate::{Course, RawCourse};
-use serde::{Deserialize, Serialize};
-use std::fmt::Display;
-#[derive(Copy, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum ClassId {
-    Id(i64),
-    /// 如果该班级为用户自建班级，则为此变体。
-    TeacherId(i64),
-}
-impl Display for ClassId {
-    #[inline]
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ClassId::Id(id) => id.fmt(fmt),
-            ClassId::TeacherId(tea_id) => tea_id.fmt(fmt),
-        }
-    }
-}
-impl From<ClassId> for i64 {
-    #[inline]
-    fn from(value: ClassId) -> Self {
-        match value {
-            ClassId::Id(id) => id,
-            ClassId::TeacherId(id) => id,
-        }
-    }
-}
-impl ClassId {}
+use crate::{CourseWithInfo, RawCourse};
+use bincode::{Decode, Encode};
+use serde::Serialize;
 
 /// # [`ClassInfo`]
 /// 班级信息，包括班级 ID 以及是否结课。
-#[derive(Copy, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Copy, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Decode, Encode)]
 pub struct ClassInfo {
-    id: ClassId,
+    id: i64,
     ended: bool,
 }
 impl ClassInfo {
@@ -43,12 +18,17 @@ impl ClassInfo {
     //     }
     // }
     #[inline]
-    pub fn new(id: ClassId, ended: bool) -> ClassInfo {
+    pub fn new(id: i64, ended: bool) -> ClassInfo {
+        ClassInfo { id, ended }
+    }
+    #[inline]
+    pub fn new_with_state(id: i64, state: Option<u8>) -> ClassInfo {
+        let ended = state.is_none_or(|state| state == 0);
         ClassInfo { id, ended }
     }
     /// 返回 [`ClassId`].
     #[inline]
-    pub fn id(&self) -> ClassId {
+    pub fn id(&self) -> i64 {
         self.id
     }
     /// 返回是否已经结课。
@@ -60,7 +40,7 @@ impl ClassInfo {
 /// # [`Class`]
 /// 代表班级，通过 [`raw_courses`](Class::raw_courses) 获取班级内的课程（不包含班级信息）。
 /// 通过 [`into_courses`](Class::into_courses) 获取班级内的课程（包含班级信息）。
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Class {
     raw_courses: Vec<RawCourse>,
     info: ClassInfo,
@@ -85,7 +65,7 @@ impl Class {
     }
     /// 获取班级内的课程（包含班级信息）。
     #[inline]
-    pub fn into_courses(self) -> Vec<Course> {
+    pub fn into_courses(self) -> Vec<CourseWithInfo> {
         let Self { raw_courses, info } = self;
         raw_courses
             .into_iter()

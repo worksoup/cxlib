@@ -1,6 +1,6 @@
 use cxlib_error::AgentError;
 use log::warn;
-use ureq::{http::Response, Agent, Body};
+use ureq::{Agent, Body, http::Response};
 
 static PPT_SIGN: &str = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax";
 // // web 聊天页
@@ -16,7 +16,9 @@ pub fn chat_group_pre_sign(
     tuid: &str,
 ) -> Result<Response<Body>, AgentError> {
     let url = CHAT_GROUP_PRE_SIGN;
-    let url = format!("{url}?activeId={active_id}&code=&uid={uid}&courseId=null&classId=0&general=0&chatId={chat_id}&appType=0&tid={tuid}&atype=null&sys=0");
+    let url = format!(
+        "{url}?activeId={active_id}&code=&uid={uid}&courseId=null&classId=0&general=0&chatId={chat_id}&appType=0&tid={tuid}&atype=null&sys=0"
+    );
     Ok(client.get(&url).call()?)
 }
 // 无课程群聊的签到
@@ -38,7 +40,9 @@ pub fn chat_group_photo_sign(
     object_id: &str,
 ) -> Result<Response<Body>, AgentError> {
     let url = CHAT_GROUP_SIGN;
-    let url = format!("{url}?activeId={active_id}&uid={uid}&clientip=&useragent=&latitude=-1&longitude=-1&fid=0&objectId={object_id}");
+    let url = format!(
+        "{url}?activeId={active_id}&uid={uid}&clientip=&useragent=&latitude=-1&longitude=-1&fid=0&objectId={object_id}"
+    );
     Ok(client.get(&url).call()?)
 }
 pub fn chat_group_location_sign(

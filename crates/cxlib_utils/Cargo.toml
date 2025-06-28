@@ -1,12 +1,9 @@
 [package]
 name = "cxlib_utils"
-edition = "2021"
+edition = "2024"
 version.workspace = true
 authors.workspace = true
 
 [features]
 
 [dependencies]
-inquire.workspace = true
-log.workspace = true
-ureq.workspace = true

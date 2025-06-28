@@ -1,9 +1,13 @@
-use crate::{Course, Session, SignDetail};
-use cxlib_error::{CxlibResultUtils, SignError};
-use cxlib_protocol::collect::types as protocol;
+use crate::{CourseWithInfo, Session, SignDetail};
+use cxlib_error::AgentError;
+use cxlib_error_utils::CxlibResultUtils;
+use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
+use derive_where::derive_where;
+use getset2::Getset2;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
+    marker::PhantomData,
     time::{Duration, SystemTime},
 };
 
@@ -21,14 +25,18 @@ pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
 /// 未分类的课程签到。
 ///
 /// 对于该类型的分类、处理等，请参考 `cxlib_default_impl::sign` 中的相关部分。
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize)]
-pub struct RawSign {
-    pub start_time_mills: u64,
-    pub active_id: String,
-    pub name: String,
-    pub course: Course,
-    pub other_id: String,
-    pub status_code: i32,
+#[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+#[derive(Serialize, Getset2)]
+#[getset2(get_ref(pub))]
+pub struct RawSign<SignProtocol> {
+    active_id: String,
+    course: CourseWithInfo,
+    name: String,
+    other_id: String,
+    status_code: i32,
+    start_time_mills: u64,
+    #[serde(skip)]
+    _p: PhantomData<SignProtocol>,
 }
 fn time_string_from_mills(mills: u64) -> String {
     #[inline]
@@ -40,7 +48,7 @@ fn time_string_from_mills(mills: u64) -> String {
     time_string(std::time::UNIX_EPOCH + Duration::from_millis(mills))
 }
 
-impl Display for RawSign {
+impl<P> Display for RawSign<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name_width = get_width_str_should_be(self.name.as_str(), 12);
         write!(
@@ -57,7 +65,37 @@ impl Display for RawSign {
     }
 }
 
-impl RawSign {
+impl<P> RawSign<P> {
+    pub fn from_other<A>(other: RawSign<A>) -> Self {
+        other.as_other().clone()
+    }
+    pub fn into_other<A>(self) -> RawSign<A> {
+        RawSign::from_other(self)
+    }
+    pub fn as_other<A>(&self) -> &RawSign<A> {
+        unsafe { std::mem::transmute(&self) }
+    }
+    pub fn from_other_ref<A>(other: &RawSign<A>) -> &Self {
+        other.as_other()
+    }
+    pub fn new(
+        active_id: String,
+        course: CourseWithInfo,
+        name: String,
+        other_id: String,
+        status_code: i32,
+        start_time_mills: u64,
+    ) -> Self {
+        Self {
+            start_time_mills,
+            active_id,
+            name,
+            course,
+            other_id,
+            status_code,
+            _p: Default::default(),
+        }
+    }
     pub fn fmt_without_course_info(&self) -> String {
         let name_width = get_width_str_should_be(self.name.as_str(), 12);
         format!(
@@ -69,7 +107,14 @@ impl RawSign {
             width = name_width,
         )
     }
-    pub fn get_sign_detail(active_id: &str, session: &Session) -> Result<SignDetail, SignError> {
+    pub fn get_sign_detail<TypesProtocol, UserProtocol>(
+        active_id: &str,
+        session: &Session<UserProtocol>,
+    ) -> Result<SignDetail, AgentError>
+    where
+        TypesProtocol: TypesProtocolTrait,
+        UserProtocol: UserProtocolTrait,
+    {
         #[derive(Deserialize)]
         struct GetSignDetailR {
             #[serde(rename = "ifPhoto")]
@@ -79,7 +124,7 @@ impl RawSign {
             #[serde(rename = "signCode")]
             sign_code: Option<String>,
         }
-        let r = protocol::sign_detail(session, active_id)?;
+        let r = TypesProtocol::sign_detail(session, active_id)?;
         let GetSignDetailR {
             is_photo_sign,
             is_refresh_qrcode,
@@ -88,11 +133,18 @@ impl RawSign {
         Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
     }
     #[inline]
-    pub fn get_detail(&self, session: &Session) -> Result<SignDetail, SignError> {
-        Self::get_sign_detail(&self.active_id, session)
+    pub fn get_detail<TypesProtocol, UserProtocol>(
+        &self,
+        session: &Session<UserProtocol>,
+    ) -> Result<SignDetail, AgentError>
+    where
+        TypesProtocol: TypesProtocolTrait,
+        UserProtocol: UserProtocolTrait,
+    {
+        Self::get_sign_detail::<TypesProtocol, UserProtocol>(&self.active_id, session)
     }
 }
-impl RawSign {
+impl<P> RawSign<P> {
     // pub fn speculate_type_by_text(text: &str) -> Sign {
     //     if text.contains("拍照") {
     //         Sign::Photo

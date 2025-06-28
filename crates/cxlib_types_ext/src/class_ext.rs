@@ -1,12 +1,22 @@
-use cxlib_error::{CourseError, MaybeFatalError};
-use cxlib_types::{Class, Session};
+use cxlib_error_utils::MaybeFatalError;
+use cxlib_protocol::collect::UserProtocolTrait;
+use cxlib_types::{Class, CourseError, Session};
 use log::warn;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 
 pub trait ClassExt {
-    fn get_from_sessions<'a, Sessions: Iterator<Item = &'a Session>>(
+    /// 通过用户会话获取班级列表。
+    ///
+    /// # Errors
+    /// 仅返回当前语境下的致命错误。
+    fn get_from_sessions<
+        'a,
+        UserProtocol: UserProtocolTrait + Send + 'static,
+        Sessions: Iterator<Item = &'a Session<UserProtocol>>,
+    >(
         sessions: Sessions,
-    ) -> Result<HashMap<Class, Vec<Session>>, CourseError> {
+    ) -> Result<HashMap<Class, Vec<Session<UserProtocol>>>, CourseError> {
+        // 由于多个线程几乎同时启动，故不需要 fatal_error_occurred 变量判断是否出现致命错误而直接返回。
         let mut handles = Vec::new();
         for session in sessions {
             let session_ = session.clone();

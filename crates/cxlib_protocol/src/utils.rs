@@ -1,7 +1,7 @@
 use cxlib_error::AgentError;
 use log::debug;
 use std::ops::{Deref, DerefMut};
-use ureq::{http::Response, Agent, Body};
+use ureq::{Agent, Body, http::Response};
 
 pub struct PPTSignHelper {
     url: String,

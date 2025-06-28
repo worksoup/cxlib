@@ -1,7 +1,10 @@
-use crate::{ClassInfo, Course};
+use crate::{ClassInfo, CourseWithInfo};
+use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Decode, Encode,
+)]
 pub struct RawCourse {
     id: i64,
     #[serde(rename = "teacherfactor")]
@@ -22,8 +25,14 @@ impl RawCourse {
     //     }
     // }
     #[inline]
-    pub fn into_course(self, info: ClassInfo) -> Course {
-        Course::new(self, info)
+    pub fn into_course(self, info: ClassInfo) -> CourseWithInfo {
+        let Self {
+            id,
+            teacher,
+            image_url,
+            name,
+        } = self;
+        CourseWithInfo::new_with_fields(id, info, name, image_url, teacher)
     }
     #[inline]
     pub fn new(id: i64, teacher: String, image_url: Option<String>, name: String) -> RawCourse {

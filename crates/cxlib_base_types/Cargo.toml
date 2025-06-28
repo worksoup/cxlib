@@ -1,0 +1,9 @@
+[package]
+name = "cxlib_base_types"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+bincode.workspace = true
+serde = { workspace = true, features = ["derive"] }

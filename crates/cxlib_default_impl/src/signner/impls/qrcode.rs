@@ -1,7 +1,8 @@
 use crate::{sign::QrCodeSign, signner::LocationInfoGetterTrait};
-use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
-use cxlib_types::{Location, Session};
-use cxlib_utils::inquire_confirm;
+use cx_interact::inquire_confirm;
+use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
+use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait, utils::CaptchaSolver};
+use cxlib_types::{Geoaddr, LocationPreprocessorTrait, Session};
 use log::warn;
 use std::{
     collections::HashMap,
@@ -10,15 +11,18 @@ use std::{
 };
 use yapt::point_2d::Point;
 
-pub struct DefaultQrCodeSignner<'a, T: LocationInfoGetterTrait> {
+pub struct DefaultQrCodeSignner<'a, T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> {
     location_info_getter: T,
     location_str: &'a Option<String>,
     path: &'a Option<PathBuf>,
     enc: &'a Option<String>,
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     precisely: bool,
+    preprocessor: &'a PP,
 }
-impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
+impl<'a, T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait>
+    DefaultQrCodeSignner<'a, T, PP>
+{
     pub fn new(
         location_info_getter: T,
         location_str: &'a Option<String>,
@@ -26,6 +30,7 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
         enc: &'a Option<String>,
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         precisely: bool,
+        preprocessor: &'a PP,
     ) -> Self {
         Self {
             location_info_getter,
@@ -34,28 +39,52 @@ impl<'a, T: LocationInfoGetterTrait> DefaultQrCodeSignner<'a, T> {
             enc,
             #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
             precisely,
+            preprocessor,
         }
     }
 }
 
-impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignner<'_, T> {
-    type ExtData<'e> = (&'e str, Option<Vec<Location>>);
+impl<
+    T: LocationInfoGetterTrait,
+    CaptchaProtocol,
+    SignProtocol,
+    Preprocessor: LocationPreprocessorTrait,
+> SignnerTrait<QrCodeSign<SignProtocol>, CaptchaProtocol, SignProtocol>
+    for DefaultQrCodeSignner<'_, T, Preprocessor>
+where
+    CaptchaProtocol: CaptchaProtocolTrait,
+    SignProtocol: SignProtocolTrait + Send + 'static,
+{
+    type ExtData<'e> = (&'e str, Option<Vec<Geoaddr>>);
 
-    fn sign<'a, Sessions: Iterator<Item = &'a Session> + Clone>(
+    fn sign<'a, U, Sessions>(
         &mut self,
-        sign: &QrCodeSign,
+        sign: &QrCodeSign<SignProtocol>,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session, SignResult>, SignError> {
-        fn get_locations<T: LocationInfoGetterTrait>(
-            self_: &DefaultQrCodeSignner<T>,
-            sign: &QrCodeSign,
-        ) -> Option<Vec<Location>> {
-            if sign.raw_sign.get_preset_location().is_some() {
-                Some(
-                    self_
-                        .location_info_getter
-                        .get_locations(sign.as_location_sign(), self_.location_str),
-                )
+        captcha_solver: &'static CaptchaSolver,
+    ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError>
+    where
+        U: Send + 'static,
+        Sessions: Iterator<Item = &'a Session<U>> + Clone,
+    {
+        fn get_locations<
+            SignProtocol,
+            T: LocationInfoGetterTrait,
+            Preprocessor: LocationPreprocessorTrait,
+        >(
+            self_: &DefaultQrCodeSignner<T, Preprocessor>,
+            sign: &QrCodeSign<SignProtocol>,
+        ) -> Option<Vec<Geoaddr>> {
+            if sign
+                .raw_sign
+                .get_preset_location(self_.preprocessor)
+                .is_some()
+            {
+                Some(self_.location_info_getter.get_locations(
+                    sign.as_location_sign(),
+                    self_.location_str,
+                    self_.preprocessor,
+                ))
             } else {
                 None
             }
@@ -68,7 +97,7 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
         let mut map = HashMap::new();
         let locations = get_locations(self, sign).clone();
         if sign.is_refresh() {
-            let sessions = sessions.collect::<Vec<&'a Session>>();
+            let sessions = sessions.collect::<Vec<&'a Session<U>>>();
             let index_result_map = Arc::new(Mutex::new(HashMap::new()));
             let mut handles = Vec::new();
             for (sessions_index, session) in sessions.clone().into_iter().enumerate() {
@@ -78,8 +107,14 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
                 let enc = enc.clone();
                 let locations = locations.clone();
                 let h = std::thread::spawn(move || {
-                    let a = Self::sign_single(&sign, &session, (&enc, locations))
-                        .unwrap_or_else(|e| SignResult::Fail { msg: e.to_string() });
+                    let a = <Self as SignnerTrait<
+                        QrCodeSign<SignProtocol>,
+                        CaptchaProtocol,
+                        SignProtocol,
+                    >>::sign_single(
+                        &sign, &session, captcha_solver, (&enc, locations)
+                    )
+                    .unwrap_or_else(|e| SignResult::Fail { msg: e.to_string() });
                     index_result_map.lock().unwrap().insert(sessions_index, a);
                 });
                 handles.push(h);
@@ -96,31 +131,46 @@ impl<T: LocationInfoGetterTrait> SignnerTrait<QrCodeSign> for DefaultQrCodeSignn
             }
         } else {
             for session in sessions {
-                let state = Self::sign_single(sign, session, (&enc, locations.clone()))?;
+                let state = <Self as SignnerTrait<
+                    QrCodeSign<SignProtocol>,
+                    CaptchaProtocol,
+                    SignProtocol,
+                >>::sign_single(
+                    sign, session, captcha_solver, (&enc, locations.clone())
+                )?;
                 map.insert(session, state);
             }
         }
         Ok(map)
     }
 
-    fn sign_single(
-        sign: &QrCodeSign,
-        session: &Session,
-        (enc, locations): (&str, Option<Vec<Location>>),
+    fn sign_single<U>(
+        sign: &QrCodeSign<SignProtocol>,
+        session: &Session<U>,
+        captcha_solver: &CaptchaSolver,
+        (enc, locations): (&str, Option<Vec<Geoaddr>>),
     ) -> Result<SignResult, SignError> {
         if let Some(locations) = locations {
-            crate::signner::impls::utils::sign_single_retry(sign, session, (enc, locations))
+            crate::signner::impls::utils::sign_single_retry::<CaptchaProtocol, _, _, _, _, _, _>(
+                sign,
+                session,
+                (enc, locations),
+                captcha_solver,
+            )
         } else {
-            sign.pre_sign_and_sign(session, enc, &None)
+            sign.pre_sign_and_sign::<CaptchaProtocol, _>(session, enc, captcha_solver, &None)
         }
     }
 }
 
-impl<T: LocationInfoGetterTrait> DefaultQrCodeSignner<'_, T> {
+impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSignner<'_, T, PP> {
     fn pic_to_enc(pic: &PathBuf) -> Result<String, SignError> {
         if std::fs::metadata(pic).expect("图片路径出错。").is_dir() {
             loop {
-                let yes = inquire_confirm("二维码图片是否就绪？", "本程序会读取 `--pic` 参数所指定的路径下最新修改的图片。你可以趁现在获取这张图片，然后按下回车进行签到。");
+                let yes = inquire_confirm(
+                    "二维码图片是否就绪？",
+                    "本程序会读取 `--pic` 参数所指定的路径下最新修改的图片。你可以趁现在获取这张图片，然后按下回车进行签到。",
+                );
                 if yes {
                     break;
                 }
@@ -141,7 +191,8 @@ impl<T: LocationInfoGetterTrait> DefaultQrCodeSignner<'_, T> {
     }
 
     pub fn is_enc_qrcode_url(url: &str) -> bool {
-        url.contains(&*cxlib_protocol::ProtocolItem::QrcodePat.to_string()) && url.contains("&enc=")
+        url.contains(&*cxlib_protocol::ProtocolItem::QRCODE_PAT.to_string())
+            && url.contains("&enc=")
     }
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     pub fn capture_screen_for_enc(is_refresh: bool, precise: bool) -> Option<String> {
@@ -189,15 +240,23 @@ impl<T: LocationInfoGetterTrait> DefaultQrCodeSignner<'_, T> {
                     continue;
                 }
                 info!("存在签到二维码。");
-                return if precise && is_refresh && inquire_confirm("二维码图片是否就绪？", "本程序已在屏幕上找到签到二维码。请不要改变该二维码的位置，待二维码刷新后按下回车进行签到。") {
+                return if precise
+                    && is_refresh
+                    && inquire_confirm(
+                        "二维码图片是否就绪？",
+                        "本程序已在屏幕上找到签到二维码。请不要改变该二维码的位置，待二维码刷新后按下回车进行签到。",
+                    ) {
                     // 如果是定时刷新的二维码，等待二维码刷新。
                     let qrcode_pos_on_screen = get_rect_contains_vertex(r.getPoints());
-                    debug!("二维码位置：{:?}", qrcode_pos_on_screen);
-                    let pic = screen
-                        .capture_image()
+                    debug!("二维码位置：{qrcode_pos_on_screen:?}");
+                    let pic = screen.capture_image().unwrap_or_else(|e| panic!("{e:?}"));
+                    let cut_pic = cxlib_imageproc::cut_picture(
+                        &pic,
+                        qrcode_pos_on_screen.0,
+                        qrcode_pos_on_screen.1,
+                    );
+                    let r = Self::detect_qrcode_in_image(cut_pic.to_image().into())
                         .unwrap_or_else(|e| panic!("{e:?}"));
-                    let cut_pic =cxlib_imageproc::cut_picture(&pic, qrcode_pos_on_screen.0, qrcode_pos_on_screen.1);
-                    let r = Self::detect_qrcode_in_image(cut_pic.to_image().into()).unwrap_or_else(|e| panic!("{e:?}"));
                     Self::find_qrcode_sign_enc_in_url(r[0].getText())
                 } else {
                     // 如果不是精确截取的二维码，则不需要提示。
@@ -222,8 +281,8 @@ impl<T: LocationInfoGetterTrait> DefaultQrCodeSignner<'_, T> {
     }
 
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
-    pub fn enc_gen(
-        sign: &QrCodeSign,
+    pub fn enc_gen<SignProtocol>(
+        sign: &QrCodeSign<SignProtocol>,
         path: &Option<PathBuf>,
         enc: &Option<String>,
         precisely: bool,

@@ -1,194 +1,8 @@
-use cxlib_error::InitError;
-use onceinit::{OnceInit, StaticDefault};
+use cxlib_base_types::{
+    __private::UnhandledGeoaddr, Geoaddr, Geolocation, LocationPreprocessorTrait,
+};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::{ops::Deref, str::FromStr};
-
-/// [`LocationPreprocessorTrait`]
-/// 用来对位置作预处理。该特型试图解决如下问题：
-///
-/// 教师设置签到的位置的“可视地址”并非该位置的真实名称。
-/// 例如，程序获取到的名称为“青-692”，但实际签到时，该地点应为“中国浙江省杭州市西湖区柑普洱街太平南路”。
-///
-/// 可以借助该特型的[`do_preprocess`](LocationPreprocessorTrait::do_preprocess)方法，对该位置进行一定地处理，使之更符合真实情况。
-pub trait LocationPreprocessorTrait: Send + Sync {
-    /// 方法，消费一个 [`Location`], 生产一个新的 [`Location`].
-    /// 默认直接返回入参。
-    ///
-    /// 注意，该函数不会作用于 [`FromStr`] 和与 `[String; 4]` 间的转换当中。
-    #[inline]
-    fn do_preprocess(&self, location: Location) -> Location {
-        location
-    }
-}
-struct DefaultLocationPreprocessor;
-static NULL_LOCATION_PREPROCESSOR: DefaultLocationPreprocessor = DefaultLocationPreprocessor;
-impl LocationPreprocessorTrait for DefaultLocationPreprocessor {}
-unsafe impl StaticDefault for dyn LocationPreprocessorTrait {
-    fn static_default() -> &'static Self {
-        &NULL_LOCATION_PREPROCESSOR
-    }
-}
-static LOCATION_PREPROCESSOR: OnceInit<dyn LocationPreprocessorTrait> = OnceInit::uninit();
-
-/// # [`Location`]
-/// 签到位置，由显示地址（一般可在签到完成界面查看）、经纬度、海拔高度组成。
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
-pub struct Location {
-    addr: String,
-    lon: String,
-    lat: String,
-    alt: String,
-}
-impl Location {
-    /// 参见 [`LocationPreprocessorTrait`].
-    #[inline]
-    pub fn get_location_preprocessor() -> &'static dyn LocationPreprocessorTrait {
-        LOCATION_PREPROCESSOR.deref()
-    }
-    /// 参见 [`LocationPreprocessorTrait`], [`do_preprocess`](LocationPreprocessorTrait::do_preprocess)方法不会作用于 [`FromStr`] 和与 `[String; 4]` 间的转换当中。
-    ///
-    /// 另外，[`get_none_location`](Self::get_none_location) 内部通过 `[const { String::new() }; 4]` 构造自身，故不会调用 `do_preprocess`, 如需预处理后的结果，可手动调用本函数。
-    #[inline]
-    pub fn into_preprocessed(self) -> Location {
-        Self::get_location_preprocessor().do_preprocess(self)
-    }
-    /// 参见 [`LocationPreprocessorTrait`].
-    #[inline]
-    pub fn set_location_preprocessor(
-        preprocessor: &'static dyn LocationPreprocessorTrait,
-    ) -> Result<(), InitError> {
-        Ok(LOCATION_PREPROCESSOR.init(preprocessor)?)
-    }
-    /// 参见 [`LocationPreprocessorTrait`].
-    #[inline]
-    pub fn set_boxed_location_preprocessor(
-        preprocessor: Box<dyn LocationPreprocessorTrait>,
-    ) -> Result<(), InitError> {
-        Ok(LOCATION_PREPROCESSOR.init_boxed(preprocessor)?)
-    }
-    /// 将 self 转为 `[String; 4]`, 顺序为显示地址、经度、纬度、海拔（单位应该为米，在本程序中该字段无实际用途）。
-    #[inline]
-    pub fn into_owned_fields(self) -> [String; 4] {
-        let Location {
-            addr,
-            lon,
-            lat,
-            alt,
-        } = self;
-        [addr, lon, lat, alt]
-    }
-    /// 以 `[String; 4]` 构造自身，顺序为显示地址、经度、纬度、海拔（单位应该为米，在本程序中该字段无实际用途，可随意）。
-    ///
-    /// 注意，该函数不会对 [`Location`] 进行预处理。
-    #[inline]
-    pub fn from_owned_fields([addr, lon, lat, alt]: [String; 4]) -> Self {
-        Location {
-            addr,
-            lon,
-            lat,
-            alt,
-        }
-    }
-    /// Eq to `Self::from_owned_fields([const { String::new() }; 4])`.
-    ///
-    /// 注意，该函数不会对 [`Location`] 进行预处理。
-    #[inline]
-    pub fn get_none_location() -> Self {
-        Self::from_owned_fields([const { String::new() }; 4])
-    }
-    /// 构造函数，顺序为显示地址、经度、纬度、海拔（单位应该为米，在本程序中该字段无实际用途，可随意）。
-    #[inline]
-    pub fn new(addr: &str, lon: &str, lat: &str, alt: &str) -> Location {
-        let location = Location {
-            addr: addr.into(),
-            lon: lon.into(),
-            lat: lat.into(),
-            alt: alt.into(),
-        };
-        location.into_preprocessed()
-    }
-    /// 地址。
-    #[inline]
-    pub fn addr(&self) -> &str {
-        &self.addr
-    }
-    /// 经度。
-    #[inline]
-    pub fn lon(&self) -> &str {
-        &self.lon
-    }
-    /// 纬度。
-    #[inline]
-    pub fn lat(&self) -> &str {
-        &self.lat
-    }
-    /// 海拔。
-    #[inline]
-    pub fn alt(&self) -> &str {
-        &self.alt
-    }
-    /// 地址。
-    #[inline]
-    pub fn set_addr(&mut self, addr: &str) {
-        addr.clone_into(&mut self.addr)
-    }
-    /// 经度。
-    #[inline]
-    pub fn set_lon(&mut self, lon: &str) {
-        lon.clone_into(&mut self.lon)
-    }
-    /// 纬度。
-    #[inline]
-    pub fn set_lat(&mut self, lat: &str) {
-        lat.clone_into(&mut self.lat)
-    }
-    /// 海拔。
-    #[inline]
-    pub fn set_alt(&mut self, alt: &str) {
-        alt.clone_into(&mut self.alt)
-    }
-}
-
-impl std::fmt::Display for Location {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{},{},{},{}", self.addr, self.lon, self.lat, self.alt)
-    }
-}
-impl FromStr for Location {
-    type Err = String;
-
-    fn from_str(location_str: &str) -> Result<Self, Self::Err> {
-        let location_str: Vec<&str> = location_str.split(',').map(|item| item.trim()).collect();
-        if location_str.len() == 4 {
-            Ok(Self::new(
-                location_str[0],
-                location_str[1],
-                location_str[2],
-                location_str[3],
-            ))
-        } else {
-            Err("位置信息格式错误！格式为：`地址,经度,纬度,海拔`.".to_string())
-        }
-    }
-}
-
-// pub fn 为数据库添加位置(
-//     db: &super::sql::DataBase, course_id: i64, 位置: &Location
-// ) -> i64 {
-//     // 为指定课程添加位置。
-//     let mut 位置id = 0_i64;
-//     loop {
-//         if db.是否存在为某id的位置(位置id) {
-//             位置id += 1;
-//             continue;
-//         }
-//         db.添加位置_失败后则(位置id, course_id, 位置, |_, _, _, _| {});
-//         break;
-//     }
-//     位置id
-// }
 
 /// #[`LocationWithRange`]
 /// 带范围的签到位置。参见 [`Location`], 包含额外的签到范围（半径，单位为米），但不包含海拔信息。
@@ -271,10 +85,10 @@ impl LocationWithRange {
     /// 偏移距离在范围的百分之五以内，即 0--5 米到 0--100 米不等，但绝不会超出范围。
     ///
     /// 由于本类型不包含海拔数据，海拔将被设置为 `1108`(米).
-    pub fn to_shifted_location(&self) -> Location {
+    pub fn into_shifted_unhandled_geoaddr(self) -> UnhandledGeoaddr {
         const R: f64 = 6371393.0;
         let LocationWithRange {
-            addr,
+            addr: unhandled_place_name,
             lon,
             lat,
             range,
@@ -287,12 +101,47 @@ impl LocationWithRange {
         use std::f64::consts::{PI, TAU};
         // theta | [0.0..TAU].
         let theta = rng.random_range(0.0..TAU);
-        r *= (*range as f64)
+        r *= (range as f64)
             / R
             / (1.0 - theta.cos().powi(2) * (lat * PI / 180.0).sin().powi(2)).sqrt();
         let lat = format!("{:.6}", ((lat * PI / 180.0) + r * theta.sin()) / PI * 180.0);
         let lon = format!("{:.6}", (lon * PI / 180.0 + r * theta.cos()) / PI * 180.0);
-        Location::new(addr, &lon, &lat, "1108")
+        UnhandledGeoaddr {
+            unhandled_place_name,
+            geolocation: Geolocation {
+                lon,
+                lat,
+                alt: "1108".to_owned(),
+            },
+        }
+    }
+    /// 本类型的数据一般直接从签到信息内获取，为避免与预设位置完全一致，本程序将默认以随机偏移一定距离后的位置作为签到位置，使之符合真实情况。
+    ///
+    /// 偏移距离在范围的百分之五以内，即 0--5 米到 0--100 米不等，但绝不会超出范围。
+    ///
+    /// 由于本类型不包含海拔数据，海拔将被设置为 `1108`(米).
+    #[inline]
+    pub fn into_shifted_geoaddr(self, preprocessor: &impl LocationPreprocessorTrait) -> Geoaddr {
+        self.into_shifted_unhandled_geoaddr()
+            .to_location(preprocessor)
+    }
+    /// 本类型的数据一般直接从签到信息内获取，为避免与预设位置完全一致，本程序将默认以随机偏移一定距离后的位置作为签到位置，使之符合真实情况。
+    ///
+    /// 偏移距离在范围的百分之五以内，即 0--5 米到 0--100 米不等，但绝不会超出范围。
+    ///
+    /// 由于本类型不包含海拔数据，海拔将被设置为 `1108`(米).
+    #[inline]
+    pub fn to_shifted_unhandled_geoaddr(&self) -> UnhandledGeoaddr {
+        self.clone().into_shifted_unhandled_geoaddr()
+    }
+    /// 本类型的数据一般直接从签到信息内获取，为避免与预设位置完全一致，本程序将默认以随机偏移一定距离后的位置作为签到位置，使之符合真实情况。
+    ///
+    /// 偏移距离在范围的百分之五以内，即 0--5 米到 0--100 米不等，但绝不会超出范围。
+    ///
+    /// 由于本类型不包含海拔数据，海拔将被设置为 `1108`(米).
+    #[inline]
+    pub fn to_shifted_geoaddr(&self, preprocessor: &impl LocationPreprocessorTrait) -> Geoaddr {
+        self.clone().into_shifted_geoaddr(preprocessor)
     }
     pub fn get_range(&self) -> u32 {
         self.range
@@ -300,8 +149,11 @@ impl LocationWithRange {
 }
 #[cfg(test)]
 mod tests {
-    use crate::LocationWithRange;
+    use cxlib_base_types::LocationPreprocessorTrait;
 
+    use crate::LocationWithRange;
+    struct DefaultLocationPreprocessor;
+    impl LocationPreprocessorTrait for DefaultLocationPreprocessor {}
     #[test]
     fn a() {
         let l = LocationWithRange {
@@ -310,6 +162,6 @@ mod tests {
             lat: "34.129522".into(),
             range: 100,
         };
-        println!("{}", l.to_shifted_location())
+        println!("{}", l.to_shifted_geoaddr(&DefaultLocationPreprocessor))
     }
 }

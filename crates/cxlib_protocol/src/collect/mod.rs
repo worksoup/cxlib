@@ -1,10 +1,20 @@
 #[cfg(feature = "captcha")]
-pub mod captcha;
+mod captcha;
 #[cfg(feature = "sign")]
-pub mod sign;
+mod sign;
 #[cfg(feature = "types")]
-pub mod types;
+mod types;
 #[cfg(feature = "unused")]
-pub mod unused;
+mod unused;
 #[cfg(feature = "user")]
-pub mod user;
+mod user;
+#[cfg(feature = "captcha")]
+pub use captcha::*;
+#[cfg(feature = "sign")]
+pub use sign::*;
+#[cfg(feature = "types")]
+pub use types::*;
+#[cfg(feature = "unused")]
+pub use unused;
+#[cfg(feature = "user")]
+pub use user::*;

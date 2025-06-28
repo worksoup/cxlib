@@ -1,0 +1,9 @@
+[package]
+name = "cx_interact"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+log.workspace = true
+inquire.workspace = true

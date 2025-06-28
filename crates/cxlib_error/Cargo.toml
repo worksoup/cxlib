@@ -1,12 +1,11 @@
 [package]
 name = "cxlib_error"
-edition = "2021"
+edition = "2024"
 version.workspace = true
 authors.workspace = true
 
 [dependencies]
-log.workspace = true
+cxlib_error_utils = { path = "../cxlib_error_utils" }
 thiserror.workspace = true
 ureq.workspace = true
 ureq-proto.workspace = true
-onceinit.workspace = true

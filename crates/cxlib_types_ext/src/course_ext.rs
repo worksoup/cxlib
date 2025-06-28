@@ -1,12 +1,20 @@
 use crate::ClassExt;
-use cxlib_error::CourseError;
-use cxlib_types::{Class, Course, Session};
+use cxlib_protocol::collect::UserProtocolTrait;
+use cxlib_types::{Class, CourseError, CourseWithInfo, Session};
 use std::collections::HashMap;
 
 pub trait CourseExt {
-    fn get_from_sessions<'a, Sessions: Iterator<Item = &'a Session>>(
+    /// 通过用户会话获取班级列表。
+    ///
+    /// # Errors
+    /// 仅返回当前语境下的致命错误。
+    fn get_from_sessions<
+        'a,
+        UserProtocol: UserProtocolTrait + Send + 'static,
+        Sessions: Iterator<Item = &'a Session<UserProtocol>>,
+    >(
         sessions: Sessions,
-    ) -> Result<HashMap<Course, Vec<Session>>, CourseError> {
+    ) -> Result<HashMap<CourseWithInfo, Vec<Session<UserProtocol>>>, CourseError> {
         let classes = Class::get_from_sessions(sessions)?;
         Ok(classes
             .into_iter()
@@ -18,4 +26,4 @@ pub trait CourseExt {
             .collect())
     }
 }
-impl CourseExt for Course {}
+impl CourseExt for CourseWithInfo {}

@@ -1,36 +1,26 @@
-pub use cxlib_error::CourseError;
-
-use crate::{
-    Activity, ClassId, ClassInfo, LocationWithRange, OtherActivity, RawCourse, RawSign, Session,
-};
-use cxlib_error::{ActivityError, AgentError, CxlibResultUtils};
-use cxlib_protocol::collect::types as protocol;
+use crate::error::ActivityError;
+use crate::{Activity, ClassInfo, LocationWithRange, OtherActivity, RawCourse, RawSign, Session};
+use bincode::{Decode, Encode};
+use cxlib_error::AgentError;
+use cxlib_error_utils::CxlibResultUtils;
+use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    fmt::Display,
+    fmt::{Display, write},
+    ops::Deref,
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 use ureq::Agent;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Course {
-    raw: RawCourse,
-    class_info: ClassInfo,
+/// 课程，包含一个班级信息。
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Decode, Encode)]
+pub struct CourseWithInfo {
+    course: Course,
+    info: CourseInfo,
 }
-impl Display for Course {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "班级号:{}, 课程号: {}, 课程名: {}, 任课教师: {}",
-            self.class_id(),
-            self.id(),
-            self.name(),
-            self.teacher()
-        )
-    }
-}
-impl Course {
+impl CourseWithInfo {
     // #[inline]
     // pub fn none() -> Self {
     //     Self {
@@ -49,41 +39,86 @@ impl Course {
     //     )
     // }
     #[inline]
-    pub fn new(raw: RawCourse, class_info: ClassInfo) -> Course {
-        Course { raw, class_info }
+    pub fn new(course: Course, info: CourseInfo) -> CourseWithInfo {
+        Self { course, info }
+    }
+    #[inline]
+    pub fn from_raw(raw: RawCourse, class_info: ClassInfo) -> CourseWithInfo {
+        RawCourse::into_course(raw, class_info)
+    }
+    #[inline]
+    pub fn new_with_fields(
+        id: i64,
+        class_info: ClassInfo,
+        teacher: String,
+        image_url: Option<String>,
+        name: String,
+    ) -> CourseWithInfo {
+        let class_id = class_info.id();
+        let ended = class_info.ended();
+        Self {
+            course: Course { id, class_id },
+            info: CourseInfo {
+                ended,
+                teacher,
+                image_url,
+                name,
+            },
+        }
+    }
+
+    #[inline]
+    pub fn unwrap(self) -> (Course, CourseInfo) {
+        (self.course, self.info)
+    }
+    #[inline]
+    pub fn unwrap_ref(&self) -> (&Course, &CourseInfo) {
+        (&self.course, &self.info)
+    }
+    #[inline]
+    pub fn course(&self) -> &Course {
+        &self.course
+    }
+    #[inline]
+    pub fn info(&self) -> &CourseInfo {
+        &self.info
     }
     #[inline]
     pub fn id(&self) -> i64 {
-        self.raw.id()
+        self.course.id
     }
     #[inline]
     pub fn teacher(&self) -> &str {
-        self.raw.teacher()
+        &self.info.teacher
     }
     #[inline]
     pub fn image_url(&self) -> Option<&str> {
-        self.raw.image_url()
+        self.info.image_url.as_ref().map(AsRef::as_ref)
     }
     #[inline]
     pub fn name(&self) -> &str {
-        self.raw.name()
+        &self.info.name
     }
     #[inline]
-    pub fn class_id(&self) -> ClassId {
-        self.class_info.id()
+    pub fn class_id(&self) -> i64 {
+        self.course.class_id
     }
     #[inline]
     pub fn class_ended(&self) -> bool {
-        self.class_info.ended()
+        self.info.ended
     }
 }
 
-impl Course {
-    pub fn get_locations(
+impl CourseWithInfo {
+    // TODO: 该函数需要注意：API 可能已经失效。
+    pub fn get_locations<TypesProtocol>(
         &self,
         session: &Agent,
-    ) -> Result<HashMap<String, LocationWithRange>, AgentError> {
-        #[derive(Debug, Clone, Deserialize, Serialize)]
+    ) -> Result<HashMap<String, LocationWithRange>, AgentError>
+    where
+        TypesProtocol: TypesProtocolTrait,
+    {
+        #[derive(Debug, Clone, Deserialize)]
         struct LocationWithRangeAndActiveId {
             #[serde(rename = "activeid")]
             active_id: i64,
@@ -107,12 +142,12 @@ impl Course {
                 )
             }
         }
-        #[derive(Debug, Clone, Deserialize, Serialize)]
+        #[derive(Debug, Clone, Deserialize)]
         struct Data {
             #[serde(rename = "data")]
             data: Vec<LocationWithRangeAndActiveId>,
         }
-        let r = protocol::get_location_log(session, (self.id(), self.class_id()))?;
+        let r = TypesProtocol::get_location_log(session, (self.id(), self.class_id()))?;
         let data: Data = r.into_body().read_json().log_unwrap();
         let mut map = HashMap::new();
         for l in data.data {
@@ -154,10 +189,17 @@ struct GetActivityR {
     data: Option<Data>,
 }
 
-impl Course {
+impl CourseWithInfo {
     /// 获取该课程的活动。
-    pub fn get_activities(&self, session: &Session) -> Result<Vec<Activity>, ActivityError> {
-        let r = protocol::active_list(session, (self.id(), self.class_id()))?;
+    pub fn get_activities<
+        SignProtocol: Send + 'static,
+        TypesProtocol: TypesProtocolTrait,
+        UserProtocol: UserProtocolTrait,
+    >(
+        &self,
+        session: &Session<UserProtocol>,
+    ) -> Result<Vec<Activity<SignProtocol>>, ActivityError> {
+        let r = TypesProtocol::active_list(session, (self.id(), self.class_id()))?;
         let r: GetActivityR = r.into_body().read_json().log_unwrap();
         let activities = Arc::new(Mutex::new(Vec::new()));
         if let Some(data) = r.data {
@@ -183,14 +225,14 @@ impl Course {
                         }) {
                             let other_id = unsafe { ar.other_id.unwrap_unchecked() };
                             let active_id = ar.id.to_string();
-                            let base_sign = RawSign {
+                            let base_sign = RawSign::new(
                                 active_id,
-                                name: ar.name_one,
-                                course: c.clone(),
+                                c.clone(),
+                                ar.name_one,
                                 other_id,
-                                status_code: ar.status,
-                                start_time_mills: ar.start_time_mills,
-                            };
+                                ar.status,
+                                ar.start_time_mills,
+                            );
                             activities
                                 .lock()
                                 .unwrap()
@@ -217,5 +259,101 @@ impl Course {
         }
         let activities = Arc::into_inner(activities).unwrap().into_inner().unwrap();
         Ok(activities)
+    }
+}
+impl Display for CourseWithInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "班级号:{}, 课程号: {}, 课程名: {}, 任课教师: {}",
+            self.class_id(),
+            self.id(),
+            self.name(),
+            self.teacher()
+        )
+    }
+}
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Decode, Encode)]
+pub struct Course {
+    id: i64,
+    class_id: i64,
+}
+impl Course {
+    pub const GLOBAL: Self = Self::new(-1, -1);
+    pub const fn new(id: i64, class_id: i64) -> Self {
+        Self { id, class_id }
+    }
+    #[inline]
+    pub const fn global_course() -> Self {
+        Self::GLOBAL
+    }
+    #[inline]
+    pub const fn id(&self) -> i64 {
+        self.id
+    }
+    #[inline]
+    pub const fn class_id(&self) -> i64 {
+        self.class_id
+    }
+    #[inline]
+    pub const fn invalid(&self) -> bool {
+        self.id < 0 || self.class_id < 0
+    }
+    #[inline]
+    pub const fn is_global_course(&self) -> bool {
+        let g = Self::GLOBAL;
+        self.id == g.id && self.class_id == g.class_id
+    }
+}
+impl FromStr for Course {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut course = s.split(',').map(|s| s.trim());
+        let id = course
+            .next()
+            .ok_or_else(|| "id 解析出错！".to_owned())?
+            .parse()
+            .map_err(|e: std::num::ParseIntError| e.to_string())?;
+        let class_id = course
+            .next()
+            .ok_or_else(|| "class_id 解析出错！".to_owned())?
+            .parse()
+            .map_err(|e: std::num::ParseIntError| e.to_string())?;
+        Ok(Self { id, class_id })
+    }
+}
+impl Display for Course {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write(f, format_args!("{}, {}", self.id(), self.class_id()))
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Decode, Encode)]
+pub struct CourseInfo {
+    ended: bool,
+    teacher: String,
+    image_url: Option<String>,
+    name: String,
+}
+impl CourseInfo {
+    pub fn ended(&self) -> bool {
+        self.ended
+    }
+    pub fn teacher(&self) -> &String {
+        &self.teacher
+    }
+    pub fn image_url(&self) -> Option<&String> {
+        self.image_url.as_ref()
+    }
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+}
+impl Deref for CourseWithInfo {
+    type Target = Course;
+
+    fn deref(&self) -> &Self::Target {
+        &self.course
     }
 }

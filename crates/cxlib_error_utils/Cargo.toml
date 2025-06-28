@@ -1,0 +1,8 @@
+[package]
+name = "cxlib_error_utils"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+log.workspace = true

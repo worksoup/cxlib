@@ -4,14 +4,14 @@
 
 这些 crate 仅依赖于外部库。
 
-- ### [`cxlib_store`](./cxlib_store)
+- ### [`cxlib_store`](../app/cxlib_store)
 
   用户信息持久化相关 Trait.
 
-  例如通过手动设置或应用信息（如作者、应用名称等）确定数据目录的位置。见 [`Dir`@`lib.rs:90`](cxlib_store/src/lib.rs).
-- ### [`cxlib_error`](./cxlib_error)
+  例如通过手动设置或应用信息（如作者、应用名称等）确定数据目录的位置。见 [`Dir`@`lib.rs:90`](../app/cxlib_store/src/lib.rs).
+- ### [`cxlib_error`](cxlib_error_utils)
 
-  cxsign 库中所使用的错误类型。见 [lib.rs](cxlib_error/src/lib.rs).
+  cxsign 库中所使用的错误类型。见 [lib.rs](cxlib_error_utils/src/lib.rs).
 - ### [`cxlib_imageproc`](./cxlib_imageproc)
 
   与图像相关的函数。包括裁剪、下载、定位子图像等操作。见 [lib.rs](cxlib_imageproc/src/lib.rs).

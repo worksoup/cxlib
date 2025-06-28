@@ -1,8 +1,13 @@
-use crate::MaybeFatalError;
-use onceinit::OnceInitError;
+use cxlib_error_utils::MaybeFatalError;
 use thiserror::Error;
 use ureq::Error;
 
+/// ureq 中 返回的错误。
+///
+/// 如果出现 504、HTTP 错误、Uri 错误、连接失败、代理地址无效、
+/// 代理连接失败、Body 长度超限等短时间内无法通过重试解决的问题，
+/// [`<AgentError as MaybeFatalError>::is_fatal`](MaybeFatalError::is_fatal) 将会返回 `true`,
+/// 应当视为致命错误，代表在下一个循环或操作中依然会发生错误，此时应当结束操作，避免重复，浪费时间。
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub struct AgentError(#[from] Box<ureq::Error>);
@@ -41,15 +46,15 @@ impl MaybeFatalError for AgentError {
         //         }
         //     }
         // }
-        use ureq_proto::Error as ProtoError;
+        // use ureq_proto::Error as ProtoError;
         match &*self.0 {
             Error::StatusCode(code) => *code != 504,
             Error::Http(_) => true,
             Error::BadUri(_) => true,
-            Error::Protocol(e) => !matches!(
-                e,
-                ProtoError::UnfinishedRequest | ProtoError::IncompleteResponse
-            ),
+            Error::Protocol(_e) => {
+                // TODO
+                false
+            }
             Error::Io(_) => false,
             Error::Timeout(_) => {
                 // TODO
@@ -73,14 +78,5 @@ impl MaybeFatalError for AgentError {
                 true
             }
         }
-    }
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub struct InitError(#[from] OnceInitError);
-impl MaybeFatalError for InitError {
-    fn is_fatal(&self) -> bool {
-        false
     }
 }

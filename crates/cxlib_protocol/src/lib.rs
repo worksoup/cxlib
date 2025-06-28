@@ -1,47 +1,23 @@
 pub mod collect;
 mod default_impl;
+mod error;
 #[cfg(feature = "multipart")]
 mod multipart;
 #[cfg(feature = "ureq")]
 pub mod utils;
 
 pub use default_impl::*;
+pub use error::*;
 
-use cxlib_error::InitError;
-use onceinit::{OnceInit, OnceInitState, StaticDefault, UninitGlobal};
+pub use cxlib_error::AgentError;
 
-pub use cxlib_error::ProtocolError;
-
-pub trait ProtocolItemTrait:
-    Sized + 'static + UninitGlobal<dyn ProtocolTrait<Self>, OnceInit<dyn ProtocolTrait<Self>>>
-{
+pub trait ProtocolItemTrait {
     type ProtocolData;
-    fn config_file_name() -> &'static str;
-    fn get_protocol() -> &'static dyn ProtocolTrait<Self>;
-    fn set_protocol(protocol: &'static impl ProtocolTrait<Self>) -> Result<(), InitError> {
-        Ok(Self::init(protocol)?)
-    }
-    fn set_boxed_protocol(
-        protocol: Box<impl ProtocolTrait<Self> + 'static>,
-    ) -> Result<(), InitError> {
-        Ok(Self::init_boxed(protocol)?)
-    }
-    fn get(&self) -> String {
-        Self::get_protocol().get(self)
-    }
     fn get_default(&self) -> String;
-    fn set(&self, value: &str) {
-        Self::get_protocol().set(self, value)
-    }
-    fn store() -> Result<(), ProtocolError> {
-        Self::get_protocol().store()
-    }
-    fn update(&self, value: &str) -> bool {
-        Self::get_protocol().update(self, value)
-    }
 }
 pub trait ProtocolDataTrait {
     type ProtocolItem;
+    fn config_file_name() -> &'static str;
     fn map_by_enum<'a, T>(
         &'a self,
         t: &Self::ProtocolItem,
@@ -69,25 +45,4 @@ pub trait ProtocolTrait<ProtocolItem>: Sync {
     fn set(&self, t: &ProtocolItem, value: &str);
     fn store(&self) -> Result<(), ProtocolError>;
     fn update(&self, t: &ProtocolItem, value: &str) -> bool;
-}
-
-static PROTOCOL: OnceInit<dyn ProtocolTrait<ProtocolItem>> = OnceInit::uninit();
-
-unsafe impl<ProtocolItem, ProtocolData> StaticDefault for dyn ProtocolTrait<ProtocolItem>
-where
-    ProtocolItem: ProtocolItemTrait<ProtocolData = ProtocolData>,
-    ProtocolData: Default
-        + for<'de> serde::Deserialize<'de>
-        + serde::Serialize
-        + Send
-        + Sync
-        + 'static
-        + ProtocolDataTrait<ProtocolItem = ProtocolItem>,
-{
-    fn static_default() -> &'static Self {
-        if let OnceInitState::UNINITIALIZED = ProtocolItem::holder().state() {
-            let _ = CXProtocol::<ProtocolData>::init();
-        }
-        ProtocolItem::get_protocol()
-    }
 }
