@@ -36,15 +36,19 @@ where
         let db: &Database = cxt.as_ref();
         let r_cxt = db.begin_read().log_unwrap();
         let account_table = AccountTable::<UserProtocol>::read(&r_cxt).log_unwrap();
-        let sessions: Vec<Session<UserProtocol>> = if fresh {
+        let sessions: Vec<(Session<UserProtocol>, String)> = if fresh {
             AccountTable::<UserProtocol>::get_accounts(&account_table)
                 .into_iter()
                 .filter_map(|a| {
                     let login_solver = LoginSolverGetter::new(solver_cxt, a.login_type())
                         .unwrap()
                         .get();
-                    let session = Session::relogin(a.uname(), a.enc_pwd(), db_path, &login_solver);
-                    session.ok()
+                    let mut cookeis = std::io::Cursor::new(Vec::new());
+                    let session =
+                        Session::relogin(a.uname(), a.enc_pwd(), &mut cookeis, &login_solver);
+                    let cookies_str = String::from_utf8(cookeis.into_inner()).unwrap();
+
+                    Some((session.ok()?, cookies_str))
                 })
                 .collect()
         } else {

@@ -1,12 +1,21 @@
-use crate::{ImportExportTrait, NormalTableTrait, StoreError, TableDefinitionTrait};
+use crate::{BinCode, ImportExportTrait, NormalTableTrait, StoreError, TableDefinitionTrait};
+use bincode::{Decode, Encode};
 use cxlib_error_utils::CxlibResultUtils;
 use log::warn;
 use redb::{Database, ReadTransaction, ReadableTable, WriteTransaction};
+use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, collections::HashMap};
-
+#[derive(
+    Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Decode, Encode,
+)]
+pub struct KeyType {
+    pub block: String,
+    pub identifier: String,
+    pub key: String,
+}
 pub struct CommonDataTable;
 impl CommonDataTable {
-    pub fn iter(r_cxt: &ReadTransaction) -> Result<HashMap<String, String>, StoreError> {
+    pub fn iter(r_cxt: &ReadTransaction) -> Result<HashMap<KeyType, String>, StoreError> {
         let r = Self::read(r_cxt)?;
         let mut result = HashMap::new();
         for data in r.iter()? {
@@ -15,14 +24,20 @@ impl CommonDataTable {
         }
         Ok(result)
     }
-    pub fn get(r_cxt: &ReadTransaction, key: &String) -> Result<Option<String>, StoreError> {
+    pub fn get(
+        r_cxt: &ReadTransaction,
+        key: impl Borrow<KeyType>,
+    ) -> Result<Option<String>, StoreError> {
         let r = Self::read(r_cxt)?;
         let Some(r) = r.get(key)? else {
             return Ok(None);
         };
         Ok(Some(r.value()))
     }
-    pub fn remove(w_cxt: &WriteTransaction, key: &String) -> Result<Option<String>, StoreError> {
+    pub fn remove(
+        w_cxt: &WriteTransaction,
+        key: impl Borrow<KeyType>,
+    ) -> Result<Option<String>, StoreError> {
         let mut w = Self::write(w_cxt)?;
         let Some(r) = w.remove(key)? else {
             return Ok(None);
@@ -31,7 +46,7 @@ impl CommonDataTable {
     }
     pub fn insert(
         w_cxt: &WriteTransaction,
-        key: String,
+        key: impl Borrow<KeyType>,
         value: String,
     ) -> Result<Option<String>, StoreError> {
         let mut w = Self::write(w_cxt)?;
@@ -43,7 +58,7 @@ impl CommonDataTable {
 }
 impl ImportExportTrait for CommonDataTable {
     fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, _: Cxt, data: &str) {
-        let data = toml::from_str::<HashMap<String, String>>(data).log_unwrap();
+        let data = toml::from_str::<HashMap<KeyType, String>>(data).log_unwrap();
         let w_cxt = db.begin_write().log_unwrap();
         for (key, value) in data {
             match Self::insert(&w_cxt, key, value) {
@@ -71,7 +86,7 @@ impl ImportExportTrait for CommonDataTable {
 }
 impl NormalTableTrait for CommonDataTable {}
 impl TableDefinitionTrait for CommonDataTable {
-    type Key = String;
+    type Key = BinCode<KeyType>;
     type Value = String;
     type Context<'cxt> = ();
     const NAME: &'static str = "common_data";

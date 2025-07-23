@@ -2,8 +2,9 @@ mod captcha_type;
 mod error;
 mod hash;
 mod solver;
-pub mod utils;
 mod verification_info;
+
+pub mod utils;
 
 pub use captcha_type::*;
 pub use error::*;

@@ -36,7 +36,6 @@ use redb::Database;
 use std::{
     cmp,
     collections::HashMap,
-    path::{Path, PathBuf},
 };
 
 pub struct CmdAppContext<UserProtocol = cxlib_internal::protocol::collect::UserProtocol> {

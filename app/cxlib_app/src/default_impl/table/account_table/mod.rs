@@ -4,8 +4,8 @@ mod internal_data;
 pub use account_data::*;
 
 use crate::{
-    GlobalMultimap, ImportExportTrait, LoginSolverGetter, NormalTableTrait, StoreError,
-    TableDefinitionTrait,
+    CommonDataTable, GlobalMultimap, ImportExportTrait, KeyType, LoginSolverGetter,
+    NormalTableTrait, StoreError, TableDefinitionTrait,
     database_guard::DatabaseGuard,
     default_impl::table::{account_table::internal_data::AccountDataInternal, utils::BinCode},
 };
@@ -15,10 +15,12 @@ use cxlib_internal::{
     types::{LoginError, LoginSolverTrait, Session, UntypedLoginSolver},
 };
 use log::{error, info, warn};
-use redb::{Database, ReadableTable, WriteTransaction};
+use redb::{Database, ReadTransaction, ReadableTable, WriteTransaction};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
+    fmt::Display,
+    io::Cursor,
     marker::PhantomData,
     path::Path,
 };
@@ -87,61 +89,147 @@ impl<UserProtocol> AccountTable<UserProtocol>
 where
     UserProtocol: 'static + UserProtocolTrait,
 {
-    pub fn get_sessions_by_uid_list_str(
-        table: &impl ReadableTable<
-            <Self as TableDefinitionTrait>::Key,
-            <Self as TableDefinitionTrait>::Value,
-        >,
+    fn loop_collect<Cxt: Copy, T, F: Fn(&WriteTransaction, &str, Cxt) -> Result<T, StoreError>>(
+        w_cxt: &WriteTransaction,
         uid_list_str: &str,
-    ) -> HashMap<String, Session<UserProtocol>> {
+        cxt: Cxt,
+        f: F,
+    ) -> Result<HashMap<String, T>, StoreError> {
         let str_list = uid_list_str
             .split(',')
             .map(|a| a.trim())
             .collect::<Vec<&str>>();
         let mut s = HashMap::new();
         for uid in str_list {
-            if let Some(session) = Self::get_session(table, uid) {
-                s.insert(uid.to_string(), session);
+            match f(w_cxt, uid, cxt) {
+                Ok(session) => {
+                    s.insert(uid.to_string(), session);
+                }
+                Err(e) => {
+                    if e.is_fatal() {
+                        Err(e)?;
+                    } else {
+                        warn!("账号加载失败：`{uid}`, `{e}`, 跳过。");
+                    }
+                }
             }
         }
-        s
+        Ok(s)
     }
-    pub fn get_session(
-        table: &impl ReadableTable<
-            <Self as TableDefinitionTrait>::Key,
-            <Self as TableDefinitionTrait>::Value,
-        >,
-        uid: &str,
-    ) -> Option<Session<UserProtocol>> {
-        // NOTE: read 实际上不会造成错误，除了锁中毒。
-        if Self::has_account(table, uid) {
-            let account = Self::get_account(table, uid)?;
-            Session::<UserProtocol>::load_cookies(uid, account.uname()).ok()
+    pub fn load_sessions_by_uid_list_str(
+        w_cxt: &WriteTransaction,
+        uid_list_str: &str,
+    ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
+        Self::loop_collect(w_cxt, uid_list_str, (), |w_cxt, uid, _| {
+            Ok(Self::load_session(w_cxt, uid)?)
+        })
+    }
+    pub fn get_sessions_by_uid_list_str<
+        'cxt,
+        Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>,
+    >(
+        w_cxt: &WriteTransaction,
+        uid_list_str: &str,
+        cxt: Cxt,
+    ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
+        Self::loop_collect(w_cxt, uid_list_str, cxt.borrow(), Self::get_session)
+    }
+    #[inline]
+    fn none2result(s: impl Display) -> impl FnOnce() -> StoreError {
+        move || StoreError::UnexpectedNone(s.to_string())
+    }
+    #[inline]
+    fn get_account_data(w_cxt: &WriteTransaction, uid: &str) -> Result<AccountData, StoreError> {
+        let table = Self::write(w_cxt)?;
+        if Self::has_account(&table, uid) {
+            Self::get_account(&table, uid).ok_or_else(Self::none2result(format_args!(
+                "没有该账号：`{uid}`，请检查输入或登录。"
+            )))
         } else {
-            warn!("没有该账号：[`{uid}`]，请检查输入或登录。");
-            None
+            Err(StoreError::UnexpectedNone(format!(
+                "没有该账号：`{uid}`，请检查输入或登录。"
+            )))
+        }
+    }
+    fn load_session_internal(
+        w_cxt: &WriteTransaction,
+        uid: &str,
+        account_data: &AccountData,
+    ) -> Result<Session<UserProtocol>, StoreError> {
+        let common_data_table = CommonDataTable::write(w_cxt)?;
+        let cookies = common_data_table
+            .get(&KeyType {
+                block: "cookies".to_owned(),
+                key: uid.to_owned(),
+                identifier: account_data.login_type().to_owned(),
+            })?
+            .ok_or_else(Self::none2result(format_args!(
+                "没有该账号的 cookies 数据：`{uid}`。"
+            )))?
+            .value();
+        Ok(Session::<UserProtocol>::load_cookies(
+            account_data.uname(),
+            Cursor::new(cookies),
+        )?)
+    }
+    #[inline]
+    pub fn load_session(
+        w_cxt: &WriteTransaction,
+        uid: &str,
+    ) -> Result<Session<UserProtocol>, StoreError> {
+        let account = Self::get_account_data(w_cxt, uid)?;
+        Self::load_session_internal(w_cxt, uid, &account)
+    }
+    pub fn get_session<'cxt, Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>>(
+        w_cxt: &WriteTransaction,
+        uid: &str,
+        cxt: Cxt,
+    ) -> Result<Session<UserProtocol>, StoreError> {
+        let account = Self::get_account_data(w_cxt, uid)?;
+        match Self::load_session_internal(w_cxt, uid, &account) {
+            Ok(session) => Ok(session),
+            Err(e) => match e {
+                StoreError::LoginError(LoginError::LoginExpired(e)) => {
+                    warn!(
+                        "账号 [{}] 的 cookies 加载失败，尝试重新登录。",
+                        account.uname()
+                    );
+                    Ok(
+                        <AccountDataInternal<UserProtocol> as TryFromWithContext<_>>::try_from(
+                            account,
+                            (cxt.borrow().clone(), w_cxt),
+                        )?
+                        .session,
+                    )
+                }
+                e @ _ => {
+                    error!("账号 [{}] 的 cookies 加载失败：{e}", account.uname());
+                    Err(e)?
+                }
+            },
         }
     }
     pub fn get_sessions<'cxt, Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>>(
-        table: &impl ReadableTable<
-            <Self as TableDefinitionTrait>::Key,
-            <Self as TableDefinitionTrait>::Value,
-        >,
+        w_cxt: &WriteTransaction,
         cxt: Cxt,
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
-        let accounts = Self::get_accounts(table).into_iter().collect::<Vec<_>>();
+        let account_table = AccountTable::<UserProtocol>::write(w_cxt)?;
+        let accounts = Self::get_accounts(&account_table)
+            .into_iter()
+            .collect::<Vec<_>>();
         let mut s = HashMap::new();
         for account in accounts {
-            let Ok(account) =
-                <AccountDataInternal<_> as TryFromWithContext<_>>::try_from(account, cxt.borrow())
-            else {
+            let Ok(account) = <AccountDataInternal<_> as TryFromWithContext<_>>::try_from(
+                account,
+                (cxt.borrow().clone(), w_cxt),
+            ) else {
                 continue;
             };
-            // 应该正在读取，数据库不会被修改，所以不需要再判断是否存在。
+            // 数据库应该不会被修改，所以不需要再判断是否存在。
             match Session::load_cookies_or_relogin(
+                account.enc_pwd(),
                 account.uname(),
                 account.uid(),
-                account.enc_pwd(),
                 account.login_solver(),
             ) {
                 Ok(session) => {
@@ -215,7 +303,7 @@ impl<UserProtocol> NormalTableTrait for AccountTable<UserProtocol> {}
 impl<UserProtocol> TableDefinitionTrait for AccountTable<UserProtocol> {
     type Key = String;
     type Value = BinCode<AccountData>;
-    type Context<'cxt> = (GlobalMultimap<UntypedLoginSolver<UserProtocol>>, &'cxt Path);
+    type Context<'cxt> = GlobalMultimap<UntypedLoginSolver<UserProtocol>>;
     const NAME: &'static str = "account";
 }
 impl<UserProtocol> ImportExportTrait for AccountTable<UserProtocol>

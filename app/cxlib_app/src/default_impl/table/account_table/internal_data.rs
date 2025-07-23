@@ -1,10 +1,14 @@
-use crate::{GlobalMultimap, StoreError, default_impl::table::account_table::AccountData};
+use crate::{
+    CommonDataTable, GlobalMultimap, KeyType, NormalTableTrait, StoreError,
+    default_impl::table::account_table::AccountData,
+};
 use cxlib_internal::{
     protocol::collect::UserProtocolTrait,
     types::Session,
-    types::{LoginError, LoginSolverTrait, UntypedLoginSolver},
+    types::{LoginSolverTrait, UntypedLoginSolver},
 };
-use std::{borrow::Borrow, fmt::Display, path::Path};
+use redb::WriteTransaction;
+use std::{borrow::Borrow, fmt::Display, io::Cursor};
 use try_from_with_context::TryFromWithContext;
 
 pub struct AccountDataInternal<UserProtocol> {
@@ -17,19 +21,30 @@ impl<UserProtocol> AccountDataInternal<UserProtocol>
 where
     UserProtocol: 'static,
 {
-    pub fn new<P: AsRef<Path> + ?Sized>(
-        uname: String,
-        enc_pwd: String,
-        store_path: &P,
+    pub fn new(
+        uname: &str,
+        enc_pwd: &str,
         login_solver: UntypedLoginSolver<UserProtocol>,
-    ) -> Result<Self, LoginError>
+        w_cxt: &WriteTransaction,
+    ) -> Result<Self, StoreError>
     where
         UserProtocol: UserProtocolTrait,
     {
-        let session = Session::relogin(&uname, &enc_pwd, store_path, &login_solver)?;
+        let mut cookies = Cursor::new(Vec::new());
+        let session = Session::relogin(&uname, &enc_pwd, &mut cookies, &login_solver)?;
+        let cookies_str = String::from_utf8(cookies.into_inner()).unwrap();
+        let mut common_data_table = CommonDataTable::write(w_cxt)?;
+        common_data_table.insert(
+            KeyType {
+                block: "cookies".to_owned(),
+                key: session.uid().to_owned(),
+                identifier: login_solver.login_type().to_owned(),
+            },
+            cookies_str,
+        )?;
         Ok(Self {
             session: session.into(),
-            enc_pwd,
+            enc_pwd: enc_pwd.to_owned(),
             login_solver,
         })
     }
@@ -60,25 +75,6 @@ impl<UserProtocol> AccountDataInternal<UserProtocol> {
         &self.login_solver
     }
 }
-impl<P, UserProtocol> TryFrom<(String, String, &P, UntypedLoginSolver<UserProtocol>)>
-    for AccountDataInternal<UserProtocol>
-where
-    P: AsRef<Path> + ?Sized,
-    UserProtocol: 'static + UserProtocolTrait,
-{
-    type Error = LoginError;
-
-    fn try_from(
-        (uname, enc_pwd, store_path, login_solver): (
-            String,
-            String,
-            &P,
-            UntypedLoginSolver<UserProtocol>,
-        ),
-    ) -> Result<Self, Self::Error> {
-        AccountDataInternal::new(uname, enc_pwd, store_path, login_solver)
-    }
-}
 impl<UserProtocol: 'static> Display for AccountDataInternal<UserProtocol> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         AccountData::fmt(
@@ -92,25 +88,18 @@ where
     UserProtocol: UserProtocolTrait + 'static,
 {
     type Err = StoreError;
-    type Context<'cxt> = (GlobalMultimap<UntypedLoginSolver<UserProtocol>>, &'cxt Path);
+    type Context<'cxt> = (
+        GlobalMultimap<UntypedLoginSolver<UserProtocol>>,
+        &'cxt WriteTransaction,
+    );
     fn try_from<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(
         account_data: AccountData,
         cxt: Cxt,
     ) -> Result<Self, Self::Err> {
-        let (cxt, store_path) = cxt.borrow();
+        let (cxt, w_cxt) = cxt.borrow();
         let solver = cxt.build(account_data.login_type());
         if let Some(solver) = solver {
-            let session = Session::relogin(
-                account_data.uname(),
-                account_data.enc_pwd(),
-                store_path,
-                &solver,
-            )?;
-            Ok(Self {
-                session,
-                enc_pwd: account_data.enc_pwd().to_owned(),
-                login_solver: UntypedLoginSolver::from_typed(solver),
-            })
+            Self::new(account_data.uname(), account_data.enc_pwd(), solver, w_cxt)
         } else {
             Err(StoreError::ParseError(
                 "该登录类型未注册，无法持久化。".to_string(),
@@ -123,7 +112,10 @@ where
     UserProtocol: UserProtocolTrait + 'static,
 {
     type Err = StoreError;
-    type Context<'cxt> = (GlobalMultimap<UntypedLoginSolver<UserProtocol>>, &'cxt Path);
+    type Context<'cxt> = (
+        GlobalMultimap<UntypedLoginSolver<UserProtocol>>,
+        &'cxt WriteTransaction,
+    );
 
     fn try_from<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(
         s: &str,
