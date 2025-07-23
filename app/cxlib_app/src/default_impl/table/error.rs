@@ -23,6 +23,8 @@ pub enum StoreError {
     LogicError(String),
     #[error("意外的空值：`{0}`, 无法完成。")]
     UnexpectedNone(String),
+    #[error("数据错误：`{0}`, 无法完成。")]
+    UnexpectedData(String),
 }
 impl From<TransactionError> for StoreError {
     fn from(value: TransactionError) -> Self {

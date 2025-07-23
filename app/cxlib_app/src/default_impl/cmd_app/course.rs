@@ -47,7 +47,7 @@ impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
         drop(course_table);
         let account_table = AccountTable::<UserProtocol>::read(&r_cxt)?;
         // 列出所有账号的课程，避免 course.uid_list 不完整。
-        let sessions = AccountTable::get_sessions(&account_table, cxt);
+        let sessions = AccountTable::get_all_sessions(&account_table, cxt);
         // 获取课程信息。
         let courses = CourseWithInfo::get_from_sessions(sessions?.values())?
             .into_iter()

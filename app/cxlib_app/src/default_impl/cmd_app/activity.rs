@@ -306,7 +306,7 @@ impl SignParser {
         let sessions = if let Some(uid_list_str) = &uid_list_str {
             AccountTable::get_sessions_by_uid_list_str(&account_table, uid_list_str)
         } else {
-            AccountTable::get_sessions(&account_table, account_table_cxt.clone())?
+            AccountTable::get_all_sessions(&account_table, account_table_cxt.clone())?
         };
         let mut courses = CoursesCmdApp::update_course_table(db, account_table_cxt)?;
         let courses = if let Some(course) = course {

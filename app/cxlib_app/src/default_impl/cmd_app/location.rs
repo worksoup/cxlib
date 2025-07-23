@@ -480,7 +480,7 @@ impl LocationParser {
             let sessions = database_guard
                 .read(|r_cxt| {
                     let account_table = AccountTable::<UserProtocol>::read(r_cxt)?;
-                    AccountTable::get_sessions(&account_table, cxt)
+                    AccountTable::get_all_sessions(&account_table, cxt)
                 })
                 .log_unwrap()
                 .into_inner();
@@ -550,7 +550,7 @@ impl LocationParser {
                     let sessions = database_guard
                         .read(|r_cxt| {
                             let account_table = AccountTable::<UserProtocol>::read(r_cxt)?;
-                            AccountTable::get_sessions(&account_table, cxt)
+                            AccountTable::get_all_sessions(&account_table, cxt)
                         })
                         .log_unwrap()
                         .into_inner();

@@ -19,16 +19,13 @@ type CourseStoreDataWithSessions<UserProtocol> =
 impl CourseTable {
     /// 从缓存中获取课程与会话。
     #[inline]
-    pub fn get_courses_with_sessions<'cxt, Cxt, LoginSolver, UserProtocol>(
+    pub fn get_courses_with_sessions<LoginSolver, UserProtocol>(
         r_cxt: &ReadTransaction,
-        cxt: Cxt,
     ) -> Result<impl Iterator<Item = (Course, CourseStoreDataWithSessions<UserProtocol>)>, StoreError>
     where
         UserProtocol: UserProtocolTrait + 'static,
-        Cxt: Borrow<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
     {
-        let account_table = AccountTable::<UserProtocol>::read(r_cxt)?;
-        let sessions = AccountTable::get_sessions(&account_table, cxt)?;
+        let sessions = AccountTable::load_all_sessions(&r_cxt)?;
         let course_table = Self::read(r_cxt)?;
         let r = Self::get_courses_with_current_sessions(&course_table, sessions);
         drop(course_table);

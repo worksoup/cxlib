@@ -37,7 +37,7 @@ where
         let r_cxt = db.begin_read().log_unwrap();
         let account_table = AccountTable::<UserProtocol>::read(&r_cxt).log_unwrap();
         let sessions: Vec<(Session<UserProtocol>, String)> = if fresh {
-            AccountTable::<UserProtocol>::get_accounts(&account_table)
+            AccountTable::<UserProtocol>::get_all_accounts(&account_table)
                 .into_iter()
                 .filter_map(|a| {
                     let login_solver = LoginSolverGetter::new(solver_cxt, a.login_type())
@@ -53,7 +53,7 @@ where
                 .collect()
         } else {
             // 列出所有账号。
-            AccountTable::get_sessions(&account_table, (solver_cxt.clone(), db_path))
+            AccountTable::get_all_sessions(&account_table, (solver_cxt.clone(), db_path))
                 .log_unwrap()
                 .into_values()
                 .collect()
