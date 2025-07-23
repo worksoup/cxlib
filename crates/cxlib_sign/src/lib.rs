@@ -1,6 +1,6 @@
-use crate::utils::{CaptchaSolver, try_secondary_verification};
+use crate::utils::try_secondary_verification;
 use cx_gizmo_types::OptionPair;
-use cxlib_captcha::CaptchaId;
+use cxlib_captcha::{CaptchaId, CaptchaSolver};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{
     collect::{CaptchaProtocolTrait, SignProtocolTrait},

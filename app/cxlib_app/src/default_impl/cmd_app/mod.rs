@@ -10,9 +10,10 @@ pub use account::*;
 pub use accounts::*;
 pub use activity::*;
 pub use course::*;
-use cxlib_store::{Dir, DirTrait};
+use cxlib_store::{AppInfo, Dir, DirTrait};
 pub use location::*;
 pub use locations::*;
+use ref_wrapper::{UNIT, Unit};
 pub use where_is_config::*;
 
 #[cfg(feature = "completion")]
@@ -23,7 +24,7 @@ pub use completions::*;
 use crate::{AliasTable, CourseData, CourseTable, GlobalMultimap, NormalTableTrait};
 use clap::Command;
 use cxlib_internal::{
-    captcha::utils::get_now_timestamp_mills,
+    captcha::{CaptchaSolver, utils::get_now_timestamp_mills},
     default_impl::{sign::LocationSign, signner::LocationInfoGetterTrait},
     sign::SignTrait,
     types::{
@@ -33,29 +34,32 @@ use cxlib_internal::{
 };
 use log::warn;
 use redb::Database;
-use std::{
-    cmp,
-    collections::HashMap,
-};
+use std::cmp;
 
 pub struct CmdAppContext<UserProtocol = cxlib_internal::protocol::collect::UserProtocol> {
+    dir: Dir,
     db: Database,
     command: Command,
     login_solvers: GlobalMultimap<UntypedLoginSolver<UserProtocol>>,
-    dir: Dir,
+    app_info: AppInfo,
+    captcha_solver: &'static CaptchaSolver,
 }
 impl<U> CmdAppContext<U> {
     pub fn new(
+        dir: Dir,
         command: Command,
         login_solvers: GlobalMultimap<UntypedLoginSolver<U>>,
-        dir: Dir,
+        app_info: AppInfo,
+        captcha_solver: &'static CaptchaSolver,
     ) -> Self {
         let db = Database::builder().create(dir.get_database_dir()).unwrap();
         Self {
+            dir,
             db,
             command,
-            dir,
+            app_info,
             login_solvers,
+            captcha_solver,
         }
     }
 }
@@ -69,14 +73,34 @@ impl<U> AsRef<Database> for CmdAppContext<U> {
         &self.db
     }
 }
-impl<U> AsRef<Dir> for CmdAppContext<U> {
-    fn as_ref(&self) -> &Dir {
-        &self.dir
+impl<U> AsRef<AppInfo> for CmdAppContext<U> {
+    fn as_ref(&self) -> &AppInfo {
+        &self.app_info
     }
 }
 impl<U> AsRef<GlobalMultimap<UntypedLoginSolver<U>>> for CmdAppContext<U> {
     fn as_ref(&self) -> &GlobalMultimap<UntypedLoginSolver<U>> {
         &self.login_solvers
+    }
+}
+impl<U> AsRef<&'static CaptchaSolver> for CmdAppContext<U> {
+    fn as_ref(&self) -> &&'static CaptchaSolver {
+        &self.captcha_solver
+    }
+}
+impl<U> AsRef<CaptchaSolver> for CmdAppContext<U> {
+    fn as_ref(&self) -> &CaptchaSolver {
+        self.captcha_solver
+    }
+}
+impl<U> AsRef<Unit> for CmdAppContext<U> {
+    fn as_ref(&self) -> &Unit {
+        &UNIT
+    }
+}
+impl<U> AsRef<Dir> for CmdAppContext<U> {
+    fn as_ref(&self) -> &Dir {
+        &self.dir
     }
 }
 
@@ -88,7 +112,7 @@ pub trait CourseDataFilterAndSorterTrait<Context> {
     ) -> cmp::Ordering;
 }
 pub struct DefaultCourseDataSorter;
-impl CourseDataFilterAndSorterTrait<HashMap<i64, u64>> for DefaultCourseDataSorter {
+impl<T> CourseDataFilterAndSorterTrait<T> for DefaultCourseDataSorter {
     fn filter(a: (&Course, &CourseInfo, &CourseData)) -> bool {
         !a.1.ended()
             && (*a.2.recently_used_timestamp() == u64::MAX || {
@@ -142,7 +166,7 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
         drop(alias_table);
         match geolocation {
             Ok(addr @ Some(_)) => addr,
-            r @ Err(_) | r @ Ok(None) => {
+            r => {
                 if let Err(e) = r {
                     log::warn!("{e:?}");
                 }

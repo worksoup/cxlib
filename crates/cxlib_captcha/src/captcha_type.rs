@@ -1,5 +1,8 @@
+use std::{fmt::Display, str::FromStr};
+
 use crate::{
-    CaptchaError, VerificationInfoTrait,
+    CaptchaError, IconClickImage, ObstacleImage, RotateImages, SlideImages, TextClickInfo,
+    VerificationInfoTrait,
     hash::{encode, hash, uuid},
     utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
 };
@@ -42,6 +45,103 @@ impl ValidateResult {
                 validate
             })
             .ok_or_else(|| CaptchaError::VerifyFailed)
+    }
+}
+/// # [`CaptchaType`]
+/// 验证码类型，目前只有 [`CaptchaType::Slide`] 类型支持良好，无需初始化 `Solver`.
+/// 如需自行支持，请为该类型 [实现 `Solver`](CaptchaType::init_solver).
+///
+/// 若需自行处理图片下载等步骤，参见 [`CaptchaType::set_verification_info_type`].
+/// 该函数可以替换掉默认的验证信息类型。
+#[derive(Debug, Clone)]
+pub enum CaptchaType {
+    /// ## 滑块验证码
+    /// 拖动滑块至合适位置，完成验证。
+    ///
+    /// 对应的验证信息类型为 [`SlideImages`],
+    /// 如需自定义 `Solver`, 请参考其文档。
+    Slide,
+    /// ## 文字点选验证码
+    /// 按照提示依次点击三个汉字，完成验证。
+    ///
+    /// 对应的验证信息类型为 [`TextClickInfo`],
+    /// 请参考其文档初始化 `Solver`.
+    TextClick,
+    /// ## 图片旋转验证码
+    /// 将图片旋转至合适角度，完成验证。
+    ///
+    /// 对应的验证信息类型为 [`RotateImages`],
+    /// 请参考其文档初始化 `Solver`.
+    Rotate,
+    /// ## 图标点选验证码
+    /// 按照提示依次点击三个图标，完成验证。
+    ///
+    /// 对应的验证信息类型为 [`IconClickImage`],
+    /// 请参考其文档初始化 `Solver`.
+    IconClick,
+    /// ## 单图标点选验证码
+    /// 按照提示点击单个图标，完成验证。
+    ///
+    /// 对应的验证信息类型为 [`ObstacleImage`],
+    /// 请参考其文档初始化 `Solver`.
+    Obstacle,
+    /// ## 自定义类型验证码
+    Custom(&'static str),
+}
+impl CaptchaType {
+    const DEFAULT: CaptchaType = CaptchaType::Rotate;
+}
+impl Default for CaptchaType {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+impl FromStr for CaptchaType {
+    type Err = CaptchaError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "slide" | "Slide" | "SLIDE" => CaptchaType::Slide,
+            "iconclick" | "IconClick" | "ICONCLICK" | "icon_click" | "ICON_CLICK" => {
+                CaptchaType::IconClick
+            }
+            "textclick" | "TextClick" | "TEXTCLICK" | "text_click" | "TEXT_CLICK" => {
+                CaptchaType::TextClick
+            }
+            "obstacle" | "Obstacle" | "OBSTACLE" => CaptchaType::Obstacle,
+            "rotate" | "Rotate" | "ROTATE" => CaptchaType::Rotate,
+            _ => Err(CaptchaError::UnsupportedType)?,
+        })
+    }
+}
+impl Display for CaptchaType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_ref())
+    }
+}
+impl AsRef<str> for CaptchaType {
+    fn as_ref(&self) -> &str {
+        match self {
+            CaptchaType::Slide => "slide",
+            CaptchaType::TextClick => "textclick",
+            CaptchaType::Rotate => "rotate",
+            CaptchaType::IconClick => "iconclick",
+            CaptchaType::Obstacle => "obstacle",
+            CaptchaType::Custom(r#type) => r#type,
+        }
+    }
+}
+pub type CaptchaSolver = fn(&Agent, &str, &str) -> Result<String, CaptchaError>;
+impl CaptchaType {
+    pub fn solver<CaptchaProtocol: CaptchaProtocolTrait>(&self) -> Option<CaptchaSolver> {
+        Some(match self {
+            CaptchaType::Slide => SlideImages::solve_captcha::<CaptchaProtocol>,
+            CaptchaType::TextClick => TextClickInfo::solve_captcha::<CaptchaProtocol>,
+            CaptchaType::Rotate => RotateImages::solve_captcha::<CaptchaProtocol>,
+            CaptchaType::IconClick => IconClickImage::solve_captcha::<CaptchaProtocol>,
+            CaptchaType::Obstacle => ObstacleImage::solve_captcha::<CaptchaProtocol>,
+            CaptchaType::Custom(_) => None?,
+        })
     }
 }
 pub trait CaptchaSolverTrait {
@@ -205,7 +305,7 @@ mod tests {
     fn auto_solve_captcha_test() {
         let agent = ureq::Agent::new_with_defaults();
         let r = RotateImages::solve_captcha::<CaptchaProtocol>(&agent, CAPTCHA_ID, REFERER);
-        println!("{:?}", r);
+        println!("{r:?}");
     }
     #[test]
     fn generate_captcha_key() {
@@ -244,7 +344,7 @@ mod tests {
             let validate_info =
                 T::get_captcha::<CaptchaProtocol>(&agent, captcha_id, server_time + 1, REFERER)
                     .unwrap();
-            println!("{:?}", validate_info);
+            println!("{validate_info:?}");
         }
         get_captcha_::<IconClickImage>();
         get_captcha_::<ObstacleImage>();

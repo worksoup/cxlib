@@ -1,6 +1,7 @@
 use crate::sign::GestureOrSigncodeSign;
+use cxlib_captcha::CaptchaSolver;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
-use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait, utils::CaptchaSolver};
+use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::Session;
 use std::collections::HashMap;
 

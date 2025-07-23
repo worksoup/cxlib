@@ -19,6 +19,7 @@ pub trait LocationPreprocessorTrait: Send + Sync {
         location
     }
 }
+impl LocationPreprocessorTrait for ref_wrapper::Unit {}
 pub mod __private {
     use std::{
         borrow::{Borrow, BorrowMut},

@@ -34,8 +34,13 @@ pub enum AccountParser {
     },
 }
 
-pub struct AccountCmdApp<UserProtocol> {
-    _t: PhantomData<UserProtocol>,
+pub struct AccountCmdApp<UserProtocol = cxlib_internal::protocol::collect::UserProtocol>(
+    PhantomData<UserProtocol>,
+);
+impl<U> Default for AccountCmdApp<U> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
 }
 impl<'cxt, Context, UserProtocol> AppTrait<Context> for AccountCmdApp<UserProtocol>
 where
@@ -45,21 +50,17 @@ where
 {
     type OwnedData = AccountParser;
     fn run(&self, context: &Context, owned_data: Self::OwnedData) {
+        let db: &Database = context.as_ref();
         match owned_data {
             AccountParser::Add { uname, passwd } => {
                 let pwd = cx_interact::inquire_pwd(passwd);
                 let login_type_and_uname = uname.split_once(":");
+                let w_cxt = db.begin_write().log_unwrap();
                 let session = if let Some((login_type, uname)) = login_type_and_uname {
-                    AccountTable::login(
-                        context.as_ref(),
-                        context,
-                        uname.into(),
-                        pwd,
-                        login_type.into(),
-                    )
+                    AccountTable::login(&w_cxt, context, uname.into(), pwd, login_type.into())
                 } else {
                     AccountTable::login(
-                        context.as_ref(),
+                        &w_cxt,
                         context,
                         uname.clone(),
                         pwd,

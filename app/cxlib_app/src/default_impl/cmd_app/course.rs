@@ -13,7 +13,6 @@ use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
     marker::PhantomData,
-    path::Path,
 };
 
 #[derive(Parser, Debug, Clone)]
@@ -45,50 +44,50 @@ impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
         let course_table = CourseTable::read(&r_cxt)?;
         let cached_courses = CourseTable::get_courses(&course_table)?;
         drop(course_table);
-        let account_table = AccountTable::<UserProtocol>::read(&r_cxt)?;
         // 列出所有账号的课程，避免 course.uid_list 不完整。
-        let sessions = AccountTable::get_all_sessions(&account_table, cxt);
+        let sessions = AccountTable::get_all_sessions(db, cxt);
         // 获取课程信息。
-        let courses = CourseWithInfo::get_from_sessions(sessions?.values())?
-            .into_iter()
-            .map(|(course_with_info, sessions)| {
-                let old_data = cached_courses.get(&course_with_info);
-                let users = sessions
-                    .into_iter()
-                    .map(|s| s.uid().to_owned())
-                    .collect::<Vec<_>>();
-                let (course, info) = course_with_info.unwrap();
-                if let Some((recently_used_timestamp, locations)) =
-                    old_data.map(|(_, data)| (data.recently_used_timestamp(), data.locations()))
-                {
-                    (
-                        course,
+        let courses: HashMap<Course, (CourseInfo, CourseData)> =
+            CourseWithInfo::get_from_sessions(sessions?.values())?
+                .into_iter()
+                .map(|(course_with_info, sessions)| {
+                    let old_data = cached_courses.get(&course_with_info);
+                    let users = sessions
+                        .into_iter()
+                        .map(|s| s.uid().to_owned())
+                        .collect::<Vec<_>>();
+                    let (course, info) = course_with_info.unwrap();
+                    if let Some((recently_used_timestamp, locations)) =
+                        old_data.map(|(_, data)| (data.recently_used_timestamp(), data.locations()))
+                    {
                         (
-                            info,
-                            CourseData::new(
-                                *recently_used_timestamp,
-                                users,
-                                locations.cloned().collect(),
+                            course,
+                            (
+                                info,
+                                CourseData::new(
+                                    *recently_used_timestamp,
+                                    users,
+                                    locations.cloned().collect(),
+                                ),
                             ),
-                        ),
-                    )
-                } else {
-                    (
-                        course,
+                        )
+                    } else {
                         (
-                            info,
-                            CourseData::new(
-                                // TODO: 应该是没有问题，但是就是有点别扭。
-                                // 未出现过的课程时间为 `u64::MAX`.
-                                u64::MAX,
-                                users,
-                                vec![],
+                            course,
+                            (
+                                info,
+                                CourseData::new(
+                                    // TODO: 应该是没有问题，但是就是有点别扭。
+                                    // 未出现过的课程时间为 `u64::MAX`.
+                                    u64::MAX,
+                                    users,
+                                    vec![],
+                                ),
                             ),
-                        ),
-                    )
-                }
-            })
-            .collect::<HashMap<_, _>>();
+                        )
+                    }
+                })
+                .collect::<HashMap<_, _>>();
         drop(r_cxt);
         let w_cxt = db.begin_write().map_err(StoreError::from)?;
         CourseTable::delete(&w_cxt)?;
@@ -107,20 +106,17 @@ impl<U> Default for CoursesCmdApp<U> {
         Self(Default::default())
     }
 }
-impl<'cxt, UserProtocol, Context> AppTrait<Context> for CoursesCmdApp<UserProtocol>
+impl<  UserProtocol, Context> AppTrait<Context> for CoursesCmdApp<UserProtocol>
 where
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    Context:
-        AsRef<Database> + AsRef<Path> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
+    Context: AsRef<Database> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
 {
     type OwnedData = CoursesParser;
 
     fn run(&self, cxt: &Context, data: CoursesParser) {
         let courses = if data.fresh {
-            let (login_solvers, store_path): (&GlobalMultimap<_>, &Path) =
-                (cxt.as_ref(), cxt.as_ref());
-            let account_table_cxt = (login_solvers.clone(), store_path);
-            Self::update_course_table(cxt.as_ref(), account_table_cxt).log_unwrap_or_default()
+            let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
+            Self::update_course_table(cxt.as_ref(), login_solvers.clone()).log_unwrap_or_default()
         } else {
             let db: &Database = cxt.as_ref();
             let r_cxt = db.begin_read().log_unwrap();
@@ -143,22 +139,12 @@ where
             }
         }
     }
-
-    fn meta_app<MetaApp: crate::MetaAppTrait<Self, Context, ()>>(self, meta_app: MetaApp) -> Self
-    where
-        Self: Sized,
-    {
-        meta_app.register(self)
-    }
 }
-impl<'cxt, UserProtocol, Context, OwnedData> CmdMetaAppTrait<Context, OwnedData>
+impl<UserProtocol, Context, OwnedData> CmdMetaAppTrait<Context, OwnedData>
     for CoursesCmdApp<UserProtocol>
 where
     UserProtocol: std::marker::Send + UserProtocolTrait + 'static,
-    Context: AsRef<Database>
-        + AsRef<Path>
-        + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
-        + 'static,
+    Context: AsRef<Database> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
     OwnedData: 'static,
 {
     fn read_owned_data(

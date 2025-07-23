@@ -1,6 +1,6 @@
 use crate::{PreSignResult, SignError, SignResult, SignTrait};
 use cx_gizmo_types::OptionPair;
-use cxlib_captcha::{CaptchaError, CaptchaId, utils::find_captcha};
+use cxlib_captcha::{CaptchaId, CaptchaSolver, utils::find_captcha};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{
     collect::{CaptchaProtocolTrait, SignProtocolTrait},
@@ -67,7 +67,6 @@ pub fn analysis_after_presign<
         data: captcha_id_and_location,
     })
 }
-pub type CaptchaSolver = fn(&Agent, &str, &str) -> Result<String, CaptchaError>;
 pub fn secondary_verification<CaptchaProtocol, S>(
     agent: &Agent,
     url: PPTSignHelper,

@@ -185,12 +185,12 @@ impl LocationTable {
         >,
         location: impl Borrow<Geolocation>,
     ) -> Result<String, StoreError> {
-        Ok(table
+        table
             .get(location)?
             .map(|a| a.value().unhandled_addr)
             .ok_or_else(|| {
                 StoreError::UnexpectedNone("位置对应地名不存在，请检查是否存在 Bug.".to_owned())
-            })?)
+            })
     }
     pub fn get_courses(
         table: &impl ReadableTable<

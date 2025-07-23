@@ -6,6 +6,7 @@ authors.workspace = true
 
 [dependencies]
 cx_interact = { path = "../../gizmos/cx_interact" }
+cxlib_captcha = { path = "../cxlib_captcha" }
 cxlib_error_utils = { path = "../cxlib_error_utils" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["default_impl"] }

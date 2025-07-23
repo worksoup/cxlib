@@ -1,8 +1,9 @@
 //! 写了 8 行导入语句、3 行辅助特型、8 行特型实现，只为复用 40 行的代码。
 //! 好，还有 2 行调侃。
 use crate::sign::{LocationSign, QrCodeSign};
+use cxlib_captcha::CaptchaSolver;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
-use cxlib_sign::{PreSignResult, SignError, SignResult, SignTrait, utils::CaptchaSolver};
+use cxlib_sign::{PreSignResult, SignError, SignResult, SignTrait};
 use cxlib_types::{Geoaddr, Session};
 use log::warn;
 use std::borrow::Borrow;

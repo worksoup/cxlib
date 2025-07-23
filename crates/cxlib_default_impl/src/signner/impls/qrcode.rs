@@ -1,7 +1,8 @@
 use crate::{sign::QrCodeSign, signner::LocationInfoGetterTrait};
 use cx_interact::inquire_confirm;
+use cxlib_captcha::CaptchaSolver;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
-use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait, utils::CaptchaSolver};
+use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::{Geoaddr, LocationPreprocessorTrait, Session};
 use log::warn;
 use std::{

@@ -119,8 +119,8 @@ mod tests {
         println!("{:?}", to_bytes(k));
         println!("{:?}", encode(to_bytes(k)));
         let k = k.map(|a| a as i32);
-        println!("{:?}", k);
+        println!("{k:?}");
         let u = uuid();
-        println!("{:?}", u);
+        println!("{u:?}");
     }
 }

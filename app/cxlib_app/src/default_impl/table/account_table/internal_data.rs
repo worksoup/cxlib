@@ -31,7 +31,7 @@ where
         UserProtocol: UserProtocolTrait,
     {
         let mut cookies = Cursor::new(Vec::new());
-        let session = Session::relogin(&uname, &enc_pwd, &mut cookies, &login_solver)?;
+        let session = Session::relogin(uname, enc_pwd, &mut cookies, &login_solver)?;
         let cookies_str = String::from_utf8(cookies.into_inner()).unwrap();
         let mut common_data_table = CommonDataTable::write(w_cxt)?;
         common_data_table.insert(

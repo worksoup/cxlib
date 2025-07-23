@@ -1,11 +1,11 @@
 use crate::{
-    AccountTable, AppTrait, CmdMetaAppTrait, CourseData, CourseDataFilterAndSorterTrait,
-    CourseTable, CoursesCmdApp, DefaultCourseDataSorter, DefaultLocationInfoGetter, GlobalMultimap,
-    NormalTableTrait, error::Error,
+    AccountTable, AppTrait, CmdMetaAppTrait, CourseDataFilterAndSorterTrait, CourseTable,
+    CoursesCmdApp, DefaultCourseDataSorter, DefaultLocationInfoGetter, GlobalMultimap,
+    error::Error,
 };
 use clap::{ArgMatches, FromArgMatches, Parser};
-use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::{
+    captcha::CaptchaSolver,
     default_impl::{
         sign::Sign,
         signner::{
@@ -16,22 +16,17 @@ use cxlib_internal::{
     protocol::collect::{
         CaptchaProtocolTrait, SignProtocolTrait, TypesProtocolTrait, UserProtocolTrait,
     },
-    sign::{SignResult, SignTrait, SignnerTrait, utils::CaptchaSolver},
+    sign::{SignResult, SignTrait, SignnerTrait},
     types::{
-        Activity, Course, CourseInfo, CourseWithInfo, LocationPreprocessorTrait, RawSign, Session,
+        Activity, Course, CourseWithInfo, LocationPreprocessorTrait, RawSign, Session,
         UntypedLoginSolver, ext::ActivityExt,
     },
 };
 use cxlib_store::AppInfo;
 use log::{debug, error, info, warn};
 use redb::Database;
-use std::{
-    cmp,
-    collections::HashMap,
-    marker::PhantomData,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use ref_wrapper::Unit;
+use std::{collections::HashMap, marker::PhantomData, path::PathBuf, time::Duration};
 
 #[derive(Clone)]
 pub struct CliArgs {
@@ -259,27 +254,30 @@ impl SignParser {
         }
         Ok(())
     }
-    pub fn do_sign<'cxt, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Cxt, T>(
+    pub fn do_sign<
+        CaptchaProtocol,
+        SignProtocol,
+        TypesProtocol,
+        UserProtocol,
+        Cxt,
+        LocationGetter,
+        T: CourseDataFilterAndSorterTrait<Cxt>,
+    >(
         self,
-        cxt: Cxt,
-        db: &Database,
-        location_getter: T,
+        cxt: &Cxt,
+        location_getter: LocationGetter,
         preprocessor: &impl LocationPreprocessorTrait,
         captcha_solver: &'static CaptchaSolver,
-        mut filter: impl FnMut((&Course, &CourseInfo, &CourseData)) -> bool,
-        mut sorter: impl FnMut(
-            (&Course, &CourseInfo, &CourseData),
-            (&Course, &CourseInfo, &CourseData),
-        ) -> cmp::Ordering,
     ) -> Result<(), Error>
     where
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: std::marker::Send + SignProtocolTrait + 'static,
         TypesProtocol: TypesProtocolTrait + 'static,
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-        Cxt: AsRef<Path> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
-        T: LocationInfoGetterTrait + Copy,
+        Cxt: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Database>,
+        LocationGetter: LocationInfoGetterTrait + Copy,
     {
+        let db = cxt.as_ref();
         let Self {
             id: active_id,
             uid: uid_list_str,
@@ -299,16 +297,13 @@ impl SignParser {
             signcode: code,
         };
         let has_uid_arg = uid_list_str.is_some();
-        let (login_solvers, store_path): (&GlobalMultimap<_>, &Path) = (cxt.as_ref(), cxt.as_ref());
-        let account_table_cxt = (login_solvers.clone(), store_path);
-        let r_cxt = db.begin_read().log_unwrap();
-        let account_table = AccountTable::<UserProtocol>::read(&r_cxt).log_unwrap();
+        let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
         let sessions = if let Some(uid_list_str) = &uid_list_str {
-            AccountTable::get_sessions_by_uid_list_str(&account_table, uid_list_str)
+            AccountTable::get_sessions_by_uid_list_str(db, uid_list_str, login_solvers)?
         } else {
-            AccountTable::get_all_sessions(&account_table, account_table_cxt.clone())?
+            AccountTable::get_all_sessions(db, login_solvers)?
         };
-        let mut courses = CoursesCmdApp::update_course_table(db, account_table_cxt)?;
+        let mut courses = CoursesCmdApp::update_course_table(db, login_solvers)?;
         let courses = if let Some(course) = course {
             Some((course.clone(), courses.remove(&course).unwrap()))
                 .into_iter()
@@ -318,11 +313,11 @@ impl SignParser {
         };
         let mut courses =
             CourseTable::courses_to_course_sessions_map_with_current_sessions(courses, sessions)
-                .filter(|(course, (info, data, _))| filter((course, info, data)))
+                .filter(|(course, (info, data, _))| T::filter((course, info, data)))
                 .collect::<Vec<_>>();
         courses.sort_by(
             |(a_course, (a_info, a_data, _)), (b_course, (b_info, b_data, _))| {
-                sorter((a_course, a_info, a_data), (b_course, b_info, b_data))
+                T::sorter((a_course, a_info, a_data), (b_course, b_info, b_data))
             },
         );
         {
@@ -423,11 +418,11 @@ impl SignParser {
     }
 }
 pub struct SignMainApp<
-    CaptchaProtocol,
-    SignProtocol,
-    TypesProtocol,
-    UserProtocol,
-    Preprocessor,
+    CaptchaProtocol = cxlib_internal::protocol::collect::CaptchaProtocol,
+    SignProtocol = cxlib_internal::protocol::collect::SignProtocol,
+    TypesProtocol = cxlib_internal::protocol::collect::TypesProtocol,
+    UserProtocol = cxlib_internal::protocol::collect::UserProtocol,
+    Preprocessor = Unit,
     T = DefaultCourseDataSorter,
 > {
     _p: PhantomData<(CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol)>,
@@ -445,14 +440,13 @@ impl<C, S, Ty, U, T> Default for SignMainApp<C, S, Ty, U, T> {
     }
 }
 
-impl<'cxt, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, Context, T>
+impl<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, Context, T>
     AppTrait<Context>
     for SignMainApp<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, T>
 where
     Context: AsRef<Database>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
-        + AsRef<Path>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
         + AsRef<&'static CaptchaSolver>,
     T: CourseDataFilterAndSorterTrait<Context>,
@@ -466,21 +460,17 @@ where
 
     fn run(&self, cxt: &Context, data: Self::OwnedData) {
         warn!("{}", SignParser::notice_content(cxt.as_ref()));
-        data.do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _, _>(
+        data.do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _, _, T>(
             cxt,
-            cxt.as_ref(),
             DefaultLocationInfoGetter::from(cxt.as_ref()),
             AsRef::<Preprocessor>::as_ref(&cxt),
             AsRef::<&'static CaptchaSolver>::as_ref(&cxt),
-            T::filter,
-            T::sorter,
         )
         .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
     }
 }
 
 impl<
-    'cxt,
     CaptchaProtocol,
     SignProtocol,
     TypesProtocol,
@@ -495,7 +485,6 @@ where
     Context: AsRef<Database>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
-        + AsRef<Path>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
         + AsRef<&'static CaptchaSolver>
         + 'static,

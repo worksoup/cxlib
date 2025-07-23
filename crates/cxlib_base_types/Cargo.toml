@@ -6,4 +6,5 @@ authors.workspace = true
 
 [dependencies]
 bincode.workspace = true
+ref_wrapper = { path = "../../gizmos/ref_wrapper" }
 serde = { workspace = true, features = ["derive"] }

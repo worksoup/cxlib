@@ -1,6 +1,7 @@
 use crate::{sign::LocationSign, signner::LocationInfoGetterTrait};
+use cxlib_captcha::CaptchaSolver;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
-use cxlib_sign::{SignError, SignResult, SignnerTrait, utils::CaptchaSolver};
+use cxlib_sign::{SignError, SignResult, SignnerTrait};
 use cxlib_types::{Geoaddr, LocationPreprocessorTrait, Session};
 use std::collections::HashMap;
 

@@ -19,7 +19,7 @@ use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
     marker::PhantomData,
-    path::{Path, PathBuf},
+    path::PathBuf,
     str::FromStr,
 };
 #[derive(Debug, Clone)]
@@ -42,9 +42,9 @@ impl FromStr for GeolocationOrUnhandledGeoaddr {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.parse::<UnhandledGeoaddr>() {
-            Ok(ok) => return Ok(Self::UnhandledGeoaddr(ok)),
+            Ok(ok) => Ok(Self::UnhandledGeoaddr(ok)),
             Err(_) => {
-                return Ok(Self::Geolocation(s.parse::<Geolocation>()?));
+                Ok(Self::Geolocation(s.parse::<Geolocation>()?))
             }
         }
     }
@@ -207,7 +207,7 @@ impl LocationParser {
                                 w_cxt,
                                 geolocation,
                                 unhandled_place_name,
-                                &courses.into_iter().collect(),
+                                courses.into_iter().collect::<Vec<_>>(),
                             )
                         })
                         .log_unwrap();
@@ -225,7 +225,7 @@ impl LocationParser {
                             w_cxt,
                             geolocation,
                             unhandled_place_name,
-                            &vec![],
+                            vec![],
                         )
                     })
                     .log_unwrap();
@@ -477,13 +477,7 @@ impl LocationParser {
         }
         if let Some(course_without_info) = course {
             // 获取所有用户。
-            let sessions = database_guard
-                .read(|r_cxt| {
-                    let account_table = AccountTable::<UserProtocol>::read(r_cxt)?;
-                    AccountTable::get_all_sessions(&account_table, cxt)
-                })
-                .log_unwrap()
-                .into_inner();
+            let sessions = AccountTable::get_all_sessions(database_guard, cxt).log_unwrap();
             // 获取用户所有的课程。
             let courses = CourseWithInfo::get_from_sessions(sessions.values())
                 .ok()
@@ -511,7 +505,7 @@ impl LocationParser {
                                             w_cxt,
                                             geolocation,
                                             unhandled_place_name,
-                                            &vec![course.course().clone()],
+                                            vec![course.course().clone()],
                                             &[],
                                         );
                                     }
@@ -547,13 +541,7 @@ impl LocationParser {
             course
                 .and_then(|course_without_info| {
                     // 获取所有用户。
-                    let sessions = database_guard
-                        .read(|r_cxt| {
-                            let account_table = AccountTable::<UserProtocol>::read(r_cxt)?;
-                            AccountTable::get_all_sessions(&account_table, cxt)
-                        })
-                        .log_unwrap()
-                        .into_inner();
+                    let sessions = AccountTable::get_all_sessions(database_guard, cxt).log_unwrap();
                     let courses = CourseWithInfo::get_from_sessions(sessions.values())
                         .unwrap_or_default()
                         .into_keys()
@@ -653,17 +641,13 @@ impl<T, U> Default for LocationCmdApp<T, U> {
 impl<
     TypesProtocol: TypesProtocolTrait,
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    Context: AsRef<Database>
-        + AsRef<Path>
-        + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
-        + AsRef<AppInfo>,
+    Context: AsRef<Database> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<AppInfo>,
 > AppTrait<Context> for LocationCmdApp<TypesProtocol, UserProtocol>
 {
     type OwnedData = LocationParser;
     fn run(&self, cxt: &Context, command: LocationParser) {
-        let path: &Path = cxt.as_ref();
         let map: &GlobalMultimap<_> = cxt.as_ref();
-        command.parse::<TypesProtocol, UserProtocol, <AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'_>>(cxt.as_ref(), (map.clone(), path), cxt.as_ref())
+        command.parse::<TypesProtocol, UserProtocol, <AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'_>>(cxt.as_ref(), map.clone(), cxt.as_ref())
     }
 }
 impl<
@@ -671,7 +655,6 @@ impl<
     TypesProtocol: TypesProtocolTrait + 'static,
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     Context: AsRef<Database>
-        + AsRef<Path>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
         + AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
         + AsRef<AppInfo>

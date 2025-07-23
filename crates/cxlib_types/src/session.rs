@@ -9,7 +9,7 @@ use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{ProtocolItem, collect::UserProtocolTrait};
 use log::info;
 use serde::Deserialize;
-use std::{hash::Hash, marker::PhantomData, ops::Deref, path::Path};
+use std::{hash::Hash, marker::PhantomData, ops::Deref};
 use ureq::Agent;
 
 #[derive(Debug)]

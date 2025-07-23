@@ -153,7 +153,7 @@ where
         let str_list = uid_list_str.split(',').map(|a| a.trim());
         let account_data = Self::get_accounts(&Self::read(r_cxt)?, str_list);
         Self::loop_collect(r_cxt, account_data, (), |r_cxt, uid, account_data, _| {
-            Ok(Self::load_session_internal(r_cxt, &uid, &account_data)?)
+            Self::load_session_internal(r_cxt, uid, &account_data)
         })
     }
     pub fn get_sessions_by_uid_list_str<
@@ -232,7 +232,7 @@ where
         cxt: Cxt,
     ) -> Result<Session<UserProtocol>, StoreError> {
         let r_cxt = db.begin_read()?;
-        match Self::load_session_internal(&r_cxt, &uid, &account_data) {
+        match Self::load_session_internal(&r_cxt, uid, &account_data) {
             Ok(session) => Ok(session),
             Err(e) => match e {
                 StoreError::LoginError(LoginError::LoginExpired(_)) => {
@@ -250,13 +250,14 @@ where
                         .session,
                     )
                 }
-                e @ _ => {
+                e => {
                     error!("账号 [{}] 的 cookies 加载失败：{e}", account_data.uname());
                     Err(e)?
                 }
             },
         }
     }
+    #[inline]
     pub fn get_session<'cxt, Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>>(
         db: &Database,
         uid: &str,
@@ -266,15 +267,17 @@ where
         let account = Self::get_account_data(&Self::read(&r_cxt)?, uid)?;
         Self::get_session_internal(db, uid, account, cxt)
     }
+    #[inline]
     pub fn load_all_sessions(
         r_cxt: &ReadTransaction,
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
         let account_table = AccountTable::<UserProtocol>::read(r_cxt)?;
         let accounts = Self::get_all_accounts(&account_table);
         Self::loop_collect(r_cxt, accounts, (), |w_cxt, uid, account_data, _| {
-            Self::load_session_internal(w_cxt, &uid, &account_data)
+            Self::load_session_internal(w_cxt, uid, &account_data)
         })
     }
+    #[inline]
     pub fn get_all_sessions<'cxt, Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>>(
         db: &Database,
         cxt: Cxt,
@@ -284,6 +287,7 @@ where
         let accounts = Self::get_all_accounts(&account_table);
         Self::loop_collect(db, accounts, cxt.borrow(), Self::get_session_internal)
     }
+    #[inline]
     fn store_cookies(
         w_cxt: &WriteTransaction,
         cookies: String,
@@ -326,12 +330,11 @@ where
         )?;
         Ok(session)
     }
-    pub fn relogin<'cxt, Cxt: AsRef<<Self as TableDefinitionTrait>::Context<'cxt>>>(
+    fn relogin_internal<'cxt, Cxt: AsRef<<Self as TableDefinitionTrait>::Context<'cxt>>>(
         w_cxt: &WriteTransaction,
         cxt: Cxt,
-        uid: String,
+        account_data: AccountData,
     ) -> Result<Session<UserProtocol>, StoreError> {
-        let account_data = Self::uid_to_account_data(w_cxt, &uid)?;
         let cxt = cxt.as_ref();
         let solver = LoginSolverGetter::new(cxt, account_data.login_type())
             .ok_or_else(|| LoginError::UnsupportedProtocol)?;
@@ -339,10 +342,33 @@ where
         let mut cookies = Cursor::new(Vec::new());
         let uname = account_data.uname();
         let enc_pwd = account_data.enc_pwd();
-        let session = Session::relogin(&uname, &enc_pwd, &mut cookies, &solver)?;
+        let session = Session::relogin(uname, enc_pwd, &mut cookies, &solver)?;
         let cookies_str = String::from_utf8(cookies.into_inner()).unwrap();
         Self::store_cookies(w_cxt, cookies_str, session.uid(), solver.login_type())?;
         Ok(session)
+    }
+    #[inline]
+    pub fn relogin<'cxt, Cxt: AsRef<<Self as TableDefinitionTrait>::Context<'cxt>>>(
+        w_cxt: &WriteTransaction,
+        cxt: Cxt,
+        uid: String,
+    ) -> Result<Session<UserProtocol>, StoreError> {
+        let account_data = Self::uid_to_account_data(w_cxt, &uid)?;
+        Self::relogin_internal(w_cxt, cxt, account_data)
+    }
+    pub fn relogin_all<'cxt, Cxt: AsRef<<Self as TableDefinitionTrait>::Context<'cxt>>>(
+        w_cxt: &WriteTransaction,
+        cxt: Cxt,
+    ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
+        let table = Self::write(w_cxt)?;
+        let account_data = Self::get_all_accounts(&table);
+        drop(table);
+        Self::loop_collect(
+            w_cxt,
+            account_data,
+            &cxt,
+            |w_cxt, _, account_data, cxt| Self::relogin_internal(w_cxt, cxt, account_data),
+        )
     }
 }
 impl<UserProtocol> NormalTableTrait for AccountTable<UserProtocol> {}

@@ -25,7 +25,7 @@ impl CourseTable {
     where
         UserProtocol: UserProtocolTrait + 'static,
     {
-        let sessions = AccountTable::load_all_sessions(&r_cxt)?;
+        let sessions = AccountTable::load_all_sessions(r_cxt)?;
         let course_table = Self::read(r_cxt)?;
         let r = Self::get_courses_with_current_sessions(&course_table, sessions);
         drop(course_table);
