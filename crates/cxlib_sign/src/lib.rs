@@ -32,10 +32,10 @@ pub use error::*;
 /// 签到类型的划分主要依据前人的工作。
 ///
 /// 细节详见各签到的文档。
-pub trait SignTrait<SignProtocol>: Ord {
+pub trait SignTrait: Ord {
     type PreSignData: ?Sized;
     type Data: ?Sized;
-    fn sign_url<U>(
+    fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
@@ -46,7 +46,7 @@ pub trait SignTrait<SignProtocol>: Ord {
     /// 获取各签到类型内部对原始签到类型的引用。
     /// [`RawSign`] 的各字段均为 `pub`,
     /// 故可以通过本函数获取一些签到通用的信息。
-    fn as_inner(&self) -> &RawSign<SignProtocol>;
+    fn as_inner(&self) -> &RawSign;
     /// 判断签到活动是否有效（目前认定两小时内未结束的签到为有效签到）。
     fn is_valid(&self) -> bool {
         let time = std::time::Duration::from_millis(*self.as_inner().start_time_mills());
@@ -58,7 +58,7 @@ pub trait SignTrait<SignProtocol>: Ord {
                 < two_hours
     }
     /// 获取签到后状态。参见返回类型 [`SignState`].
-    fn get_sign_state<U>(&self, session: &Session<U>) -> Result<SignState, SignError>
+    fn get_sign_state<SignProtocol, U>(&self, session: &Session<U>) -> Result<SignState, SignError>
     where
         SignProtocol: SignProtocolTrait,
     {
@@ -95,7 +95,7 @@ pub trait SignTrait<SignProtocol>: Ord {
         }
     }
     /// 预签到。
-    fn pre_sign<CaptchaProtocol, U>(
+    fn pre_sign<CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
@@ -105,7 +105,7 @@ pub trait SignTrait<SignProtocol>: Ord {
         SignProtocol: SignProtocolTrait,
     {
         let _ = pre_sign_data;
-        <RawSign<SignProtocol> as SignTrait<SignProtocol>>::pre_sign::<CaptchaProtocol, _>(
+        <RawSign as SignTrait>::pre_sign::<CaptchaProtocol, SignProtocol, _>(
             self.as_inner(),
             session,
             &(),
@@ -123,7 +123,7 @@ pub trait SignTrait<SignProtocol>: Ord {
     /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
     /// 调用 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 进行判断，如果真，则调用 [`sign_unchecked`](SignTrait::sign_unchecked), 否则返回
     /// [`SignResult::Fail`]{msg: "签到未准备好！".to_string()}
-    fn sign<CaptchaProtocol, U>(
+    fn sign<CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
         pre_sign_url: &str,
@@ -138,7 +138,7 @@ pub trait SignTrait<SignProtocol>: Ord {
     {
         match self.pre_check_data(session, data)? {
             Ok(_) => {
-                let url = self.sign_url(session, pre_sign_data, data);
+                let url = self.sign_url::<SignProtocol, U>(session, pre_sign_data, data);
                 try_secondary_verification::<CaptchaProtocol, SignProtocol, Self>(
                     session,
                     url,
@@ -151,7 +151,7 @@ pub trait SignTrait<SignProtocol>: Ord {
         }
     }
     /// 预签到并签到。
-    fn pre_sign_and_sign<CaptchaProtocol, U>(
+    fn pre_sign_and_sign<CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
@@ -162,13 +162,13 @@ pub trait SignTrait<SignProtocol>: Ord {
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait,
     {
-        let r = self.pre_sign::<CaptchaProtocol, _>(session, pre_sign_data)?;
+        let r = self.pre_sign::<CaptchaProtocol, SignProtocol, U>(session, pre_sign_data)?;
         match r {
             PreSignResult::Susses => Ok(SignResult::Susses),
             PreSignResult::Data {
                 ref url,
                 data: ref pre_sign_result_data,
-            } => self.sign::<CaptchaProtocol, _>(
+            } => self.sign::<CaptchaProtocol, SignProtocol, U>(
                 session,
                 url,
                 pre_sign_result_data,
@@ -180,11 +180,11 @@ pub trait SignTrait<SignProtocol>: Ord {
     }
 }
 
-impl<SignProtocol> SignTrait<SignProtocol> for RawSign<SignProtocol> {
+impl SignTrait for RawSign {
     type PreSignData = ();
     type Data = ();
 
-    fn sign_url<UserProtocol>(
+    fn sign_url<SignProtocol, UserProtocol>(
         &self,
         session: &Session<UserProtocol>,
         _: &(),
@@ -199,10 +199,10 @@ impl<SignProtocol> SignTrait<SignProtocol> for RawSign<SignProtocol> {
         )
     }
 
-    fn as_inner(&self) -> &RawSign<SignProtocol> {
+    fn as_inner(&self) -> &RawSign {
         self
     }
-    fn pre_sign<CaptchaProtocol, U>(
+    fn pre_sign<CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
         _: &(),
@@ -307,7 +307,7 @@ pub struct SignActivityRaw {
 /// 针对同一个签到，但不同 Session 的处理程序。
 pub trait SignnerTrait<T, CaptchaProtocol, SignProtocol>
 where
-    T: SignTrait<SignProtocol>,
+    T: SignTrait,
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
 {

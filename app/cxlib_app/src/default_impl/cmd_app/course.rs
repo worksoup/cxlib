@@ -6,7 +6,7 @@ use clap::{ArgMatches, FromArgMatches, Parser};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::{
     protocol::collect::UserProtocolTrait,
-    types::{Course, CourseInfo, CourseWithInfo, UntypedLoginSolver, ext::CourseExt},
+    types::{Course, CourseInfo, CourseWithInfo, Session, UntypedLoginSolver, ext::CourseExt},
 };
 use redb::Database;
 use std::{
@@ -32,6 +32,36 @@ pub struct CoursesCmdApp<UserProtocol = cxlib_internal::protocol::collect::UserP
     PhantomData<UserProtocol>,
 );
 impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
+    pub fn update_sessions_courses<'a>(
+        db: &Database,
+        sessions: impl Iterator<Item = &'a Session<UserProtocol>>,
+    ) -> Result<HashMap<Course, (CourseInfo, CourseData)>, error::Error>
+    where
+        UserProtocol: UserProtocolTrait + Send + 'static,
+    {
+        // 获取课程信息。
+        let courses = CourseWithInfo::get_from_sessions(sessions)?;
+        let w_cxt = db.begin_write().map_err(StoreError::from)?;
+        let mut course_table = CourseTable::write(&w_cxt)?;
+        let mut updated = HashMap::new();
+        for (course, users) in courses.iter() {
+            let course_data = (
+                course.info().clone(),
+                CourseData::new(
+                    u64::MAX,
+                    users.iter().map(|s| s.uid().to_owned()).collect(),
+                    vec![],
+                ),
+            );
+            let r =
+                CourseTable::merge_course(&mut course_table, course.course(), course_data, false)?;
+            updated.insert(course.course().clone(), r);
+        }
+        drop(course_table);
+        w_cxt.commit().log_unwrap();
+        Ok(updated)
+    }
+    #[inline]
     pub fn update_course_table<Cxt>(
         db: &Database,
         cxt: Cxt,
@@ -40,73 +70,18 @@ impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
         UserProtocol: UserProtocolTrait + Send + 'static,
         Cxt: Borrow<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
     {
-        let r_cxt = db.begin_read().map_err(StoreError::from)?;
-        let course_table = CourseTable::read(&r_cxt)?;
-        let cached_courses = CourseTable::get_courses(&course_table)?;
-        drop(course_table);
         // 列出所有账号的课程，避免 course.uid_list 不完整。
-        let sessions = AccountTable::get_all_sessions(db, cxt);
-        // 获取课程信息。
-        let courses: HashMap<Course, (CourseInfo, CourseData)> =
-            CourseWithInfo::get_from_sessions(sessions?.values())?
-                .into_iter()
-                .map(|(course_with_info, sessions)| {
-                    let old_data = cached_courses.get(&course_with_info);
-                    let users = sessions
-                        .into_iter()
-                        .map(|s| s.uid().to_owned())
-                        .collect::<Vec<_>>();
-                    let (course, info) = course_with_info.unwrap();
-                    if let Some((recently_used_timestamp, locations)) =
-                        old_data.map(|(_, data)| (data.recently_used_timestamp(), data.locations()))
-                    {
-                        (
-                            course,
-                            (
-                                info,
-                                CourseData::new(
-                                    *recently_used_timestamp,
-                                    users,
-                                    locations.cloned().collect(),
-                                ),
-                            ),
-                        )
-                    } else {
-                        (
-                            course,
-                            (
-                                info,
-                                CourseData::new(
-                                    // TODO: 应该是没有问题，但是就是有点别扭。
-                                    // 未出现过的课程时间为 `u64::MAX`.
-                                    u64::MAX,
-                                    users,
-                                    vec![],
-                                ),
-                            ),
-                        )
-                    }
-                })
-                .collect::<HashMap<_, _>>();
-        drop(r_cxt);
-        let w_cxt = db.begin_write().map_err(StoreError::from)?;
-        CourseTable::delete(&w_cxt)?;
-        let mut course_table = CourseTable::write(&w_cxt)?;
-        for (course, (info, data)) in courses.iter() {
-            CourseTable::insert_course(&mut course_table, course, (info.clone(), data.clone()))
-                .log_unwrap();
-        }
-        drop(course_table);
-        w_cxt.commit().log_unwrap();
-        Ok(courses)
+        let sessions = AccountTable::get_all_sessions(db, cxt)?;
+        Self::update_sessions_courses(db, sessions.values())
     }
 }
 impl<U> Default for CoursesCmdApp<U> {
+    #[inline]
     fn default() -> Self {
         Self(Default::default())
     }
 }
-impl<  UserProtocol, Context> AppTrait<Context> for CoursesCmdApp<UserProtocol>
+impl<UserProtocol, Context> AppTrait<Context> for CoursesCmdApp<UserProtocol>
 where
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     Context: AsRef<Database> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,

@@ -33,8 +33,8 @@ impl<UserProtocol> AccountTable<UserProtocol> {
             <Self as TableDefinitionTrait>::Value,
         >,
         uid: &str,
-    ) -> bool {
-        Self::contains_key(table, &uid.to_owned()).unwrap()
+    ) -> Result<bool, StoreError> {
+        Self::contains_key(table, &uid.to_owned())
     }
     pub fn delete_account(w_cxt: &WriteTransaction, uid: &str) {
         let mut w = <Self as NormalTableTrait>::write(w_cxt).log_unwrap();
@@ -182,7 +182,7 @@ where
         >,
         uid: &str,
     ) -> Result<AccountData, StoreError> {
-        if Self::has_account(table, uid) {
+        if Self::has_account(table, uid)? {
             Self::get_account(table, uid).ok_or_else(Self::none2result(format_args!(
                 "没有该账号：`{uid}`，请检查输入或登录。"
             )))
@@ -363,12 +363,9 @@ where
         let table = Self::write(w_cxt)?;
         let account_data = Self::get_all_accounts(&table);
         drop(table);
-        Self::loop_collect(
-            w_cxt,
-            account_data,
-            &cxt,
-            |w_cxt, _, account_data, cxt| Self::relogin_internal(w_cxt, cxt, account_data),
-        )
+        Self::loop_collect(w_cxt, account_data, &cxt, |w_cxt, _, account_data, cxt| {
+            Self::relogin_internal(w_cxt, cxt, account_data)
+        })
     }
 }
 impl<UserProtocol> NormalTableTrait for AccountTable<UserProtocol> {}

@@ -7,25 +7,23 @@ use std::marker::PhantomData;
 
 #[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 #[derive(Serialize)]
-pub struct PhotoSign<SignProtocol, TypesProtocol> {
-    raw_sign: RawSign<SignProtocol>,
+pub struct PhotoSign<TypesProtocol> {
+    raw_sign: RawSign,
     #[serde(skip)]
     _p: PhantomData<TypesProtocol>,
 }
-impl<SignProtocol, TypesProtocol> PhotoSign<SignProtocol, TypesProtocol> {
-    pub fn new(raw_sign: RawSign<SignProtocol>) -> Self {
+impl<TypesProtocol> PhotoSign<TypesProtocol> {
+    pub fn new(raw_sign: RawSign) -> Self {
         Self {
             raw_sign,
             _p: PhantomData,
         }
     }
 }
-impl<SignProtocol, TypesProtocol> SignTrait<SignProtocol>
-    for PhotoSign<SignProtocol, TypesProtocol>
-{
+impl<TypesProtocol> SignTrait for PhotoSign<TypesProtocol> {
     type PreSignData = ();
     type Data = Photo<TypesProtocol>;
-    fn sign_url<U>(
+    fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
         _: &(),
@@ -36,12 +34,12 @@ impl<SignProtocol, TypesProtocol> SignTrait<SignProtocol>
     {
         SignProtocol::photo_sign_url(
             (session.uid(), session.fid(), session.name()),
-            self.as_inner().active_id(),
+            self.raw_sign.active_id(),
             runtime_data.get_object_id(),
         )
     }
 
-    fn as_inner(&self) -> &RawSign<SignProtocol> {
+    fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }
 }

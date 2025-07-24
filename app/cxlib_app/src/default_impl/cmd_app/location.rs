@@ -634,6 +634,7 @@ pub struct LocationCmdApp<
     UserProtocol = cxlib_internal::protocol::collect::UserProtocol,
 >(PhantomData<(TypesProtocol, UserProtocol)>);
 impl<T, U> Default for LocationCmdApp<T, U> {
+    #[inline]
     fn default() -> Self {
         Self(Default::default())
     }

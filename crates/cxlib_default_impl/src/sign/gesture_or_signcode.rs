@@ -3,19 +3,17 @@ use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
 use cxlib_sign::{SignError, SignResult, SignTrait};
 use cxlib_types::Session;
-use derive_where::derive_where;
 use serde::{Deserialize, Serialize};
 
 /// 手势签到。
-#[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-#[derive(Serialize)]
-pub struct GestureOrSigncodeSign<SignProtocol> {
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize)]
+pub struct GestureOrSigncodeSign {
     is_gesture: bool,
-    raw_sign: RawSign<SignProtocol>,
+    raw_sign: RawSign,
 }
 
-impl<SignProtocol> GestureOrSigncodeSign<SignProtocol> {
-    pub fn new(is_gesture: bool, raw_sign: RawSign<SignProtocol>) -> Self {
+impl GestureOrSigncodeSign {
+    pub fn new(is_gesture: bool, raw_sign: RawSign) -> Self {
         Self {
             is_gesture,
             raw_sign,
@@ -32,7 +30,7 @@ impl<SignProtocol> GestureOrSigncodeSign<SignProtocol> {
     /// 4 5 6
     /// 7 8 9
     /// ```
-    pub fn check_signcode<U>(
+    pub fn check_signcode<SignProtocol, U>(
         session: &Session<U>,
         active_id: &str,
         signcode: &str,
@@ -59,11 +57,11 @@ impl<SignProtocol> GestureOrSigncodeSign<SignProtocol> {
     }
 }
 
-impl<SignProtocol> SignTrait<SignProtocol> for GestureOrSigncodeSign<SignProtocol> {
+impl SignTrait for GestureOrSigncodeSign {
     type PreSignData = ();
     type Data = str;
 
-    fn sign_url<U>(
+    fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
         _: &Self::PreSignData,
@@ -74,12 +72,12 @@ impl<SignProtocol> SignTrait<SignProtocol> for GestureOrSigncodeSign<SignProtoco
     {
         SignProtocol::signcode_sign_url(
             (session.uid(), session.fid(), session.name()),
-            self.as_inner().active_id(),
+            self.raw_sign.active_id(),
             data,
         )
     }
 
-    fn as_inner(&self) -> &RawSign<SignProtocol> {
+    fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }
 }

@@ -52,6 +52,7 @@ pub struct DefaultLoginSolver<UserProtocol> {
     _t: PhantomData<UserProtocol>,
 }
 impl<T> Default for DefaultLoginSolver<T> {
+    #[inline]
     fn default() -> Self {
         Self { _t: PhantomData }
     }
@@ -104,10 +105,12 @@ where
 {
     type UserProtocol = UserProtocol;
 
+    #[inline]
     fn login_type(&self) -> &str {
         "default"
     }
 
+    #[inline]
     fn is_logged_in(&self, agent: &Agent) -> bool
     where
         Self::UserProtocol: UserProtocolTrait,

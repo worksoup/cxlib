@@ -1,16 +1,19 @@
+use bincode::{Decode, Encode};
+use serde::{Deserialize, Serialize};
+
 use crate::{CourseWithInfo, RawSign};
 /// # Activity
 ///
 /// 活动类型，是一个枚举，可能是一个[暂未被分类的课程签到](RawSign)，也可能是[其他活动](OtherActivity)，如通知、作业等。
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
-pub enum Activity<SignProtocol> {
-    RawSign(RawSign<SignProtocol>),
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Serialize, Deserialize, Decode, Encode)]
+pub enum Activity {
+    RawSign(RawSign),
     Other(OtherActivity),
 }
 /// # OtherActivity
 ///
 /// 除课程签到外的其他活动，如通知、作业等。
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Decode, Encode, Serialize, Deserialize)]
 pub struct OtherActivity {
     pub id: String,
     pub name: String,
@@ -19,7 +22,7 @@ pub struct OtherActivity {
     pub start_time_mills: u64,
 }
 
-impl<P> Activity<P> {
+impl Activity {
     pub fn course(&self) -> &CourseWithInfo {
         match self {
             Activity::RawSign(a) => a.course(),

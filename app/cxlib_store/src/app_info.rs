@@ -5,6 +5,7 @@ pub struct AppInfo {
     application: &'static str,
 }
 impl Default for AppInfo {
+    #[inline]
     fn default() -> Self {
         Self::DEFAULT_CONFIG_DIR_INFO
     }
@@ -16,6 +17,7 @@ impl AppInfo {
         organization: "Worksoup",
         application: "cxsign",
     };
+    #[inline]
     pub fn new(
         env_arg: &'static str,
         qualifier: &'static str,
@@ -29,15 +31,19 @@ impl AppInfo {
             application,
         }
     }
+    #[inline]
     pub fn env_arg(&self) -> &'static str {
         self.env_arg
     }
+    #[inline]
     pub fn qualifier(&self) -> &'static str {
         self.qualifier
     }
+    #[inline]
     pub fn organization(&self) -> &'static str {
         self.organization
     }
+    #[inline]
     pub fn application(&self) -> &'static str {
         self.application
     }

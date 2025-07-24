@@ -1,13 +1,12 @@
 use crate::{CourseWithInfo, Session, SignDetail};
+use bincode::{Decode, Encode};
 use cxlib_error::AgentError;
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
-use derive_where::derive_where;
 use getset2::Getset2;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
-    marker::PhantomData,
     time::{Duration, SystemTime},
 };
 
@@ -25,18 +24,28 @@ pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
 /// 未分类的课程签到。
 ///
 /// 对于该类型的分类、处理等，请参考 `cxlib_default_impl::sign` 中的相关部分。
-#[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-#[derive(Serialize, Getset2)]
+#[derive(
+    Debug,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Eq,
+    Hash,
+    Clone,
+    Serialize,
+    Deserialize,
+    Getset2,
+    Decode,
+    Encode,
+)]
 #[getset2(get_ref(pub))]
-pub struct RawSign<SignProtocol> {
+pub struct RawSign {
     active_id: String,
     course: CourseWithInfo,
     name: String,
     other_id: String,
     status_code: i32,
     start_time_mills: u64,
-    #[serde(skip)]
-    _p: PhantomData<SignProtocol>,
 }
 fn time_string_from_mills(mills: u64) -> String {
     #[inline]
@@ -48,7 +57,7 @@ fn time_string_from_mills(mills: u64) -> String {
     time_string(std::time::UNIX_EPOCH + Duration::from_millis(mills))
 }
 
-impl<P> Display for RawSign<P> {
+impl Display for RawSign {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name_width = get_width_str_should_be(self.name.as_str(), 12);
         write!(
@@ -65,19 +74,7 @@ impl<P> Display for RawSign<P> {
     }
 }
 
-impl<P> RawSign<P> {
-    pub fn from_other<A>(other: RawSign<A>) -> Self {
-        other.as_other().clone()
-    }
-    pub fn into_other<A>(self) -> RawSign<A> {
-        RawSign::from_other(self)
-    }
-    pub fn as_other<A>(&self) -> &RawSign<A> {
-        unsafe { std::mem::transmute(&self) }
-    }
-    pub fn from_other_ref<A>(other: &RawSign<A>) -> &Self {
-        other.as_other()
-    }
+impl RawSign {
     pub fn new(
         active_id: String,
         course: CourseWithInfo,
@@ -93,7 +90,6 @@ impl<P> RawSign<P> {
             course,
             other_id,
             status_code,
-            _p: Default::default(),
         }
     }
     pub fn fmt_without_course_info(&self) -> String {
@@ -144,7 +140,7 @@ impl<P> RawSign<P> {
         Self::get_sign_detail::<TypesProtocol, UserProtocol>(&self.active_id, session)
     }
 }
-impl<P> RawSign<P> {
+impl RawSign {
     // pub fn speculate_type_by_text(text: &str) -> Sign {
     //     if text.contains("拍照") {
     //         Sign::Photo

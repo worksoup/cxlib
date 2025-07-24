@@ -92,6 +92,7 @@ impl CaptchaType {
     const DEFAULT: CaptchaType = CaptchaType::Rotate;
 }
 impl Default for CaptchaType {
+    #[inline]
     fn default() -> Self {
         Self::DEFAULT
     }
@@ -115,11 +116,13 @@ impl FromStr for CaptchaType {
     }
 }
 impl Display for CaptchaType {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_ref())
     }
 }
 impl AsRef<str> for CaptchaType {
+    #[inline]
     fn as_ref(&self) -> &str {
         match self {
             CaptchaType::Slide => "slide",

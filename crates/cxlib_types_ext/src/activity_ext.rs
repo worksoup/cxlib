@@ -11,17 +11,15 @@ use std::{
     },
 };
 /// 类型别名，代表接收端所接受数据的类型。
-pub type ActivitiesSessionsPair<SignProtocol, UserProtocol> =
-    (Vec<Activity<SignProtocol>>, Vec<Session<UserProtocol>>);
+pub type ActivitiesSessionsPair<UserProtocol> = (Vec<Activity>, Vec<Session<UserProtocol>>);
 /// 接收端本身的类型。
-pub type ActivitiesReceiverInner<SignProtocol, UserProtocol> =
-    Receiver<ActivitiesSessionsPair<SignProtocol, UserProtocol>>;
+pub type ActivitiesReceiverInner<UserProtocol> = Receiver<ActivitiesSessionsPair<UserProtocol>>;
 #[derive(thiserror::Error, Debug)]
-pub enum ActivitiesReceiverError<SignProtocol, UserProtocol> {
+pub enum ActivitiesReceiverError<UserProtocol> {
     #[error(transparent)]
     RecvError(#[from] RecvError),
     #[error(transparent)]
-    SendError(#[from] SendError<ActivitiesSessionsPair<SignProtocol, UserProtocol>>),
+    SendError(#[from] SendError<ActivitiesSessionsPair<UserProtocol>>),
     #[error(transparent)]
     ActivityError(#[from] ActivityError),
 }
@@ -30,23 +28,23 @@ pub enum ActivitiesReceiverError<SignProtocol, UserProtocol> {
 /// 不推荐使用 for 循环迭代元素。
 ///
 /// 请使用 while 循环与 [`ActivitiesReceiver::recv`], 以获取错误信息。
-pub struct ActivitiesReceiver<SignProtocol, UserProtocol> {
-    receiver: ActivitiesReceiverInner<SignProtocol, UserProtocol>,
+pub struct ActivitiesReceiver<UserProtocol> {
+    receiver: ActivitiesReceiverInner<UserProtocol>,
     fatal_error_occurred: Arc<AtomicBool>,
-    fatal_error: Arc<Mutex<Option<ActivitiesReceiverError<SignProtocol, UserProtocol>>>>,
+    fatal_error: Arc<Mutex<Option<ActivitiesReceiverError<UserProtocol>>>>,
 }
-impl<S, T> MaybeFatalError for ActivitiesReceiver<S, T> {
+impl<T> MaybeFatalError for ActivitiesReceiver<T> {
     /// 当前语境下均为不可恢复错误。
     #[inline]
     fn is_fatal(&self) -> bool {
         true
     }
 }
-impl<S, T> ActivitiesReceiver<S, T> {
+impl<T> ActivitiesReceiver<T> {
     /// # Errors
     /// 返回的错误均为当前语境下不可恢复错误。
     #[inline]
-    pub fn recv(&self) -> Result<ActivitiesSessionsPair<S, T>, ActivitiesReceiverError<S, T>> {
+    pub fn recv(&self) -> Result<ActivitiesSessionsPair<T>, ActivitiesReceiverError<T>> {
         if self.fatal_error_occurred.load(Ordering::Relaxed) {
             let mut error = self.fatal_error.lock().unwrap();
             Err(error.deref_mut().take().unwrap())?
@@ -54,27 +52,25 @@ impl<S, T> ActivitiesReceiver<S, T> {
         Ok(self.receiver.recv()?)
     }
 }
-impl<SignProtocol, T> IntoIterator for ActivitiesReceiver<SignProtocol, T> {
-    type Item = (Vec<Activity<SignProtocol>>, Vec<Session<T>>);
-    type IntoIter =
-        <Receiver<(Vec<Activity<SignProtocol>>, Vec<Session<T>>)> as IntoIterator>::IntoIter;
+impl<T> IntoIterator for ActivitiesReceiver<T> {
+    type Item = (Vec<Activity>, Vec<Session<T>>);
+    type IntoIter = <Receiver<(Vec<Activity>, Vec<Session<T>>)> as IntoIterator>::IntoIter;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.receiver.into_iter()
     }
 }
-impl<'a, SignProtocol, T> IntoIterator for &'a ActivitiesReceiver<SignProtocol, T> {
-    type Item = (Vec<Activity<SignProtocol>>, Vec<Session<T>>);
-    type IntoIter =
-        <&'a Receiver<(Vec<Activity<SignProtocol>>, Vec<Session<T>>)> as IntoIterator>::IntoIter;
+impl<'a, T> IntoIterator for &'a ActivitiesReceiver<T> {
+    type Item = (Vec<Activity>, Vec<Session<T>>);
+    type IntoIter = <&'a Receiver<(Vec<Activity>, Vec<Session<T>>)> as IntoIterator>::IntoIter;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.receiver.iter()
     }
 }
-pub trait ActivityExt<SignProtocol> {
+pub trait ActivityExt {
     /// 分块，以便多个线程一同处理。
     #[inline]
     fn courses_chunks<Iter: Iterator>(
@@ -98,10 +94,7 @@ pub trait ActivityExt<SignProtocol> {
         UserProtocol: UserProtocolTrait + Send + 'static,
     >(
         sorted_courses: impl Iterator<Item = (CourseWithInfo, Vec<Session<UserProtocol>>)>,
-    ) -> ActivitiesReceiver<SignProtocol, UserProtocol>
-    where
-        SignProtocol: Send + 'static,
-    {
+    ) -> ActivitiesReceiver<UserProtocol> {
         let (sender, receiver) = std::sync::mpsc::channel();
         let fatal_error_occurred = Arc::new(AtomicBool::new(false));
         let fatal_error = Arc::new(Mutex::new(None));
@@ -122,8 +115,7 @@ pub trait ActivityExt<SignProtocol> {
                     }
                     debug!("加载课程 [{course}] 的签到。");
                     if let Some(session) = sessions.first() {
-                        let activities =
-                            course.get_activities::<SignProtocol, TypesProtocol, _>(session);
+                        let activities = course.get_activities::<TypesProtocol, _>(session);
                         match activities {
                             Ok(activities) => {
                                 // 有活动才发送。
@@ -171,4 +163,4 @@ pub trait ActivityExt<SignProtocol> {
         }
     }
 }
-impl<SignProtocol> ActivityExt<SignProtocol> for Activity<SignProtocol> {}
+impl ActivityExt for Activity {}

@@ -25,8 +25,7 @@ impl DefaultPhotoSignner {
     }
 }
 impl<CaptchaProtocol, SignProtocol, TypesProtocol>
-    SignnerTrait<PhotoSign<SignProtocol, TypesProtocol>, CaptchaProtocol, SignProtocol>
-    for DefaultPhotoSignner
+    SignnerTrait<PhotoSign<TypesProtocol>, CaptchaProtocol, SignProtocol> for DefaultPhotoSignner
 where
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
@@ -36,7 +35,7 @@ where
 
     fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
         &mut self,
-        sign: &PhotoSign<SignProtocol, TypesProtocol>,
+        sign: &PhotoSign<TypesProtocol>,
         sessions: Sessions,
         captcha_solver: &CaptchaSolver,
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
@@ -73,7 +72,7 @@ where
             let index = session_to_index[session];
             if let Some(photo) = pic_map.get(&index).cloned() {
                 let a = <Self as SignnerTrait<
-                    PhotoSign<SignProtocol, TypesProtocol>,
+                    PhotoSign<TypesProtocol>,
                     CaptchaProtocol,
                     SignProtocol,
                 >>::sign_single(sign, session, captcha_solver, &photo)?;
@@ -91,11 +90,16 @@ where
     }
 
     fn sign_single<U>(
-        sign: &PhotoSign<SignProtocol, TypesProtocol>,
+        sign: &PhotoSign<TypesProtocol>,
         session: &Session<U>,
         captcha_solver: &CaptchaSolver,
         photo: &Photo<TypesProtocol>,
     ) -> Result<SignResult, SignError> {
-        sign.pre_sign_and_sign::<CaptchaProtocol, U>(session, &(), captcha_solver, photo)
+        sign.pre_sign_and_sign::<CaptchaProtocol, SignProtocol, U>(
+            session,
+            &(),
+            captcha_solver,
+            photo,
+        )
     }
 }

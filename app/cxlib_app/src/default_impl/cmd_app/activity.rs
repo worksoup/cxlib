@@ -124,7 +124,7 @@ impl SignParser {
         )
     }
     pub fn match_signs<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, T>(
-        raw_sign: RawSign<SignProtocol>,
+        raw_sign: RawSign,
         location_getter: T,
         preprocessor: &impl LocationPreprocessorTrait,
         sessions: &[Session<UserProtocol>],
@@ -141,10 +141,10 @@ impl SignParser {
         let sign_name = raw_sign.name().clone();
         let mut sign = if sessions.is_empty() {
             warn!("无法判断签到[{sign_name}]的签到类型。");
-            Sign::<SignProtocol, TypesProtocol>::Unknown(raw_sign)
+            Sign::<TypesProtocol>::Unknown(raw_sign)
         } else {
             info!("成功判断签到[{sign_name}]的签到类型。");
-            Sign::from_raw(raw_sign, &sessions[0])
+            Sign::from_raw::<SignProtocol, _>(raw_sign, &sessions[0])
         };
         let sign = &mut sign;
         let CliArgs {
@@ -160,26 +160,27 @@ impl SignParser {
         match sign {
             Sign::Photo(ps) => {
                 info!("签到[{sign_name}]为拍照签到。");
-                sign_results = <DefaultPhotoSignner as SignnerTrait<_, CaptchaProtocol, _>>::sign(
-                    &mut DefaultPhotoSignner::new(image),
-                    ps,
-                    sessions,
-                    captcha_solver,
-                )?;
+                sign_results =
+                    <DefaultPhotoSignner as SignnerTrait<_, CaptchaProtocol, SignProtocol>>::sign(
+                        &mut DefaultPhotoSignner::new(image),
+                        ps,
+                        sessions,
+                        captcha_solver,
+                    )?;
             }
             Sign::Normal(ns) => {
                 info!("签到[{sign_name}]为普通签到。");
                 sign_results = <DefaultNormalOrRawSignner as SignnerTrait<
                     _,
                     CaptchaProtocol,
-                    _,
+                    SignProtocol,
                 >>::sign(
                     &mut DefaultNormalOrRawSignner, ns, sessions, captcha_solver
                 )?;
             }
             Sign::QrCode(qs) => {
                 info!("签到[{sign_name}]为二维码签到。");
-                sign_results = SignnerTrait::<_, CaptchaProtocol, _>::sign(
+                sign_results = SignnerTrait::<_, CaptchaProtocol, SignProtocol>::sign(
                     &mut DefaultQrCodeSignner::new(
                         location_getter,
                         location_str,
@@ -205,7 +206,7 @@ impl SignParser {
                     info!("签到[{sign_name}]为签到码签到。");
                 }
                 if let Some(signcode) = signcode {
-                    sign_results = SignnerTrait::<_, CaptchaProtocol, _>::sign(
+                    sign_results = SignnerTrait::<_, CaptchaProtocol, SignProtocol>::sign(
                         &mut DefaultGestureOrSigncodeSignner::new(signcode),
                         goss,
                         sessions,
@@ -225,7 +226,7 @@ impl SignParser {
             }
             Sign::Location(ls) => {
                 info!("签到[{sign_name}]为位置签到。");
-                sign_results = SignnerTrait::<_, CaptchaProtocol, _>::sign(
+                sign_results = SignnerTrait::<_, CaptchaProtocol, SignProtocol>::sign(
                     &mut DefaultLocationSignner::new(location_getter, location_str, preprocessor),
                     ls,
                     sessions,
@@ -234,7 +235,7 @@ impl SignParser {
             }
             Sign::Unknown(us) => {
                 warn!("签到[{}]为无效签到类型！", us.name());
-                sign_results = SignnerTrait::<_, CaptchaProtocol, _>::sign(
+                sign_results = SignnerTrait::<_, CaptchaProtocol, SignProtocol>::sign(
                     &mut DefaultNormalOrRawSignner,
                     us,
                     sessions,
@@ -243,7 +244,10 @@ impl SignParser {
             }
         }
         if !sign_results.is_empty() {
-            info!("签到活动[{}]签到结果：", sign.as_raw().name());
+            info!(
+                "签到活动[{}]签到结果：",
+                sign.as_raw::<SignProtocol>().name()
+            );
             for (session, sign_result) in sign_results {
                 if let SignResult::Fail { msg } = sign_result {
                     warn!("\t用户[{}]签到失败！失败信息：[{:?}]", session.name(), msg);
@@ -328,9 +332,7 @@ impl SignParser {
             .into_iter()
             .map(|(course, (info, _, sessions))| (CourseWithInfo::new(course, info), sessions));
         let activities_receiver = if let Some(limit) = limit {
-            Activity::<SignProtocol>::get_from_courses::<TypesProtocol, UserProtocol>(
-                iter.take(limit),
-            )
+            Activity::get_from_courses::<TypesProtocol, UserProtocol>(iter.take(limit))
         } else {
             Activity::get_from_courses::<TypesProtocol, UserProtocol>(iter)
         };
@@ -388,7 +390,7 @@ impl SignParser {
                         );
                         let names = sessions.iter().map(|s| s.name()).collect::<Vec<_>>();
                         info!("签到者：{names:?}");
-                        Self::match_signs::<CaptchaProtocol, _, TypesProtocol, _, _>(
+                        Self::match_signs::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
                             raw_sign,
                             location_getter,
                             preprocessor,

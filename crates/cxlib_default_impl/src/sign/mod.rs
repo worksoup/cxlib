@@ -4,7 +4,6 @@ mod normal;
 mod photo;
 mod qrcode;
 
-use derive_where::derive_where;
 pub use gesture_or_signcode::*;
 pub use location::*;
 pub use normal::*;
@@ -20,23 +19,23 @@ use std::collections::HashMap;
 pub type CaptchaId = String;
 
 /// 总体的签到类型。是一个枚举，可以通过 [`RawSign::to_sign`] 获取。
-#[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub enum Sign<SignProtocol, TypesProtocol> {
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub enum Sign<TypesProtocol> {
     /// 拍照签到
-    Photo(PhotoSign<SignProtocol, TypesProtocol>),
+    Photo(PhotoSign<TypesProtocol>),
     /// 普通签到
-    Normal(NormalSign<SignProtocol>),
+    Normal(NormalSign),
     /// 二维码签到
-    QrCode(QrCodeSign<SignProtocol>),
+    QrCode(QrCodeSign),
     /// 手势签到或签到码签到
-    GestureOrSigncode(GestureOrSigncodeSign<SignProtocol>),
+    GestureOrSigncode(GestureOrSigncodeSign),
     /// 位置签到
-    Location(LocationSign<SignProtocol>),
+    Location(LocationSign),
     /// 未知
-    Unknown(RawSign<SignProtocol>),
+    Unknown(RawSign),
 }
-impl<SignProtocol, TypesProtocol> Sign<SignProtocol, TypesProtocol> {
-    pub fn detail<UserProtocol>(
+impl<TypesProtocol> Sign<TypesProtocol> {
+    pub fn detail<SignProtocol, UserProtocol>(
         &self,
         session: &Session<UserProtocol>,
     ) -> Result<SignDetail, SignError>
@@ -44,10 +43,12 @@ impl<SignProtocol, TypesProtocol> Sign<SignProtocol, TypesProtocol> {
         TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait,
     {
-        Ok(self.as_raw().get_detail::<TypesProtocol, _>(session)?)
+        Ok(self
+            .as_raw::<SignProtocol>()
+            .get_detail::<TypesProtocol, _>(session)?)
     }
-    pub fn from_raw<UserProtocol>(
-        raw: RawSign<SignProtocol>,
+    pub fn from_raw<SignProtocol, UserProtocol>(
+        raw: RawSign,
         session: &Session<UserProtocol>,
     ) -> Self
     where
@@ -113,7 +114,7 @@ impl<SignProtocol, TypesProtocol> Sign<SignProtocol, TypesProtocol> {
             Sign::Unknown(raw)
         }
     }
-    pub fn as_raw(&self) -> &RawSign<SignProtocol> {
+    pub fn as_raw<SignProtocol>(&self) -> &RawSign {
         match self {
             Sign::Photo(a) => a.as_inner(),
             Sign::Normal(a) => a.as_inner(),

@@ -1,6 +1,7 @@
 //! redb 使用细节。
 
 mod account_table;
+mod activity_table;
 mod alias_table;
 mod common_data_table;
 mod course_table;
@@ -11,6 +12,7 @@ mod location_table;
 mod utils;
 
 pub use account_table::*;
+pub use activity_table::*;
 pub use alias_table::*;
 pub use common_data_table::*;
 pub use course_table::*;

@@ -15,7 +15,9 @@ use std::{
 use ureq::Agent;
 
 /// 课程，包含一个班级信息。
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Decode, Encode)]
+#[derive(
+    Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Decode, Encode,
+)]
 pub struct CourseWithInfo {
     course: Course,
     info: CourseInfo,
@@ -192,13 +194,12 @@ struct GetActivityR {
 impl CourseWithInfo {
     /// 获取该课程的活动。
     pub fn get_activities<
-        SignProtocol: Send + 'static,
         TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait,
     >(
         &self,
         session: &Session<UserProtocol>,
-    ) -> Result<Vec<Activity<SignProtocol>>, ActivityError> {
+    ) -> Result<Vec<Activity>, ActivityError> {
         let r = TypesProtocol::active_list(session, (self.id(), self.class_id()))?;
         let r: GetActivityR = r.into_body().read_json().log_unwrap();
         let activities = Arc::new(Mutex::new(Vec::new()));
@@ -273,7 +274,9 @@ impl Display for CourseWithInfo {
         )
     }
 }
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Decode, Encode)]
+#[derive(
+    Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Decode, Encode,
+)]
 pub struct Course {
     id: i64,
     class_id: i64,
@@ -329,7 +332,9 @@ impl Display for Course {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Decode, Encode)]
+#[derive(
+    Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Decode, Encode,
+)]
 pub struct CourseInfo {
     ended: bool,
     teacher: String,

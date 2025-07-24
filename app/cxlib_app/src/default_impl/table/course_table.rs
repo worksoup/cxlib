@@ -82,6 +82,36 @@ impl CourseTable {
             Err(e) => Err((e.into(), v))?,
         }
     }
+    pub fn merge_course(
+        table: &mut redb::Table<
+            <Self as TableDefinitionTrait>::Key,
+            <Self as TableDefinitionTrait>::Value,
+        >,
+        course: impl Borrow<Course>,
+        course_data: CourseStoreData,
+        update_info: bool,
+    ) -> Result<CourseStoreData, StoreError> {
+        let course_data =
+            if let Some((old_info, old_data)) = Self::get_course(table, course.borrow())? {
+                let (info, data) = course_data;
+                fn merge<T: std::cmp::Eq + std::hash::Hash>(old: Vec<T>, new: Vec<T>) -> Vec<T> {
+                    let mut new = new.into_iter().collect::<HashSet<_>>();
+                    new.extend(old);
+                    new.into_iter().collect()
+                }
+                let users = merge(old_data.users, data.users);
+                let locations = merge(old_data.locations, data.locations);
+
+                (
+                    if update_info { info } else { old_info },
+                    CourseData::new(data.recently_used_timestamp_secs, users, locations),
+                )
+            } else {
+                course_data
+            };
+        Self::insert_course(table, course, course_data.clone()).map_err(|e| (*e).0)?;
+        Ok(course_data)
+    }
     pub fn update_users<'s>(
         db: &Database,
         course: &Course,

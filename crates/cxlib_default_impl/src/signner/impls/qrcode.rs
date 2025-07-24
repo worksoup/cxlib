@@ -50,7 +50,7 @@ impl<
     CaptchaProtocol,
     SignProtocol,
     Preprocessor: LocationPreprocessorTrait,
-> SignnerTrait<QrCodeSign<SignProtocol>, CaptchaProtocol, SignProtocol>
+> SignnerTrait<QrCodeSign, CaptchaProtocol, SignProtocol>
     for DefaultQrCodeSignner<'_, T, Preprocessor>
 where
     CaptchaProtocol: CaptchaProtocolTrait,
@@ -60,7 +60,7 @@ where
 
     fn sign<'a, U, Sessions>(
         &mut self,
-        sign: &QrCodeSign<SignProtocol>,
+        sign: &QrCodeSign,
         sessions: Sessions,
         captcha_solver: &'static CaptchaSolver,
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError>
@@ -68,13 +68,9 @@ where
         U: Send + 'static,
         Sessions: Iterator<Item = &'a Session<U>> + Clone,
     {
-        fn get_locations<
-            SignProtocol,
-            T: LocationInfoGetterTrait,
-            Preprocessor: LocationPreprocessorTrait,
-        >(
+        fn get_locations<T: LocationInfoGetterTrait, Preprocessor: LocationPreprocessorTrait>(
             self_: &DefaultQrCodeSignner<T, Preprocessor>,
-            sign: &QrCodeSign<SignProtocol>,
+            sign: &QrCodeSign,
         ) -> Option<Vec<Geoaddr>> {
             if sign
                 .raw_sign
@@ -109,7 +105,7 @@ where
                 let locations = locations.clone();
                 let h = std::thread::spawn(move || {
                     let a = <Self as SignnerTrait<
-                        QrCodeSign<SignProtocol>,
+                        QrCodeSign,
                         CaptchaProtocol,
                         SignProtocol,
                     >>::sign_single(
@@ -132,13 +128,13 @@ where
             }
         } else {
             for session in sessions {
-                let state = <Self as SignnerTrait<
-                    QrCodeSign<SignProtocol>,
-                    CaptchaProtocol,
-                    SignProtocol,
-                >>::sign_single(
-                    sign, session, captcha_solver, (&enc, locations.clone())
-                )?;
+                let state =
+                    <Self as SignnerTrait<QrCodeSign, CaptchaProtocol, SignProtocol>>::sign_single(
+                        sign,
+                        session,
+                        captcha_solver,
+                        (&enc, locations.clone()),
+                    )?;
                 map.insert(session, state);
             }
         }
@@ -146,20 +142,28 @@ where
     }
 
     fn sign_single<U>(
-        sign: &QrCodeSign<SignProtocol>,
+        sign: &QrCodeSign,
         session: &Session<U>,
         captcha_solver: &CaptchaSolver,
         (enc, locations): (&str, Option<Vec<Geoaddr>>),
     ) -> Result<SignResult, SignError> {
         if let Some(locations) = locations {
-            crate::signner::impls::utils::sign_single_retry::<CaptchaProtocol, _, _, _, _, _, _>(
-                sign,
-                session,
-                (enc, locations),
-                captcha_solver,
-            )
+            crate::signner::impls::utils::sign_single_retry::<
+                CaptchaProtocol,
+                SignProtocol,
+                _,
+                _,
+                _,
+                _,
+                _,
+            >(sign, session, (enc, locations), captcha_solver)
         } else {
-            sign.pre_sign_and_sign::<CaptchaProtocol, _>(session, enc, captcha_solver, &None)
+            sign.pre_sign_and_sign::<CaptchaProtocol, SignProtocol, _>(
+                session,
+                enc,
+                captcha_solver,
+                &None,
+            )
         }
     }
 }
@@ -282,8 +286,8 @@ impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSig
     }
 
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
-    pub fn enc_gen<SignProtocol>(
-        sign: &QrCodeSign<SignProtocol>,
+    pub fn enc_gen(
+        sign: &QrCodeSign,
         path: &Option<PathBuf>,
         enc: &Option<String>,
         precisely: bool,

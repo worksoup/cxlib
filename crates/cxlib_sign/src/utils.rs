@@ -87,7 +87,7 @@ where
     let r = {
         let url = url.with_validate(&url_param);
         let r = url.get(agent)?;
-        RawSign::<S>::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap())
+        RawSign::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap())
     };
     Ok(r)
 }
@@ -100,7 +100,7 @@ pub fn try_secondary_verification<CaptchaProtocol, S, Sign>(
 ) -> Result<SignResult, SignError>
 where
     CaptchaProtocol: CaptchaProtocolTrait,
-    Sign: SignTrait<S> + ?Sized,
+    Sign: SignTrait + ?Sized,
 {
     let r = url.get(agent)?;
     match Sign::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap()) {

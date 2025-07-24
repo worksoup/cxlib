@@ -8,13 +8,8 @@ pub const UNIT: Unit = Unit::__;
 impl Unit {
     const __: Self = RefWrapper(());
 }
-impl Default for Unit {
-    fn default() -> Self {
-        UNIT
-    }
-}
 
-#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq, Default)]
 #[repr(transparent)]
 pub struct RefWrapper<T: ?Sized>(pub T);
 

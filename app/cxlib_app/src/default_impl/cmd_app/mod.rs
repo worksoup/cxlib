@@ -182,9 +182,9 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
         }
         .map(|l| l.to_location(preprocessor))
     }
-    fn get_fallback_location<SignProtocol>(
+    fn get_fallback_location(
         &self,
-        sign: &LocationSign<SignProtocol>,
+        sign: &LocationSign,
         preprocessor: &impl LocationPreprocessorTrait,
     ) -> Option<Geoaddr> {
         let r_cxt = self.0.begin_read().ok()?;

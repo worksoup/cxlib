@@ -8,7 +8,7 @@ use std::collections::HashMap;
 pub struct DefaultNormalOrRawSignner;
 
 fn sign_single_<CaptchaProtocol, SignProtocol, U>(
-    sign: &RawSign<SignProtocol>,
+    sign: &RawSign,
     session: &Session<U>,
     captcha_solver: &CaptchaSolver,
 ) -> Result<SignResult, SignError>
@@ -16,10 +16,10 @@ where
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
 {
-    sign.pre_sign_and_sign::<CaptchaProtocol, U>(session, &(), captcha_solver, &())
+    sign.pre_sign_and_sign::<CaptchaProtocol, SignProtocol, U>(session, &(), captcha_solver, &())
 }
 fn sign_<'a, CaptchaProtocol, SignProtocol, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
-    sign: &RawSign<SignProtocol>,
+    sign: &RawSign,
     sessions: Sessions,
     captcha_solver: &CaptchaSolver,
 ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError>
@@ -36,8 +36,7 @@ where
     Ok(map)
 }
 
-impl<CaptchaProtocol, SignProtocol>
-    SignnerTrait<NormalSign<SignProtocol>, CaptchaProtocol, SignProtocol>
+impl<CaptchaProtocol, SignProtocol> SignnerTrait<NormalSign, CaptchaProtocol, SignProtocol>
     for DefaultNormalOrRawSignner
 where
     CaptchaProtocol: CaptchaProtocolTrait,
@@ -47,7 +46,7 @@ where
 
     fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
         &mut self,
-        sign: &NormalSign<SignProtocol>,
+        sign: &NormalSign,
         sessions: Sessions,
         captcha_solver: &CaptchaSolver,
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
@@ -60,7 +59,7 @@ where
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single<U>(
-        sign: &NormalSign<SignProtocol>,
+        sign: &NormalSign,
         session: &Session<U>,
         captcha_solver: &CaptchaSolver,
         _: Self::ExtData<'_>,
@@ -69,8 +68,8 @@ where
     }
 }
 
-impl<CaptchaProtocol, SignProtocol>
-    SignnerTrait<RawSign<SignProtocol>, CaptchaProtocol, SignProtocol> for DefaultNormalOrRawSignner
+impl<CaptchaProtocol, SignProtocol> SignnerTrait<RawSign, CaptchaProtocol, SignProtocol>
+    for DefaultNormalOrRawSignner
 where
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
@@ -79,7 +78,7 @@ where
 
     fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
         &mut self,
-        sign: &RawSign<SignProtocol>,
+        sign: &RawSign,
         sessions: Sessions,
         captcha_solver: &CaptchaSolver,
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
@@ -88,7 +87,7 @@ where
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
     fn sign_single<U>(
-        sign: &RawSign<SignProtocol>,
+        sign: &RawSign,
         session: &Session<U>,
         captcha_solver: &CaptchaSolver,
         _: Self::ExtData<'_>,

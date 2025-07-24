@@ -12,14 +12,14 @@ pub trait LocationInfoGetterTrait {
         location_str: &str,
         preprocessor: &impl LocationPreprocessorTrait,
     ) -> Option<Geoaddr>;
-    fn get_fallback_location<SignProtocol>(
+    fn get_fallback_location(
         &self,
-        sign: &LocationSign<SignProtocol>,
+        sign: &LocationSign,
         preprocessor: &impl LocationPreprocessorTrait,
     ) -> Option<Geoaddr>;
-    fn get_locations<SignProtocol>(
+    fn get_locations(
         &self,
-        sign: &LocationSign<SignProtocol>,
+        sign: &LocationSign,
         location_str: &Option<String>,
         location_preprocessor: &impl LocationPreprocessorTrait,
     ) -> Vec<Geoaddr> {

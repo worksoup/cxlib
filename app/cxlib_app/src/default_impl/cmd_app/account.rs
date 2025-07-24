@@ -38,6 +38,7 @@ pub struct AccountCmdApp<UserProtocol = cxlib_internal::protocol::collect::UserP
     PhantomData<UserProtocol>,
 );
 impl<U> Default for AccountCmdApp<U> {
+    #[inline]
     fn default() -> Self {
         Self(Default::default())
     }

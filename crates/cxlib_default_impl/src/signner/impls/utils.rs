@@ -8,8 +8,8 @@ use cxlib_types::{Geoaddr, Session};
 use log::warn;
 use std::borrow::Borrow;
 
-pub(crate) trait SignRetry<I, O: Borrow<<Self as SignTrait<SignProtocol>>::Data>, SignProtocol>:
-    SignTrait<SignProtocol>
+pub(crate) trait SignRetry<I, O: Borrow<<Self as SignTrait>::Data>, SignProtocol>:
+    SignTrait
 {
     fn guess_if_retry(msg: &str) -> bool {
         msg.contains("位置")
@@ -19,18 +19,18 @@ pub(crate) trait SignRetry<I, O: Borrow<<Self as SignTrait<SignProtocol>>::Data>
     }
     fn data_helper(data: I) -> O;
 }
-impl<SignProtocol> SignRetry<Geoaddr, <Self as SignTrait<SignProtocol>>::Data, SignProtocol>
-    for QrCodeSign<SignProtocol>
+impl<SignProtocol> SignRetry<Geoaddr, <Self as SignTrait>::Data, SignProtocol>
+    for QrCodeSign
 {
-    fn data_helper(data: Geoaddr) -> <Self as SignTrait<SignProtocol>>::Data {
+    fn data_helper(data: Geoaddr) -> <Self as SignTrait>::Data {
         Some(data)
     }
 }
 impl<'a, SignProtocol>
-    SignRetry<&'a Geoaddr, &'a <Self as SignTrait<SignProtocol>>::Data, SignProtocol>
-    for LocationSign<SignProtocol>
+    SignRetry<&'a Geoaddr, &'a <Self as SignTrait>::Data, SignProtocol>
+    for LocationSign
 {
-    fn data_helper(data: &'a Geoaddr) -> &'a <Self as SignTrait<SignProtocol>>::Data {
+    fn data_helper(data: &'a Geoaddr) -> &'a <Self as SignTrait>::Data {
         data
     }
 }
@@ -47,19 +47,19 @@ pub(crate) fn sign_single_retry<
     sign: &Sign,
     session: &Session<U>,
     (pre_sign_data, locations): (
-        &<Sign as SignTrait<SignProtocol>>::PreSignData,
+        &<Sign as SignTrait>::PreSignData,
         InputDataIter,
     ),
     captcha_solver: &CaptchaSolver,
 ) -> Result<SignResult, SignError>
 where
     SignProtocol: SignProtocolTrait,
-    Sign: SignTrait<SignProtocol> + SignRetry<InputData, Data, SignProtocol>,
-    Data: Borrow<<Sign as SignTrait<SignProtocol>>::Data>,
+    Sign: SignTrait + SignRetry<InputData, Data, SignProtocol>,
+    Data: Borrow<<Sign as SignTrait>::Data>,
     InputDataIter: IntoIterator<Item = InputData>,
     CaptchaProtocol: CaptchaProtocolTrait,
 {
-    let r = sign.pre_sign::<CaptchaProtocol, U>(session, pre_sign_data)?;
+    let r = sign.pre_sign::<CaptchaProtocol, SignProtocol, U>(session, pre_sign_data)?;
     match r {
         PreSignResult::Susses => Ok(SignResult::Susses),
         PreSignResult::Data {
@@ -67,7 +67,7 @@ where
             data: ref pre_sign_result_data,
         } => {
             for location in locations {
-                match sign.sign::<CaptchaProtocol, U>(
+                match sign.sign::<CaptchaProtocol, SignProtocol, U>(
                     session,
                     url,
                     pre_sign_result_data,
