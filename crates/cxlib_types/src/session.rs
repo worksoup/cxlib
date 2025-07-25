@@ -73,11 +73,15 @@ where
     UserProtocol: UserProtocolTrait,
 {
     #[inline]
-    pub fn from_raw(uname: String, agent: Agent, cookies: UserCookies) -> Result<Self, LoginError> {
-        let stu_name = DefaultLoginSolver::<UserProtocol>::find_stu_name_in_html(&agent)?;
+    pub fn from_raw(
+        uname: String,
+        stu_name: String,
+        agent: Agent,
+        cookies: UserCookies,
+    ) -> Result<Self, LoginError> {
         let session = Self {
             agent,
-            uname: uname.to_string(),
+            uname,
             stu_name,
             cookies,
             _p: Default::default(),
@@ -86,10 +90,14 @@ where
     }
     /// 加载本地 Cookies 并返回 [`Session`].
     #[inline]
-    pub fn load_cookies<R: std::io::BufRead>(uname: &str, r: R) -> Result<Self, LoginError> {
+    pub fn load_cookies<R: std::io::BufRead>(
+        uname: String,
+        stu_name: String,
+        r: R,
+    ) -> Result<Self, LoginError> {
         let agent = Self::load_cookies_raw(r)?;
         let cookies = UserCookies::new(&agent);
-        let session = Self::from_raw(uname.to_string(), agent, cookies)?;
+        let session = Self::from_raw(uname, stu_name, agent, cookies)?;
         info!("用户[{}]加载 Cookies 成功！", session.name());
         Ok(session)
     }
@@ -102,11 +110,12 @@ where
     pub fn load_cookies_or_relogin<R: std::io::BufRead, W: std::io::Write>(
         enc_passwd: &str,
         uname: &str,
+        stu_name: String,
         r: R,
         w: &mut W,
         login_solver: &UntypedLoginSolver<UserProtocol>,
     ) -> Result<Self, LoginError> {
-        match Self::load_cookies(uname, r) {
+        match Self::load_cookies(uname.to_owned(), stu_name, r) {
             Ok(s) => Ok(s),
             Err(e) => match e {
                 LoginError::LoginExpired(_) => Self::relogin(uname, enc_passwd, w, login_solver),
@@ -130,7 +139,8 @@ where
     ) -> Result<Self, LoginError> {
         let (agent, cookies) = Self::relogin_raw(uname, enc_pwd, login_solver)?;
         Self::store_cookies(&agent, writer)?;
-        let session = Self::from_raw(uname.to_string(), agent, cookies)?;
+        let stu_name = DefaultLoginSolver::<UserProtocol>::find_stu_name_in_html(&agent)?;
+        let session = Self::from_raw(uname.to_string(), stu_name, agent, cookies)?;
         info!("用户[{}]登录成功！", session.name());
         Ok(session)
     }

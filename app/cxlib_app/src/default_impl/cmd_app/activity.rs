@@ -98,6 +98,9 @@ pub struct SignParser {
     /// 处理或列出所有签到（包括无效签到）。
     #[arg(short, long)]
     all: bool,
+    #[arg(short, long)]
+    /// 刷新
+    fresh: bool,
 }
 
 impl SignParser {
@@ -293,6 +296,7 @@ impl SignParser {
             list,
             course,
             all,
+            fresh,
         } = self;
         let arg = CliArgs {
             location_str: location,
@@ -370,7 +374,6 @@ impl SignParser {
             let mut have = false;
             for (raw_signs, sessions) in signs {
                 for raw_sign in raw_signs {
-                    // 相信分支预测。
                     if (all || raw_sign.is_valid())
                         && active_id.is_none_or(|id| (*raw_sign.active_id()) == id.to_string())
                     {

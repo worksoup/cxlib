@@ -209,7 +209,8 @@ where
             )))?
             .value();
         Ok(Session::<UserProtocol>::load_cookies(
-            account_data.uname(),
+            account_data.uname().to_owned(),
+            account_data.stu_name().to_owned(),
             Cursor::new(cookies),
         )?)
     }
@@ -326,7 +327,12 @@ where
         Self::add_account(
             w_cxt,
             session.uid(),
-            &AccountData::new(uname, enc_pwd, login_solver.login_type().to_owned()),
+            &AccountData::new(
+                uname,
+                session.name().to_owned(),
+                enc_pwd,
+                login_solver.login_type().to_owned(),
+            ),
         )?;
         Ok(session)
     }

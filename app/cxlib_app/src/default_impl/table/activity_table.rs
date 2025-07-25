@@ -1,17 +1,12 @@
 use crate::{BinCode, ImportExportTrait, NormalTableTrait, StoreError, TableDefinitionTrait};
-use bincode::{Decode, Encode};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::types::Activity;
 use log::warn;
 use redb::{Database, ReadTransaction, ReadableTable, WriteTransaction};
-use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, collections::HashMap};
-#[derive(
-    Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Decode, Encode,
-)]
 pub struct ActivityTable;
 impl ActivityTable {
-    pub fn iter(r_cxt: &ReadTransaction) -> Result<HashMap<String, Activity>, StoreError> {
+    pub fn iter(r_cxt: &ReadTransaction) -> Result<HashMap<Activity, Vec<String>>, StoreError> {
         let r = Self::read(r_cxt)?;
         let mut result = HashMap::new();
         for data in r.iter()? {
@@ -22,8 +17,8 @@ impl ActivityTable {
     }
     pub fn get(
         r_cxt: &ReadTransaction,
-        key: impl Borrow<String>,
-    ) -> Result<Option<Activity>, StoreError> {
+        key: impl Borrow<Activity>,
+    ) -> Result<Option<Vec<String>>, StoreError> {
         let r = Self::read(r_cxt)?;
         let Some(r) = r.get(key)? else {
             return Ok(None);
@@ -32,8 +27,8 @@ impl ActivityTable {
     }
     pub fn remove(
         w_cxt: &WriteTransaction,
-        key: impl Borrow<String>,
-    ) -> Result<Option<Activity>, StoreError> {
+        key: impl Borrow<Activity>,
+    ) -> Result<Option<Vec<String>>, StoreError> {
         let mut w = Self::write(w_cxt)?;
         let Some(r) = w.remove(key)? else {
             return Ok(None);
@@ -42,9 +37,9 @@ impl ActivityTable {
     }
     pub fn insert(
         w_cxt: &WriteTransaction,
-        key: impl Borrow<String>,
-        value: impl Borrow<Activity>,
-    ) -> Result<Option<Activity>, StoreError> {
+        key: impl Borrow<Activity>,
+        value: impl Borrow<Vec<String>>,
+    ) -> Result<Option<Vec<String>>, StoreError> {
         let mut w = Self::write(w_cxt)?;
         let Some(r) = w.insert(key, value)? else {
             return Ok(None);
@@ -54,7 +49,7 @@ impl ActivityTable {
 }
 impl ImportExportTrait for ActivityTable {
     fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, _: Cxt, data: &str) {
-        let data = toml::from_str::<HashMap<String, Activity>>(data).log_unwrap();
+        let data = toml::from_str::<HashMap<Activity, Vec<String>>>(data).log_unwrap();
         let w_cxt = db.begin_write().log_unwrap();
         for (key, value) in data {
             match Self::insert(&w_cxt, key, value) {
@@ -82,8 +77,8 @@ impl ImportExportTrait for ActivityTable {
 }
 impl NormalTableTrait for ActivityTable {}
 impl TableDefinitionTrait for ActivityTable {
-    type Key = String;
-    type Value = BinCode<Activity>;
+    type Key = BinCode<Activity>;
+    type Value = BinCode<Vec<String>>;
     type Context<'cxt> = ();
     const NAME: &'static str = "activity";
 }
