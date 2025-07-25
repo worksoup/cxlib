@@ -24,7 +24,7 @@ use cxlib_internal::{
 };
 use cxlib_store::AppInfo;
 use log::{debug, error, info, warn};
-use redb::Database;
+use redb::{Database, WriteTransaction};
 use ref_wrapper::Unit;
 use std::{collections::HashMap, marker::PhantomData, path::PathBuf, time::Duration};
 
@@ -262,7 +262,7 @@ impl SignParser {
         }
         Ok(())
     }
-    pub fn do_sign<
+    pub fn get_sign_and_do_sign<
         CaptchaProtocol,
         SignProtocol,
         TypesProtocol,
@@ -273,8 +273,7 @@ impl SignParser {
     >(
         self,
         cxt: &Cxt,
-        location_getter: LocationGetter,
-        preprocessor: &impl LocationPreprocessorTrait,
+        location_cxt: (LocationGetter, &impl LocationPreprocessorTrait),
         captcha_solver: &'static CaptchaSolver,
     ) -> Result<(), Error>
     where
@@ -285,7 +284,7 @@ impl SignParser {
         Cxt: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Database>,
         LocationGetter: LocationInfoGetterTrait + Copy,
     {
-        let db = cxt.as_ref();
+        let mut db_g = DatabaseGuard::new(cxt.as_ref());
         let Self {
             id: active_id,
             uid: uid_list_str,
@@ -308,153 +307,209 @@ impl SignParser {
         let has_uid_arg = uid_list_str.is_some();
         let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
         let sessions = if let Some(uid_list_str) = &uid_list_str {
-            AccountTable::get_sessions_by_uid_list_str(db, uid_list_str, login_solvers)?
+            AccountTable::get_sessions_by_uid_list_str(&db_g, uid_list_str, login_solvers)?
         } else {
-            AccountTable::get_all_sessions(db, login_solvers)?
+            AccountTable::get_all_sessions(&db_g, login_solvers)?
         };
-        let mut courses = CoursesCmdApp::update_course_table(db, login_solvers)?;
-        let courses = if let Some(course) = course {
-            Some((course.clone(), courses.remove(&course).unwrap()))
-                .into_iter()
-                .collect()
-        } else {
-            courses
-        };
-        let mut courses =
-            CourseTable::courses_to_course_sessions_map_with_current_sessions(courses, sessions)
-                .filter(|(course, (info, data, _))| T::filter((course, info, data)))
-                .collect::<Vec<_>>();
-        courses.sort_by(
-            |(a_course, (a_info, a_data, _)), (b_course, (b_info, b_data, _))| {
-                T::sorter((a_course, a_info, a_data), (b_course, b_info, b_data))
-            },
-        );
-        {
-            let debug_courses = courses.iter().map(|(a, _b)| a).collect::<Vec<_>>();
-            debug!("{debug_courses:?}");
-        }
-        let iter = courses
-            .into_iter()
-            .map(|(course, (info, _, sessions))| (CourseWithInfo::new(course, info), sessions));
-        let activities_receiver = if let Some(limit) = limit {
-            Activity::get_from_courses::<TypesProtocol, UserProtocol>(iter.take(limit))
-        } else {
-            Activity::get_from_courses::<TypesProtocol, UserProtocol>(iter)
-        };
-        let signs = activities_receiver.into_iter().map(|(a, s)| {
-            let max = a.iter().max_by_key(|a| a.start_time_mills()).unwrap();
-
-            CourseTable::update_recently_used_time(db, max.course(), max.start_time_mills());
-            (
-                a.into_iter().filter_map(|a| match a {
-                    Activity::RawSign(k) => Some(k),
-                    Activity::Other(_) => None,
-                }),
-                s,
+        if fresh {
+            let mut courses = CourseTable::courses_to_course_sessions_map_with_current_sessions(
+                CoursesCmdApp::update_sessions_courses(&db_g, sessions.values())?,
+                &sessions,
             )
-        });
-        if list {
-            if let Some(active_id) = active_id {
-                warn!("将忽略活动 ID 参数（{active_id}）。")
+            .collect::<HashMap<_, _>>();
+            let courses = if let Some(course) = course {
+                vec![(course.clone(), courses.remove(&course).unwrap())]
+            } else {
+                let mut courses = courses
+                    .into_iter()
+                    .filter(|(course, (info, data, _))| T::filter((course, info, data)))
+                    .collect::<Vec<_>>();
+                courses.sort_by(
+                    |(a_course, (a_info, a_data, _)), (b_course, (b_info, b_data, _))| {
+                        T::sorter((a_course, a_info, a_data), (b_course, b_info, b_data))
+                    },
+                );
+                courses
+            };
+            #[cfg(debug_assertions)]
+            {
+                let debug_courses = courses.iter().map(|(a, _b)| a).collect::<Vec<_>>();
+                debug!("{debug_courses:?}");
             }
-            let signs = signs.flat_map(|(activities, sessions)| {
-                activities.map(move |a| {
-                    let s = sessions
-                        .iter()
-                        .map(|s| s.name().to_owned())
-                        .collect::<Vec<_>>();
-                    (a, s)
-                })
-            });
-            for (sign, names) in signs {
-                if all || sign.is_valid() {
-                    println!("{names:?}:{sign}");
-                }
-            }
-        } else {
-            let mut have = false;
-            for (raw_signs, sessions) in signs {
-                for raw_sign in raw_signs {
-                    if (all || raw_sign.is_valid())
-                        && active_id.is_none_or(|id| (*raw_sign.active_id()) == id.to_string())
-                    {
-                        have = true;
-                        info!(
-                            "即将处理签到：[{}], id 为 {}, 开始时间为 {}, 课程为 {} / {} / {}",
-                            raw_sign.name(),
-                            raw_sign.active_id(),
-                            chrono::DateTime::<chrono::Local>::from(
-                                std::time::UNIX_EPOCH
-                                    + Duration::from_millis(*raw_sign.start_time_mills())
-                            )
-                            .format("%+"),
-                            raw_sign.course().class_id(),
-                            raw_sign.course().id(),
-                            raw_sign.course().name()
-                        );
-                        let names = sessions.iter().map(|s| s.name()).collect::<Vec<_>>();
-                        info!("签到者：{names:?}");
-                        Self::match_signs::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
-                            raw_sign,
-                            location_getter,
-                            preprocessor,
-                            &sessions,
-                            captcha_solver,
-                            &arg,
-                        )
-                        .unwrap_or_else(|e| warn!("{e}"));
-                    }
-                }
-            }
-            if !have {
-                if active_id.is_some() {
-                    if has_uid_arg {
-                        panic!(
-                            "没有该签到活动！请检查签到活动 ID 是否正确或所指定的账号是否存在该签到活动！"
-                        );
-                    } else {
-                        panic!("没有该签到活动！请检查签到活动 ID 是否正确！");
-                    }
+            let iter = courses
+                .into_iter()
+                .map(|(course, (info, _, sessions))| (CourseWithInfo::new(course, info), sessions))
+                .take(limit.unwrap_or(usize::MAX));
+            db_g.write(|w_cxt| {
+                let activities = Self::get_activities::<TypesProtocol, _>(w_cxt, iter)?.flat_map(
+                    |(activities, users)| {
+                        activities
+                            .into_iter()
+                            .map(move |activity| (activity, users.clone()))
+                    },
+                );
+
+                if list {
+                    Self::display_activities(all, active_id, activities);
                 } else {
-                    warn!("签到列表为空。");
+                    Self::do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
+                        all,
+                        active_id,
+                        has_uid_arg,
+                        location_cxt,
+                        captcha_solver,
+                        &arg,
+                        activities,
+                    );
                 }
+                Ok::<_, StoreError>(())
+            })?;
+        } else {
+            let activities = Self::get_cached_activities(cxt, sessions.values())?;
+            let activities = if let Some(course) = course {
+                activities
+                    .into_iter()
+                    .filter(|(_, (actiity, _))| actiity.course().course().eq(&course))
+                    .collect()
+            } else {
+                activities
             }
-        }
+            .into_values();
+            if list {
+                Self::display_activities(all, active_id, activities);
+            } else {
+                Self::do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
+                    all,
+                    active_id,
+                    has_uid_arg,
+                    location_cxt,
+                    captcha_solver,
+                    &arg,
+                    activities,
+                );
+            }
+        };
         Ok(())
     }
-    pub fn update_activity_table<Cxt, TypesProtocol: TypesProtocolTrait, UserProtocol>(
-        cxt: Cxt,
+    pub fn do_sign<
+        CaptchaProtocol: CaptchaProtocolTrait,
+        SignProtocol: SignProtocolTrait + std::marker::Send + 'static,
+        TypesProtocol: TypesProtocolTrait + 'static,
+        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
+        LocationGetter: LocationInfoGetterTrait + Copy,
+    >(
+        all: bool,
+        active_id: Option<i64>,
+        has_uid_arg: bool,
+        (location_getter, preprocessor): (LocationGetter, &impl LocationPreprocessorTrait),
+        captcha_solver: &'static CaptchaSolver,
+        cli_args: &CliArgs,
+        activities: impl IntoIterator<Item = (Activity, Vec<Session<UserProtocol>>)>,
+    ) {
+        let signs = activities.into_iter().filter_map(|(activity, sessions)| {
+            if let Activity::RawSign(raw_sign) = activity
+                && (all || raw_sign.is_valid())
+                && active_id.is_none_or(|id| (*raw_sign.active_id()) == id.to_string())
+            {
+                Some((raw_sign, sessions))
+            } else {
+                None
+            }
+        });
+        let mut have = false;
+        for (raw_sign, sessions) in signs {
+            have = true;
+            info!(
+                "即将处理签到：[{}], id 为 {}, 开始时间为 {}, 课程为 {} / {} / {}",
+                raw_sign.name(),
+                raw_sign.active_id(),
+                chrono::DateTime::<chrono::Local>::from(
+                    std::time::UNIX_EPOCH + Duration::from_millis(*raw_sign.start_time_mills())
+                )
+                .format("%+"),
+                raw_sign.course().class_id(),
+                raw_sign.course().id(),
+                raw_sign.course().name()
+            );
+            let names = sessions.iter().map(|s| s.name()).collect::<Vec<_>>();
+            info!("签到者：{names:?}");
+            Self::match_signs::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
+                raw_sign,
+                location_getter,
+                preprocessor,
+                &sessions,
+                captcha_solver,
+                cli_args,
+            )
+            .unwrap_or_else(|e| warn!("{e}"));
+        }
+        if !have {
+            if active_id.is_some() {
+                if has_uid_arg {
+                    panic!(
+                        "没有该签到活动！请检查签到活动 ID 是否正确或所指定的账号是否存在该签到活动！"
+                    );
+                } else {
+                    panic!("没有该签到活动！请检查签到活动 ID 是否正确！");
+                }
+            } else {
+                warn!("签到列表为空。");
+            }
+        }
+    }
+    pub fn display_activities<UserProtocol>(
+        all: bool,
+        active_id: Option<i64>,
+        activities: impl IntoIterator<Item = (Activity, Vec<Session<UserProtocol>>)>,
+    ) {
+        if let Some(active_id) = active_id {
+            warn!("将忽略活动 ID 参数（{active_id}）。")
+        }
+        let signs = activities
+            .into_iter()
+            .filter_map(|(activity, sessions)| match activity {
+                Activity::RawSign(raw_sign) => Some((
+                    raw_sign,
+                    sessions
+                        .into_iter()
+                        .map(|s| s.name().to_owned())
+                        .collect::<Vec<_>>(),
+                )),
+                Activity::Other(_) => None,
+            });
+        for (sign, names) in signs {
+            if all || sign.is_valid() {
+                println!("{names:?}:{sign}");
+            }
+        }
+    }
+    pub fn update_activity_table<TypesProtocol: TypesProtocolTrait, UserProtocol>(
+        w_cxt: &WriteTransaction,
         courses: impl IntoIterator<Item = (CourseWithInfo, Vec<Session<UserProtocol>>)>,
-    ) -> Result<CachedActivitiesResult<UserProtocol>, Error>
+    ) -> Result<impl Iterator<Item = (Vec<Activity>, Vec<Session<UserProtocol>>)>, StoreError>
     where
-        Cxt: AsRef<Database>,
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     {
-        let mut database_guard = DatabaseGuard::new(cxt.as_ref());
         let receiver =
             Activity::get_from_courses::<TypesProtocol, UserProtocol>(courses.into_iter());
-        let r = database_guard
-            .write(|w_cxt| {
-                let mut table = ActivityTable::write(w_cxt)?;
-                let mut r = HashMap::new();
-                for (activities, users) in receiver.into_iter() {
-                    let users_str = users.iter().map(|s| s.uid().to_owned()).collect::<Vec<_>>();
-                    for activity in activities {
-                        debug!("活动：{activity:?}");
-                        let key = activity.id().to_owned();
-                        let (activity, _) =
-                            ActivityTable::merge(&mut table, &key, (activity, users_str.clone()))?;
-                        r.insert(key, (activity, users.clone()));
-                    }
+        let r = receiver.into_iter().map(move |(activities, users)| {
+            let users_str = users.iter().map(|s| s.uid().to_owned()).collect::<Vec<_>>();
+            for activity in &activities {
+                debug!("活动：{activity:?}");
+                let key = activity.id().to_owned();
+                if let Err(e) =
+                    ActivityTable::merge(w_cxt, &key, (activity.clone(), users_str.clone()))
+                {
+                    warn!("`{e}`");
                 }
-                Ok::<_, StoreError>(r)
-            })?
-            .into_inner();
+            }
+            (activities, users.clone())
+        });
         Ok(r)
     }
-    pub fn list_cached_activities<Cxt, UserProtocol>(
+    pub fn get_cached_activities<'a, Cxt, UserProtocol: 'a>(
         cxt: Cxt,
-        sessions: impl IntoIterator<Item = Session<UserProtocol>>,
+        sessions: impl IntoIterator<Item = &'a Session<UserProtocol>>,
     ) -> Result<CachedActivitiesResult<UserProtocol>, Error>
     where
         Cxt: AsRef<Database>,
@@ -473,7 +528,7 @@ impl SignParser {
                         let sessions = users
                             .into_iter()
                             .filter_map(|uid| sessions.get(uid.as_str()))
-                            .cloned()
+                            .map(|s| (*s).clone())
                             .collect::<Vec<_>>();
                         (key, (activity, sessions))
                     })
@@ -483,15 +538,14 @@ impl SignParser {
             .into_inner())
     }
     #[inline]
-    pub fn list_activities<Cxt, TypesProtocol: TypesProtocolTrait, UserProtocol>(
-        cxt: Cxt,
+    pub fn get_activities<TypesProtocol: TypesProtocolTrait, UserProtocol>(
+        w_cxt: &WriteTransaction,
         courses: impl IntoIterator<Item = (CourseWithInfo, Vec<Session<UserProtocol>>)>,
-    ) -> Result<CachedActivitiesResult<UserProtocol>, Error>
+    ) -> Result<impl Iterator<Item = (Vec<Activity>, Vec<Session<UserProtocol>>)>, StoreError>
     where
-        Cxt: AsRef<Database>,
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     {
-        Self::update_activity_table::<_, TypesProtocol, _>(cxt, courses)
+        Self::update_activity_table::<TypesProtocol, _>(w_cxt, courses)
     }
 }
 pub struct SignMainApp<
@@ -535,12 +589,15 @@ where
 {
     type OwnedData = SignParser;
 
+    #[inline]
     fn run(&self, cxt: &Context, data: Self::OwnedData) {
         warn!("{}", SignParser::notice_content(cxt.as_ref()));
-        data.do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _, _, T>(
+        data.get_sign_and_do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _, _, T>(
             cxt,
-            DefaultLocationInfoGetter::from(cxt.as_ref()),
-            AsRef::<Preprocessor>::as_ref(&cxt),
+            (
+                DefaultLocationInfoGetter::from(cxt.as_ref()),
+                AsRef::<Preprocessor>::as_ref(&cxt),
+            ),
             AsRef::<&'static CaptchaSolver>::as_ref(&cxt),
         )
         .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
@@ -573,6 +630,7 @@ where
     TypesProtocol: TypesProtocolTrait + 'static,
     Preprocessor: LocationPreprocessorTrait + 'static,
 {
+    #[inline]
     fn read_owned_data(
         &self,
         _: &Context,

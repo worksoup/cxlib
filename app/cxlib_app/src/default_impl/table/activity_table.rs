@@ -2,7 +2,7 @@ use crate::{BinCode, ImportExportTrait, NormalTableTrait, StoreError, TableDefin
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::types::Activity;
 use log::warn;
-use redb::{Database, ReadableTable, Table};
+use redb::{Database, ReadableTable, Table, WriteTransaction};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -59,15 +59,14 @@ impl ActivityTable {
         };
         Ok(Some(r.value()))
     }
+    // TODO: update recently active time secs.
     pub fn merge(
-        table: &mut Table<
-            <Self as TableDefinitionTrait>::Key,
-            <Self as TableDefinitionTrait>::Value,
-        >,
+        w_cxt: &WriteTransaction,
         key: impl Borrow<String>,
         (activity, value): (Activity, Vec<String>),
     ) -> Result<(Activity, Vec<String>), StoreError> {
-        let users = if let Some((_, old_data)) = Self::get(table, key.borrow())? {
+        let mut activity_table = ActivityTable::write(w_cxt)?;
+        let users = if let Some((_, old_data)) = Self::get(&activity_table, key.borrow())? {
             let mut old_data = old_data.into_iter().collect::<HashSet<_>>();
             for v in value {
                 old_data.insert(v.to_owned());
@@ -77,7 +76,8 @@ impl ActivityTable {
             value
         };
         let r = (activity, users);
-        table.insert(key, &r)?;
+        activity_table.insert(key, &r)?;
+        drop(activity_table);
         Ok(r)
     }
 }

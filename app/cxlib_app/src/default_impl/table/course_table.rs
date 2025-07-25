@@ -21,20 +21,20 @@ impl CourseTable {
     #[inline]
     pub fn get_courses_with_sessions<LoginSolver, UserProtocol>(
         r_cxt: &ReadTransaction,
-    ) -> Result<impl Iterator<Item = (Course, CourseStoreDataWithSessions<UserProtocol>)>, StoreError>
+    ) -> Result<HashMap<Course, CourseStoreDataWithSessions<UserProtocol>>, StoreError>
     where
         UserProtocol: UserProtocolTrait + 'static,
     {
         let sessions = AccountTable::load_all_sessions(r_cxt)?;
         let course_table = Self::read(r_cxt)?;
-        let r = Self::get_courses_with_current_sessions(&course_table, sessions);
+        let r = Self::get_courses_with_current_sessions(&course_table, &sessions);
         drop(course_table);
-        r
+        Ok(r?.collect())
     }
     #[inline]
     pub fn courses_to_course_sessions_map_with_current_sessions<UserProtocol>(
         courses: impl IntoIterator<Item = (Course, CourseStoreData)>,
-        sessions: HashMap<String, Session<UserProtocol>>,
+        sessions: &HashMap<String, Session<UserProtocol>>,
     ) -> impl Iterator<Item = (Course, CourseStoreDataWithSessions<UserProtocol>)> {
         courses.into_iter().map(move |(course, (info, data))| {
             let sessions = data
@@ -49,16 +49,17 @@ impl CourseTable {
     /// 从缓存中获取课程与会话。
     #[inline]
     pub fn get_courses_with_current_sessions<
+        's,
         UserProtocol,
         T: ReadableTable<<Self as TableDefinitionTrait>::Key, <Self as TableDefinitionTrait>::Value>,
     >(
         table: &T,
-        sessions: HashMap<String, Session<UserProtocol>>,
+        sessions: &'s HashMap<String, Session<UserProtocol>>,
     ) -> Result<
         impl Iterator<Item = (Course, CourseStoreDataWithSessions<UserProtocol>)>
         // 个人理解：指定捕获列表，否则将捕获 table 的生命周期参数，导致该不透明类型依赖于该生命周期。
         // 但实际上并不依赖。
-        + use<UserProtocol, T>,
+        + use<'s, UserProtocol, T>,
         StoreError,
     > {
         Ok(Self::courses_to_course_sessions_map_with_current_sessions(
