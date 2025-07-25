@@ -1,7 +1,7 @@
 use crate::{
-    AccountTable, AppTrait, CmdMetaAppTrait, CourseDataFilterAndSorterTrait, CourseTable,
-    CoursesCmdApp, DefaultCourseDataSorter, DefaultLocationInfoGetter, GlobalMultimap,
-    error::Error,
+    AccountTable, ActivityTable, AppTrait, CmdMetaAppTrait, CourseDataFilterAndSorterTrait,
+    CourseTable, CoursesCmdApp, DefaultCourseDataSorter, DefaultLocationInfoGetter, GlobalMultimap,
+    NormalTableTrait, StoreError, database_guard::DatabaseGuard, error::Error,
 };
 use clap::{ArgMatches, FromArgMatches, Parser};
 use cxlib_internal::{
@@ -103,6 +103,7 @@ pub struct SignParser {
     fresh: bool,
 }
 
+type CachedActivitiesResult<UserProtocol> = HashMap<String, (Activity, Vec<Session<UserProtocol>>)>;
 impl SignParser {
     pub fn notice_content(app_info: &AppInfo) -> String {
         let app = app_info.application();
@@ -420,6 +421,77 @@ impl SignParser {
             }
         }
         Ok(())
+    }
+    pub fn update_activity_table<Cxt, TypesProtocol: TypesProtocolTrait, UserProtocol>(
+        cxt: Cxt,
+        courses: impl IntoIterator<Item = (CourseWithInfo, Vec<Session<UserProtocol>>)>,
+    ) -> Result<CachedActivitiesResult<UserProtocol>, Error>
+    where
+        Cxt: AsRef<Database>,
+        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
+    {
+        let mut database_guard = DatabaseGuard::new(cxt.as_ref());
+        let receiver =
+            Activity::get_from_courses::<TypesProtocol, UserProtocol>(courses.into_iter());
+        let r = database_guard
+            .write(|w_cxt| {
+                let mut table = ActivityTable::write(w_cxt)?;
+                let mut r = HashMap::new();
+                for (activities, users) in receiver.into_iter() {
+                    let users_str = users.iter().map(|s| s.uid().to_owned()).collect::<Vec<_>>();
+                    for activity in activities {
+                        debug!("活动：{activity:?}");
+                        let key = activity.id().to_owned();
+                        let (activity, _) =
+                            ActivityTable::merge(&mut table, &key, (activity, users_str.clone()))?;
+                        r.insert(key, (activity, users.clone()));
+                    }
+                }
+                Ok::<_, StoreError>(r)
+            })?
+            .into_inner();
+        Ok(r)
+    }
+    pub fn list_cached_activities<Cxt, UserProtocol>(
+        cxt: Cxt,
+        sessions: impl IntoIterator<Item = Session<UserProtocol>>,
+    ) -> Result<CachedActivitiesResult<UserProtocol>, Error>
+    where
+        Cxt: AsRef<Database>,
+    {
+        let database_guard = DatabaseGuard::new(cxt.as_ref());
+        let sessions = sessions
+            .into_iter()
+            .map(|s| (s.uid().to_owned(), s))
+            .collect::<HashMap<_, _>>();
+        Ok(database_guard
+            .read(|r_cxt| {
+                let table = ActivityTable::read(r_cxt)?;
+                let activities = ActivityTable::iter(&table)?
+                    .into_iter()
+                    .map(|(key, (activity, users))| {
+                        let sessions = users
+                            .into_iter()
+                            .filter_map(|uid| sessions.get(uid.as_str()))
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        (key, (activity, sessions))
+                    })
+                    .collect::<HashMap<_, _>>();
+                Ok::<_, StoreError>(activities)
+            })?
+            .into_inner())
+    }
+    #[inline]
+    pub fn list_activities<Cxt, TypesProtocol: TypesProtocolTrait, UserProtocol>(
+        cxt: Cxt,
+        courses: impl IntoIterator<Item = (CourseWithInfo, Vec<Session<UserProtocol>>)>,
+    ) -> Result<CachedActivitiesResult<UserProtocol>, Error>
+    where
+        Cxt: AsRef<Database>,
+        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
+    {
+        Self::update_activity_table::<_, TypesProtocol, _>(cxt, courses)
     }
 }
 pub struct SignMainApp<

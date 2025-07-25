@@ -2,57 +2,92 @@ use crate::{BinCode, ImportExportTrait, NormalTableTrait, StoreError, TableDefin
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::types::Activity;
 use log::warn;
-use redb::{Database, ReadTransaction, ReadableTable, WriteTransaction};
-use std::{borrow::Borrow, collections::HashMap};
+use redb::{Database, ReadableTable, Table};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet},
+};
 pub struct ActivityTable;
 impl ActivityTable {
-    pub fn iter(r_cxt: &ReadTransaction) -> Result<HashMap<Activity, Vec<String>>, StoreError> {
-        let r = Self::read(r_cxt)?;
+    pub fn iter(
+        table: &impl ReadableTable<
+            <Self as TableDefinitionTrait>::Key,
+            <Self as TableDefinitionTrait>::Value,
+        >,
+    ) -> Result<HashMap<String, (Activity, Vec<String>)>, StoreError> {
         let mut result = HashMap::new();
-        for data in r.iter()? {
+        for data in table.iter()? {
             let (k, v) = data?;
             result.insert(k.value(), v.value());
         }
         Ok(result)
     }
     pub fn get(
-        r_cxt: &ReadTransaction,
-        key: impl Borrow<Activity>,
-    ) -> Result<Option<Vec<String>>, StoreError> {
-        let r = Self::read(r_cxt)?;
-        let Some(r) = r.get(key)? else {
+        table: &impl ReadableTable<
+            <Self as TableDefinitionTrait>::Key,
+            <Self as TableDefinitionTrait>::Value,
+        >,
+        key: impl Borrow<String>,
+    ) -> Result<Option<(Activity, Vec<String>)>, StoreError> {
+        let Some(r) = table.get(key)? else {
             return Ok(None);
         };
         Ok(Some(r.value()))
     }
     pub fn remove(
-        w_cxt: &WriteTransaction,
-        key: impl Borrow<Activity>,
-    ) -> Result<Option<Vec<String>>, StoreError> {
-        let mut w = Self::write(w_cxt)?;
-        let Some(r) = w.remove(key)? else {
+        table: &mut Table<
+            <Self as TableDefinitionTrait>::Key,
+            <Self as TableDefinitionTrait>::Value,
+        >,
+        key: impl Borrow<String>,
+    ) -> Result<Option<(Activity, Vec<String>)>, StoreError> {
+        let Some(r) = table.remove(key)? else {
             return Ok(None);
         };
         Ok(Some(r.value()))
     }
     pub fn insert(
-        w_cxt: &WriteTransaction,
-        key: impl Borrow<Activity>,
-        value: impl Borrow<Vec<String>>,
-    ) -> Result<Option<Vec<String>>, StoreError> {
-        let mut w = Self::write(w_cxt)?;
-        let Some(r) = w.insert(key, value)? else {
+        table: &mut Table<
+            <Self as TableDefinitionTrait>::Key,
+            <Self as TableDefinitionTrait>::Value,
+        >,
+        key: impl Borrow<String>,
+        value: impl Borrow<(Activity, Vec<String>)>,
+    ) -> Result<Option<(Activity, Vec<String>)>, StoreError> {
+        let Some(r) = table.insert(key, value)? else {
             return Ok(None);
         };
         Ok(Some(r.value()))
     }
+    pub fn merge(
+        table: &mut Table<
+            <Self as TableDefinitionTrait>::Key,
+            <Self as TableDefinitionTrait>::Value,
+        >,
+        key: impl Borrow<String>,
+        (activity, value): (Activity, Vec<String>),
+    ) -> Result<(Activity, Vec<String>), StoreError> {
+        let users = if let Some((_, old_data)) = Self::get(table, key.borrow())? {
+            let mut old_data = old_data.into_iter().collect::<HashSet<_>>();
+            for v in value {
+                old_data.insert(v.to_owned());
+            }
+            old_data.into_iter().collect::<Vec<_>>()
+        } else {
+            value
+        };
+        let r = (activity, users);
+        table.insert(key, &r)?;
+        Ok(r)
+    }
 }
 impl ImportExportTrait for ActivityTable {
     fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, _: Cxt, data: &str) {
-        let data = toml::from_str::<HashMap<Activity, Vec<String>>>(data).log_unwrap();
+        let data = toml::from_str::<HashMap<String, (Activity, Vec<String>)>>(data).log_unwrap();
         let w_cxt = db.begin_write().log_unwrap();
+        let mut table = Self::write(&w_cxt).log_unwrap();
         for (key, value) in data {
-            match Self::insert(&w_cxt, key, value) {
+            match Self::insert(&mut table, key, value) {
                 Ok(r) => {
                     if let Some(r) = r {
                         warn!("数据已更新，原数据为：{r:?}");
@@ -63,12 +98,15 @@ impl ImportExportTrait for ActivityTable {
                 }
             };
         }
+        drop(table);
         w_cxt.commit().log_unwrap();
     }
 
     fn export_text(db: &Database) -> String {
-        let export = if let Ok(r_cxt) = db.begin_read() {
-            Self::iter(&r_cxt).unwrap_or_default()
+        let export = if let Ok(r_cxt) = db.begin_read()
+            && let Ok(table) = Self::read(&r_cxt)
+        {
+            Self::iter(&table).unwrap_or_default()
         } else {
             HashMap::new()
         };
@@ -77,8 +115,8 @@ impl ImportExportTrait for ActivityTable {
 }
 impl NormalTableTrait for ActivityTable {}
 impl TableDefinitionTrait for ActivityTable {
-    type Key = BinCode<Activity>;
-    type Value = BinCode<Vec<String>>;
+    type Key = BinCode<String>;
+    type Value = BinCode<(Activity, Vec<String>)>;
     type Context<'cxt> = ();
     const NAME: &'static str = "activity";
 }

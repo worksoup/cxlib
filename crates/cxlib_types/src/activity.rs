@@ -23,6 +23,12 @@ pub struct OtherActivity {
 }
 
 impl Activity {
+    pub fn id(&self) -> &String {
+        match self {
+            Activity::RawSign(a) => a.active_id(),
+            Activity::Other(a) => &a.id,
+        }
+    }
     pub fn course(&self) -> &CourseWithInfo {
         match self {
             Activity::RawSign(a) => a.course(),
