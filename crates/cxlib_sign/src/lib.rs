@@ -277,10 +277,12 @@ impl SignResult {
 }
 //noinspection ALL
 /// 签到后状态。
-#[derive(num_enum::FromPrimitive, num_enum::IntoPrimitive)]
+///
+/// 可以为任意值。（原因为可以通过网络请求手动设置）
+#[derive()]
 #[repr(i64)]
+#[non_exhaustive]
 pub enum SignState {
-    #[default]
     未签 = 0,
     签到成功 = 1,
     教师代签 = 2,
@@ -293,7 +295,18 @@ pub enum SignState {
     签到已过期 = 11,
     公假 = 12,
 }
-
+impl From<i64> for SignState {
+    #[inline]
+    fn from(number: i64) -> Self {
+        unsafe { std::mem::transmute::<i64, SignState>(number) }
+    }
+}
+impl From<SignState> for i64 {
+    #[inline]
+    fn from(enum_value: SignState) -> Self {
+        enum_value as Self
+    }
+}
 /// 签到以及其他活动的原始类型。不应使用。
 #[derive(Debug)]
 pub struct SignActivityRaw {
