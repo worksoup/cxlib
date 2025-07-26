@@ -111,7 +111,7 @@ where
                     >>::sign_single(
                         &sign, &session, captcha_solver, (&enc, locations)
                     )
-                    .unwrap_or_else(|e| SignResult::Fail { msg: e.to_string() });
+                    .unwrap_or_else(|e| SignResult::Failure { msg: e.to_string() });
                     index_result_map.lock().unwrap().insert(sessions_index, a);
                 });
                 handles.push(h);
@@ -158,7 +158,7 @@ where
                 _,
             >(sign, session, (enc, locations), captcha_solver)
         } else {
-            sign.pre_sign_and_sign::<CaptchaProtocol, SignProtocol, _>(
+            sign.check_state_and_do_sign::<CaptchaProtocol, SignProtocol, _>(
                 session,
                 enc,
                 captcha_solver,

@@ -81,7 +81,7 @@ where
             } else {
                 map.insert(
                     session,
-                    SignResult::Fail {
+                    SignResult::Failure {
                         msg: format!("拍照签到[{}]没有获取到有效的照片！", sign.as_inner().name()),
                     },
                 );
@@ -96,7 +96,7 @@ where
         captcha_solver: &CaptchaSolver,
         photo: &Photo<TypesProtocol>,
     ) -> Result<SignResult, SignError> {
-        sign.pre_sign_and_sign::<CaptchaProtocol, SignProtocol, U>(
+        sign.check_state_and_do_sign::<CaptchaProtocol, SignProtocol, U>(
             session,
             &(),
             captcha_solver,

@@ -483,12 +483,16 @@ impl SignParser {
                 Ok(sign_results) => {
                     info!("签到活动[{}]签到结果：", raw_sign.name());
                     for (session, sign_result) in sign_results {
-                        if let SignResult::Fail { msg } = sign_result {
-                            warn!("\t用户[{}]签到失败！失败信息：[{:?}]", session.name(), msg);
-                        } else {
-                            info!("\t用户[{}]签到成功！", session.name(),);
-                            // TODO: update activity status code.
-                            // let status = raw_sign.get_sign_state::<SignProtocol, _>(session);
+                        match sign_result {
+                            SignResult::Success => {
+                                info!("\t用户[{}]签到成功！", session.name(),);
+                            }
+                            SignResult::PartialSuccess { msg } => {
+                                warn!("\t用户[{}]签到成功：[{:?}]。", session.name(), msg);
+                            }
+                            SignResult::Failure { msg } => {
+                                warn!("\t用户[{}]签到失败！失败信息：[{:?}]", session.name(), msg);
+                            }
                         }
                     }
                 }

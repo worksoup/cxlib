@@ -50,7 +50,7 @@ impl GestureOrSigncodeSign {
         if result == 1 {
             Ok(Ok(()))
         } else {
-            Ok(Err(SignResult::Fail {
+            Ok(Err(SignResult::Failure {
                 msg: "签到码或手势不正确".into(),
             }))
         }

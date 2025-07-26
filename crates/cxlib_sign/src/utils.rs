@@ -104,7 +104,7 @@ where
 {
     let r = url.get(agent)?;
     match Sign::guess_sign_result_by_text(&r.into_body().read_to_string().log_unwrap()) {
-        SignResult::Fail { msg } => {
+        SignResult::Failure { msg } => {
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。
                 let url = url.patch_enc_by_pre_sign_result_msg(msg);
@@ -116,7 +116,7 @@ where
                     referer,
                 )
             } else {
-                Ok(SignResult::Fail { msg })
+                Ok(SignResult::Failure { msg })
             }
         }
         success => Ok(success),

@@ -47,7 +47,7 @@ where
         captcha_solver: &CaptchaSolver,
         signcode: &str,
     ) -> Result<SignResult, SignError> {
-        sign.pre_sign_and_sign::<CaptchaProtocol, SignProtocol, U>(
+        sign.check_state_and_do_sign::<CaptchaProtocol, SignProtocol, U>(
             session,
             &(),
             captcha_solver,

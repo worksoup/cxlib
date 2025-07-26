@@ -35,6 +35,24 @@ pub use error::*;
 pub trait SignTrait: Ord {
     type PreSignData: ?Sized;
     type Data: ?Sized;
+    /// 通过签到结果的字符串判断签到结果如何。
+    fn guess_sign_result_by_text(text: &str) -> SignResult {
+        match text {
+            "success" => SignResult::Success,
+            msg => {
+                if msg.is_empty() {
+                    SignResult::Failure {
+                        msg:
+                        "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
+                    }
+                } else if msg == "您已签到过了" {
+                    SignResult::Success
+                } else {
+                    SignResult::Failure { msg: msg.into() }
+                }
+            }
+        }
+    }
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -76,23 +94,50 @@ pub trait SignTrait: Ord {
         } = r.into_body().read_json().log_unwrap();
         Ok(status.into())
     }
-    /// 通过签到结果的字符串判断签到结果如何。
-    fn guess_sign_result_by_text(text: &str) -> SignResult {
-        match text {
-            "success" => SignResult::Susses,
-            msg => {
-                if msg.is_empty() {
-                    SignResult::Fail {
-                        msg:
-                        "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
-                    }
-                } else if msg == "您已签到过了" {
-                    SignResult::Susses
-                } else {
-                    SignResult::Fail { msg: msg.into() }
+    /// 获取签到后状态。参见返回类型 [`SignState`].
+    fn guess_sign_result_by_state<SignProtocol, U>(
+        &self,
+        session: &Session<U>,
+    ) -> Result<Option<SignResult>, SignError>
+    where
+        SignProtocol: SignProtocolTrait,
+    {
+        let state = self.as_inner().get_sign_state::<SignProtocol, U>(session)?;
+        let result = match state {
+            SignState::ValidSignState(valid_sign_state) => match valid_sign_state {
+                ValidSignState::未签 => {
+                    return Ok(None);
                 }
-            }
-        }
+                ValidSignState::签到成功 => SignResult::Success,
+                ValidSignState::教师代签 => SignResult::PartialSuccess {
+                    msg: format!(
+                        "用户[`{}`]签到[`{}`]为教师代签。",
+                        session.name(),
+                        self.as_inner().name()
+                    ),
+                },
+                state @ (ValidSignState::请假
+                | ValidSignState::病假
+                | ValidSignState::事假
+                | ValidSignState::公假) => SignResult::PartialSuccess {
+                    msg: format!(
+                        "用户[`{}`]签到[`{}`]为请假状态[`{state:?}`]。",
+                        session.name(),
+                        self.as_inner().name()
+                    ),
+                },
+                state @ (ValidSignState::缺勤
+                | ValidSignState::迟到
+                | ValidSignState::早退
+                | ValidSignState::签到已过期) => SignResult::Failure {
+                    msg: format!("签到失败，状态为[`{state:?}`]。",),
+                },
+            },
+            SignState::Other(number) => SignResult::Failure {
+                msg: format!("签到状态未知（`{number}`），可能是服务端 bug。"),
+            },
+        };
+        Ok(Some(result))
     }
     /// 预签到。
     fn pre_sign<CaptchaProtocol, SignProtocol, U>(
@@ -150,8 +195,8 @@ pub trait SignTrait: Ord {
             Err(msg) => Ok(msg),
         }
     }
-    /// 预签到并签到。
-    fn pre_sign_and_sign<CaptchaProtocol, SignProtocol, U>(
+    /// 检查签到状态，如果需要签到，则预签到并签到。
+    fn check_state_and_do_sign<CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
@@ -162,9 +207,15 @@ pub trait SignTrait: Ord {
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait,
     {
+        let guess_result = self
+            .as_inner()
+            .guess_sign_result_by_state::<SignProtocol, U>(session)?;
+        if let Some(guess_result) = guess_result {
+            return Ok(guess_result);
+        }
         let r = self.pre_sign::<CaptchaProtocol, SignProtocol, U>(session, pre_sign_data)?;
         match r {
-            PreSignResult::Susses => Ok(SignResult::Susses),
+            PreSignResult::Susses => Ok(SignResult::Success),
             PreSignResult::Data {
                 ref url,
                 data: ref pre_sign_result_data,
@@ -237,52 +288,35 @@ pub enum PreSignResult {
         data: OptionPair<CaptchaId, LocationWithRange>,
     },
 }
-impl PreSignResult {
-    pub fn is_susses(&self) -> bool {
-        match self {
-            PreSignResult::Susses => true,
-            PreSignResult::Data { .. } => false,
-        }
-    }
-    pub fn to_result(self) -> SignResult {
-        match self {
-            PreSignResult::Susses => SignResult::Susses,
-            PreSignResult::Data { .. } => unreachable!(),
-        }
-    }
-}
+impl PreSignResult {}
 /// 签到的结果。为枚举类型。
 /// ``` rust
 /// #[derive(Debug)]
 /// pub enum SignResult {
 ///     Susses,
-///     Fail { msg: String },
+///     Failure { msg: String },
 /// }
 ///```
 #[derive(Debug)]
 pub enum SignResult {
     /// 签到成功。
-    Susses,
+    Success,
+    PartialSuccess {
+        msg: String,
+    },
     /// 签到失败以及失败原因。
-    Fail { msg: String },
+    Failure {
+        msg: String,
+    },
 }
-impl SignResult {
-    /// 签到是否成功。
-    pub fn is_susses(&self) -> bool {
-        match self {
-            SignResult::Susses => true,
-            SignResult::Fail { .. } => false,
-        }
-    }
-}
+impl SignResult {}
 //noinspection ALL
 /// 签到后状态。
 ///
 /// 可以为任意值（签到发出端可以通过网络请求手动设置为任意值）。
-#[derive()]
+#[derive(Debug)]
 #[repr(i64)]
-#[non_exhaustive]
-pub enum SignState {
+pub enum ValidSignState {
     未签 = 0,
     签到成功 = 1,
     教师代签 = 2,
@@ -295,16 +329,32 @@ pub enum SignState {
     签到已过期 = 11,
     公假 = 12,
 }
+/// 签到后状态。
+///
+/// 可以为任意值（签到发出端可以通过网络请求手动设置为任意值）。
+#[derive(Debug)]
+pub enum SignState {
+    ValidSignState(ValidSignState),
+    Other(i64),
+}
 impl From<i64> for SignState {
     #[inline]
     fn from(number: i64) -> Self {
-        unsafe { std::mem::transmute::<i64, SignState>(number) }
+        match number {
+            0 | 1 | 2 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 => {
+                Self::ValidSignState(unsafe { std::mem::transmute::<i64, ValidSignState>(number) })
+            }
+            _ => Self::Other(number),
+        }
     }
 }
 impl From<SignState> for i64 {
     #[inline]
     fn from(enum_value: SignState) -> Self {
-        enum_value as Self
+        match enum_value {
+            SignState::ValidSignState(valid_sign_state) => valid_sign_state as Self,
+            SignState::Other(value) => value,
+        }
     }
 }
 /// 签到以及其他活动的原始类型。不应使用。
