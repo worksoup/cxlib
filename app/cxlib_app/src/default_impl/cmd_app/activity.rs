@@ -108,8 +108,6 @@ pub struct SignParser {
 
 type CachedActivitiesResult<'s, UserProtocol> =
     HashMap<String, (Activity, Vec<&'s Session<UserProtocol>>)>;
-type SignResultOrError<'s, UserProtocol> =
-    Result<HashMap<&'s Session<UserProtocol>, SignResult>, Error>;
 impl SignParser {
     pub fn notice_content(app_info: &AppInfo) -> String {
         let app = app_info.application();

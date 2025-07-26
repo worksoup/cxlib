@@ -1,7 +1,7 @@
 mod bin_code;
 
 pub use bin_code::*;
-use try_from_with_context::{FromStrWithContext, TryFromWithContext};
+use try_from_with_context::{FromStrWithContext, ParseWith, TryFromWithContext};
 
 use log::warn;
 use std::{borrow::Borrow, error::Error as ErrorTrait};
@@ -18,7 +18,7 @@ where
     let mut r = vec![];
     for line in contents {
         if !line.is_empty() {
-            let data = FromStrWithContext::from_str(line, metadata.borrow());
+            let data = line.parse_with(metadata.borrow());
             match data {
                 Ok(data) => r.push(data),
                 Err(e) => warn!("错误：第 {line_count} 行解析出错, 该行将被跳过！错误信息：{e}."),
