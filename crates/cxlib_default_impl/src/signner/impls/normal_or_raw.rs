@@ -16,7 +16,12 @@ where
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
 {
-    sign.check_state_and_do_sign::<CaptchaProtocol, SignProtocol, U>(session, &(), captcha_solver, &())
+    sign.check_state_and_do_sign::<CaptchaProtocol, SignProtocol, U>(
+        session,
+        &(),
+        captcha_solver,
+        &(),
+    )
 }
 fn sign_<'a, CaptchaProtocol, SignProtocol, U, Sessions: Iterator<Item = &'a Session<U>>>(
     sign: &RawSign,
