@@ -115,7 +115,7 @@ pub struct DefaultCourseDataSorter;
 impl<T> CourseDataFilterAndSorterTrait<T> for DefaultCourseDataSorter {
     fn filter(a: (&Course, &CourseInfo, &CourseData)) -> bool {
         !a.1.ended()
-            && (*a.2.recently_used_timestamp() == u64::MAX || {
+            && (u64::MAX == *a.2.recently_used_timestamp() || {
                 let now = (get_now_timestamp_mills() / 1000) as u64;
                 *a.2.recently_used_timestamp() > now
                     || now - a.2.recently_used_timestamp() < 160 * 24 * 60 * 60

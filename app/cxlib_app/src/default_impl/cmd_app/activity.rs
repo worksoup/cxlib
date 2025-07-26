@@ -131,11 +131,32 @@ impl SignParser {
 "#
         )
     }
-    pub fn process_typed_sign<'s, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, T>(
+    /// 以下文档由 AI 生成。
+    ///
+    ///  处理特定类型的签到
+    ///
+    /// # 参数
+    /// - `sign_name`: 签到名称标识
+    /// - `typed_sign`: 类型化的签到对象
+    /// - `location_getter`: 位置信息获取器
+    /// - `preprocessor`: 位置预处理组件
+    /// - `sessions`: 用户会话集合
+    /// - `captcha_solver`: 验证码解决器
+    /// - `cli_args`: 命令行参数
+    ///
+    /// # 返回
+    /// 每个会话的签到结果映射
+    pub fn process_typed_sign<
+        's,
+        CaptchaProtocol,
+        SignProtocol,
+        TypesProtocol,
+        UserProtocol,
+        LocationGetter,
+    >(
         sign_name: String,
         typed_sign: &mut Sign<TypesProtocol>,
-        location_getter: T,
-        preprocessor: &impl LocationPreprocessorTrait,
+        (location_getter, preprocessor): (LocationGetter, &impl LocationPreprocessorTrait),
         sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
         captcha_solver: &'static CaptchaSolver,
         cli_args: &CliArgs,
@@ -145,7 +166,7 @@ impl SignParser {
         SignProtocol: SignProtocolTrait + Send + 'static,
         TypesProtocol: TypesProtocolTrait + 'static,
         UserProtocol: UserProtocolTrait + Send + 'static,
-        T: LocationInfoGetterTrait,
+        LocationGetter: LocationInfoGetterTrait,
     {
         let sessions = sessions.into_iter();
         let CliArgs {
@@ -245,10 +266,30 @@ impl SignParser {
         }
         Ok(sign_results)
     }
-    pub fn match_signs<'s, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, T>(
+    /// 以下文档由 AI 生成。
+    ///
+    ///  匹配并处理签到类型
+    ///
+    /// # 参数
+    /// - `raw_sign`: 原始签到数据
+    /// - `location_getter`: 位置信息获取器
+    /// - `preprocessor`: 位置预处理组件
+    /// - `sessions`: 用户会话集合
+    /// - `captcha_solver`: 验证码解决器
+    /// - `cli_args`: 命令行参数
+    ///
+    /// # 返回
+    /// 元组包含处理后的原始签到数据和签到结果
+    pub fn match_signs<
+        's,
+        CaptchaProtocol,
+        SignProtocol,
+        TypesProtocol,
+        UserProtocol,
+        LocationGetter,
+    >(
         raw_sign: RawSign,
-        location_getter: T,
-        preprocessor: &impl LocationPreprocessorTrait,
+        location_cxt: (LocationGetter, &impl LocationPreprocessorTrait),
         sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
         captcha_solver: &'static CaptchaSolver,
         cli_args: &CliArgs,
@@ -261,7 +302,7 @@ impl SignParser {
         SignProtocol: SignProtocolTrait + Send + 'static,
         TypesProtocol: TypesProtocolTrait + 'static,
         UserProtocol: UserProtocolTrait + Send + 'static,
-        T: LocationInfoGetterTrait,
+        LocationGetter: LocationInfoGetterTrait,
     {
         let mut sessions = sessions.into_iter().peekable();
         let sign_name = raw_sign.name().clone();
@@ -281,14 +322,19 @@ impl SignParser {
         let r = Self::process_typed_sign::<CaptchaProtocol, SignProtocol, _, _, _>(
             sign_name,
             &mut typed_sign,
-            location_getter,
-            preprocessor,
+            location_cxt,
             sessions,
             captcha_solver,
             cli_args,
         );
         (typed_sign.into_raw(), r)
     }
+    /// 以下文档由 AI 生成。
+    ///
+    ///  获取签到数据并执行签到操作
+    ///
+    /// 核心业务逻辑：处理命令行参数，从数据库获取数据，
+    /// 根据参数执行签到或显示签到信息
     pub fn get_sign_and_do_sign<
         CaptchaProtocol,
         SignProtocol,
@@ -421,6 +467,21 @@ impl SignParser {
         };
         Ok(())
     }
+    /// 以下文档由 AI 生成。
+    ///
+    ///  执行实际的签到操作
+    ///
+    /// # 参数
+    /// - `all`: 是否处理所有签到
+    /// - `active_id`: 特定签到ID
+    /// - `has_uid_arg`: 是否有用户ID参数
+    /// - `location_cxt`: 位置上下文(获取器和预处理器)
+    /// - `captcha_solver`: 验证码解决器
+    /// - `cli_args`: 命令行参数
+    /// - `activities`: 待处理的签到活动集合
+    ///
+    /// # 返回
+    /// 操作结果(成功或错误)
     pub fn do_sign<
         's,
         CaptchaProtocol: CaptchaProtocolTrait,
@@ -432,7 +493,7 @@ impl SignParser {
         all: bool,
         active_id: Option<i64>,
         has_uid_arg: bool,
-        (location_getter, preprocessor): (LocationGetter, &impl LocationPreprocessorTrait),
+        location_cxt: (LocationGetter, &impl LocationPreprocessorTrait),
         captcha_solver: &'static CaptchaSolver,
         cli_args: &CliArgs,
         activities: impl IntoIterator<
@@ -473,8 +534,7 @@ impl SignParser {
             let (raw_sign, result) =
                 Self::match_signs::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
                     raw_sign,
-                    location_getter,
-                    preprocessor,
+                    location_cxt,
                     sessions,
                     captcha_solver,
                     cli_args,
@@ -521,6 +581,14 @@ impl SignParser {
         }
         Ok(())
     }
+    /// 以下文档由 AI 生成。
+    ///
+    ///  显示签到活动信息
+    ///
+    /// # 参数
+    /// - `all`: 是否显示所有签到
+    /// - `active_id`: 特定活动ID
+    /// - `activities`: 要显示的签到活动集合
     pub fn display_activities<'s, UserProtocol: 's>(
         all: bool,
         active_id: Option<i64>,
@@ -552,6 +620,16 @@ impl SignParser {
             }
         }
     }
+    /// 以下文档由 AI 生成。
+    ///
+    ///  更新活动数据表
+    ///
+    /// # 参数
+    /// - `w_cxt`: 数据库写事务上下文
+    /// - `courses`: 课程信息集合
+    ///
+    /// # 返回
+    /// 迭代器(包含活动列表和对应的用户会话)
     pub fn update_activity_table<TypesProtocol: TypesProtocolTrait, UserProtocol>(
         w_cxt: &WriteTransaction,
         courses: impl IntoIterator<
@@ -581,6 +659,16 @@ impl SignParser {
         });
         Ok(r)
     }
+    /// 以下文档由 AI 生成。
+    ///
+    ///  从缓存获取活动数据
+    ///
+    /// # 参数
+    /// - `cxt`: 数据库上下文
+    /// - `sessions`: 用户会话集合
+    ///
+    /// # 返回
+    /// 缓存的活动信息映射表
     pub fn get_cached_activities<'a, Cxt, UserProtocol: 'a>(
         cxt: Cxt,
         sessions: impl IntoIterator<Item = &'a Session<UserProtocol>>,
@@ -611,6 +699,16 @@ impl SignParser {
             })?
             .into_inner())
     }
+    /// 以下文档由 AI 生成。
+    ///
+    ///  获取活动数据(带课程信息)
+    ///
+    /// # 参数
+    /// - `w_cxt`: 数据库写事务上下文
+    /// - `courses`: 课程信息集合
+    ///
+    /// # 返回
+    /// 活动数据和对应的用户会话
     #[inline]
     pub fn get_activities<TypesProtocol: TypesProtocolTrait, UserProtocol>(
         w_cxt: &WriteTransaction,
@@ -622,6 +720,17 @@ impl SignParser {
         Self::update_activity_table::<TypesProtocol, _>(w_cxt, courses)
     }
 }
+/// 以下文档由 AI 生成。
+///
+///  签到主应用结构体
+///
+/// 泛型参数说明:
+/// - `CaptchaProtocol`: 验证码协议实现
+/// - `SignProtocol`: 签到协议实现
+/// - `TypesProtocol`: 类型协议实现
+/// - `UserProtocol`: 用户协议实现
+/// - `Preprocessor`: 位置预处理器
+/// - `T`: 课程数据处理策略
 pub struct SignMainApp<
     CaptchaProtocol = cxlib_internal::protocol::collect::CaptchaProtocol,
     SignProtocol = cxlib_internal::protocol::collect::SignProtocol,
@@ -630,10 +739,22 @@ pub struct SignMainApp<
     Preprocessor = Unit,
     T = DefaultCourseDataSorter,
 > {
+    /// 以下文档由 AI 生成。
+    ///
+    ///  泛型标记(用于类型推导)
     _p: PhantomData<(CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol)>,
+    /// 以下文档由 AI 生成。
+    ///
+    ///  位置处理器标记
     _lp: PhantomData<Preprocessor>,
+    /// 以下文档由 AI 生成。
+    ///
+    ///  课程数据处理策略标记
     _t: PhantomData<T>,
 }
+/// 以下文档由 AI 生成。
+///
+///  为签到主应用提供默认实现
 impl<C, S, Ty, U, T> Default for SignMainApp<C, S, Ty, U, T> {
     #[inline]
     fn default() -> Self {
@@ -644,7 +765,9 @@ impl<C, S, Ty, U, T> Default for SignMainApp<C, S, Ty, U, T> {
         }
     }
 }
-
+/// 以下文档由 AI 生成。
+///
+///  实现应用接口的签到主应用
 impl<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, Context, T>
     AppTrait<Context>
     for SignMainApp<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, T>
@@ -662,7 +785,13 @@ where
     Preprocessor: LocationPreprocessorTrait,
 {
     type OwnedData = SignParser;
-
+    /// 以下文档由 AI 生成。
+    ///
+    ///  运行签到主应用
+    ///
+    /// 1. 显示提示信息
+    /// 2. 获取签到数据
+    /// 3. 执行签到操作
     #[inline]
     fn run(&self, cxt: &Context, data: Self::OwnedData) {
         warn!("{}", SignParser::notice_content(cxt.as_ref()));
@@ -677,7 +806,9 @@ where
         .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
     }
 }
-
+/// 以下文档由 AI 生成。
+///
+///  实现命令行元应用接口
 impl<
     CaptchaProtocol,
     SignProtocol,
@@ -704,6 +835,11 @@ where
     TypesProtocol: TypesProtocolTrait + 'static,
     Preprocessor: LocationPreprocessorTrait + 'static,
 {
+    /// 以下文档由 AI 生成。
+    ///
+    ///  从命令行参数解析数据
+    ///
+    /// 使用clap解析器将命令行参数转换为结构化数据
     #[inline]
     fn read_owned_data(
         &self,

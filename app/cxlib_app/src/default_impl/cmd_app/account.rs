@@ -1,4 +1,7 @@
-use crate::{AccountTable, AppTrait, TableDefinitionTrait, cmd_app::CmdMetaAppTrait};
+use crate::{
+    AccountTable, AppTrait, CourseData, CourseTable, NormalTableTrait, StoreError,
+    TableDefinitionTrait, cmd_app::CmdMetaAppTrait, database_guard::DatabaseGuard,
+};
 use clap::{ArgMatches, FromArgMatches, Parser, arg};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::{
@@ -51,29 +54,57 @@ where
 {
     type OwnedData = AccountParser;
     fn run(&self, context: &Context, owned_data: Self::OwnedData) {
-        let db: &Database = context.as_ref();
+        let mut db = DatabaseGuard::new(context.as_ref());
         match owned_data {
             AccountParser::Add { uname, passwd } => {
                 let pwd = cx_interact::inquire_pwd(passwd);
                 let login_type_and_uname = uname.split_once(":");
-                let w_cxt = db.begin_write().log_unwrap();
-                let session = if let Some((login_type, uname)) = login_type_and_uname {
-                    AccountTable::login(&w_cxt, context, uname.into(), pwd, login_type.into())
-                } else {
-                    AccountTable::login(
-                        &w_cxt,
-                        context,
-                        uname.clone(),
-                        pwd,
-                        DefaultLoginSolver::<UserProtocol>::default()
-                            .login_type()
-                            .into(),
-                    )
-                };
+                let session = db.write(|w_cxt| {
+                    if let Some((login_type, uname)) = login_type_and_uname {
+                        AccountTable::<UserProtocol>::login(
+                            w_cxt,
+                            context,
+                            uname.into(),
+                            pwd,
+                            login_type.into(),
+                        )
+                    } else {
+                        AccountTable::login(
+                            w_cxt,
+                            context,
+                            uname.clone(),
+                            pwd,
+                            DefaultLoginSolver::<UserProtocol>::default()
+                                .login_type()
+                                .into(),
+                        )
+                    }
+                });
                 // 添加账号。
                 match session {
                     Ok(session) => {
-                        info!("添加账号[{uname}]（用户名：{}）成功！", session.name())
+                        let session = session.into_inner();
+                        info!("添加账号[{uname}]（用户名：{}）成功！", session.name());
+                        if let Ok(courses) = session.get_courses() {
+                            db.write(|w_cxt| {
+                                let users = vec![session.uid().to_owned()];
+                                for course in courses {
+                                    let data = CourseData::new(u64::MAX, users.clone(), vec![]);
+                                    let mut table = CourseTable::write(w_cxt)?;
+                                    let (course, info) = course.unwrap();
+                                    CourseTable::merge_course(
+                                        &mut table,
+                                        course,
+                                        (info, data),
+                                        true,
+                                    )?;
+                                }
+                                Ok::<_, StoreError>(())
+                            })
+                            .log_ok();
+                        } else {
+                            warn!("获取用户[{}]课程失败。", session.name());
+                        }
                     }
                     Err(e) => warn!("添加账号[{uname}]失败：{e}."),
                 };
@@ -96,6 +127,7 @@ where
                 let w_cxt = db.begin_write().log_unwrap();
                 AccountTable::<UserProtocol>::delete_account(&w_cxt, &uid);
                 w_cxt.commit().log_unwrap();
+                // TODO: 删除课程列表中的账号信息。如果账号信息为空，则删除课程。
             }
         }
     }

@@ -43,6 +43,7 @@ where
         for session in sessions.log_unwrap().into_values() {
             println!("{}, {}, {}", session.uname(), session.name(), session.uid());
         }
+        // TODO: 更新课程信息。
     }
 }
 impl<Context, OwnedData, UserProtocol> CmdMetaAppTrait<Context, OwnedData>

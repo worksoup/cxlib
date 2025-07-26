@@ -21,7 +21,7 @@ pub fn log_none<T>(e: impl std::fmt::Debug) -> Option<T> {
 
 #[inline]
 pub fn log_panic<T>(e: impl std::fmt::Debug) -> T {
-    log::error!("{e:?}",);
+    log::error!("{e:?}.");
     panic!();
 }
 

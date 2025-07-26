@@ -89,6 +89,7 @@ where
     type OwnedData = CoursesParser;
 
     fn run(&self, cxt: &Context, data: CoursesParser) {
+        // TODO: 刷新时删除原表。
         let courses = if data.fresh {
             let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
             Self::update_course_table(cxt.as_ref(), login_solvers.clone()).log_unwrap_or_default()
