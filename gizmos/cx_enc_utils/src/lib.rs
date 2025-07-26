@@ -1,4 +1,6 @@
 pub mod crypto {
+    //! *本文档为 AI 生成。*
+    //!
     //! PKCS#7 填充方案非标准实现
     //!
     //! 本模块提供了符合 PKCS#7 标准的填充方案实现，用于将数据填充至指定块大小的整数倍。
@@ -27,6 +29,8 @@ pub mod crypto {
     use std::mem::MaybeUninit;
     use std::{mem, ptr};
 
+    /// *本文档为 AI 生成。*
+    ///
     /// PKCS#7 填充方案非标准实现
     ///
     /// ## PKCS#7 填充规则（非标准扩展版）
@@ -57,6 +61,8 @@ pub mod crypto {
         let pad_num = unsafe { convert_usize_to::<T>(BLOCK_SIZE - data_len % BLOCK_SIZE) };
         data.resize((data.len() / BLOCK_SIZE + 1) * BLOCK_SIZE, pad_num);
     }
+    /// *本文档为 AI 生成。*
+    ///
     /// PKCS#7 填充方案非标准实现
     ///
     /// ## PKCS#7 填充规则（非标准扩展版）
@@ -93,6 +99,8 @@ pub mod crypto {
         }
         unsafe { mem::transmute(r) }
     }
+    /// *本文档为 AI 生成。*
+    ///
     /// # Safety
     ///
     /// 调用此函数时，调用者**必须**遵守以下安全要求：
@@ -133,6 +141,8 @@ pub mod crypto {
             pkcs7_pad_const_in_place(data_len, buffer);
         }
     }
+    /// *本文档为 AI 生成。*
+    ///
     /// # Safety
     ///
     /// 调用此函数时，调用者**必须**遵守以下安全要求：
