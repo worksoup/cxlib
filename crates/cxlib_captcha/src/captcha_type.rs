@@ -1,3 +1,8 @@
+//! 该文档为AI生成。验证码处理模块
+//!
+//! 提供验证码获取、解析和验证的完整流程支持，
+//! 支持多种验证码类型，包括滑块、文字点选、图片旋转等。
+
 use std::{fmt::Display, str::FromStr};
 
 use crate::{
@@ -13,25 +18,35 @@ use log::{debug, warn};
 use serde::{Deserialize, de::DeserializeOwned};
 use ureq::Agent;
 
+/// 该文档为AI生成。获取验证码的结果结构体
 #[derive(Debug)]
 pub struct GetCaptchaResult {
+    /// 该文档为AI生成。验证码的初始化向量(IV)
     pub iv: String,
+    /// 该文档为AI生成。包含令牌和验证数据的结构
     pub data: VerificationDataWithToken,
 }
+
+/// 该文档为AI生成。包含令牌和验证数据的结构
 #[derive(Debug, Deserialize)]
 pub struct VerificationDataWithToken {
+    /// 该文档为AI生成。验证令牌
     pub token: String,
+    /// 该文档为AI生成。验证码数据(JSON格式)
     #[serde(rename = "imageVerificationVo")]
     pub data: serde_json::Value,
 }
 
+/// 该文档为AI生成。验证结果结构体
 #[derive(Deserialize, Debug)]
 pub struct ValidateResult {
+    /// 该文档为AI生成。额外的验证数据
     #[serde(rename = "extraData")]
     extra_data: Option<String>,
 }
 
 impl ValidateResult {
+    /// 该文档为AI生成。从验证结果中提取验证信息
     pub fn get_validate_info(&self) -> Result<String, CaptchaError> {
         #[derive(Deserialize)]
         struct Tmp {
@@ -40,15 +55,27 @@ impl ValidateResult {
         self.extra_data
             .as_ref()
             .map(|s| {
-                debug!("{s}");
+                debug!("验证结果数据: {s}");
                 let Tmp { validate } = serde_json::from_str(s).unwrap();
                 validate
             })
             .ok_or_else(|| CaptchaError::VerifyFailed)
     }
 }
+
+/// 验证码类型枚举
+///
 /// # [`CaptchaType`]
-/// 验证码类型，目前只有 [`CaptchaType::Slide`] 类型支持良好，无需初始化 `Solver`.
+/// 支持多种验证码类型，每种类型对应不同的验证机制：
+/// - `Slide`: 滑块验证码
+/// - `TextClick`: 文字点选验证码
+/// - `Rotate`: 图片旋转验证码
+/// - `IconClick`: 图标点选验证码
+/// - `Obstacle`: 单图标点选验证码
+///   
+/// 目前只有 [`CaptchaType::Slide`] 与 [`CaptchaType::Rotate`] 类型支持良好.
+///
+/// TODO: fix doc.
 /// 如需自行支持，请为该类型 [实现 `Solver`](CaptchaType::init_solver).
 ///
 /// 若需自行处理图片下载等步骤，参见 [`CaptchaType::set_verification_info_type`].
@@ -85,21 +112,25 @@ pub enum CaptchaType {
     /// 对应的验证信息类型为 [`ObstacleImage`],
     /// 请参考其文档初始化 `Solver`.
     Obstacle,
-    /// ## 自定义类型验证码
-    Custom(&'static str),
 }
+
 impl CaptchaType {
+    /// 该文档为AI生成。默认验证码类型(旋转验证码)
     const DEFAULT: CaptchaType = CaptchaType::Rotate;
 }
+
 impl Default for CaptchaType {
+    /// 该文档为AI生成。获取默认验证码类型
     #[inline]
     fn default() -> Self {
         Self::DEFAULT
     }
 }
+
 impl FromStr for CaptchaType {
     type Err = CaptchaError;
 
+    /// 该文档为AI生成。从字符串解析验证码类型
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "slide" | "Slide" | "SLIDE" => CaptchaType::Slide,
@@ -115,13 +146,17 @@ impl FromStr for CaptchaType {
         })
     }
 }
+
 impl Display for CaptchaType {
+    /// 该文档为AI生成。将验证码类型转换为字符串表示
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_ref())
     }
 }
+
 impl AsRef<str> for CaptchaType {
+    /// 该文档为AI生成。获取验证码类型的字符串引用
     #[inline]
     fn as_ref(&self) -> &str {
         match self {
@@ -130,62 +165,85 @@ impl AsRef<str> for CaptchaType {
             CaptchaType::Rotate => "rotate",
             CaptchaType::IconClick => "iconclick",
             CaptchaType::Obstacle => "obstacle",
-            CaptchaType::Custom(r#type) => r#type,
         }
     }
 }
+
+/// 该文档为AI生成。验证码解决器函数类型
 pub type CaptchaSolver = fn(&Agent, &str, &str) -> Result<String, CaptchaError>;
+
 impl CaptchaType {
-    pub fn solver<CaptchaProtocol: CaptchaProtocolTrait>(&self) -> Option<CaptchaSolver> {
-        Some(match self {
+    /// 该文档为AI生成。获取验证码类型的解决器函数
+    ///
+    /// 根据验证码类型返回对应的解决函数
+    pub fn solver<CaptchaProtocol: CaptchaProtocolTrait>(&self) -> CaptchaSolver {
+        match self {
             CaptchaType::Slide => SlideImages::solve_captcha::<CaptchaProtocol>,
             CaptchaType::TextClick => TextClickInfo::solve_captcha::<CaptchaProtocol>,
             CaptchaType::Rotate => RotateImages::solve_captcha::<CaptchaProtocol>,
             CaptchaType::IconClick => IconClickImage::solve_captcha::<CaptchaProtocol>,
             CaptchaType::Obstacle => ObstacleImage::solve_captcha::<CaptchaProtocol>,
-            CaptchaType::Custom(_) => None?,
-        })
+        }
     }
 }
+
+/// 该文档为AI生成。验证码解决器特性
+///
+/// 定义了验证码处理的通用接口，包括生成密钥、获取验证码、验证验证码等
 pub trait CaptchaSolverTrait {
+    /// 该文档为AI生成。解决验证码的核心方法
     fn solver(
         agent: &Agent,
         image: serde_json::Value,
         referer: &str,
     ) -> Result<String, CaptchaError>;
+
+    /// 该文档为AI生成。生成验证码所需的密钥
     fn generate_secrets(captcha_id: &str, server_time_stamp_mills: u128) -> (String, String);
 
+    /// 该文档为AI生成。生成初始化向量(IV)
     fn generate_iv(captcha_id: &str) -> String;
+
+    /// 该文档为AI生成。获取验证码数据
     fn get_captcha<CaptchaProtocol: CaptchaProtocolTrait>(
         agent: &Agent,
         captcha_id: &str,
         server_time_mills: u128,
         referer: &str,
     ) -> Result<GetCaptchaResult, AgentError>;
+
+    /// 该文档为AI生成。验证验证码结果
     fn check_captcha<CaptchaProtocol: CaptchaProtocolTrait>(
         agent: &Agent,
         captcha_id_iv_token: (&str, &str, &str),
         text_click_arr: &str,
         server_time_mills: u128,
     ) -> Result<String, CaptchaError>;
+
+    /// 该文档为AI生成。完整的验证码解决流程
     fn solve_captcha<CaptchaProtocol: CaptchaProtocolTrait>(
         agent: &Agent,
         captcha_id: &str,
         referer: &str,
     ) -> Result<String, CaptchaError>;
 }
+
+/// 该文档为AI生成。为所有实现VerificationInfoTrait的类型提供默认实现
 impl<T> CaptchaSolverTrait for T
 where
     T: VerificationInfoTrait + DeserializeOwned + 'static,
 {
+    /// 该文档为AI生成。解决验证码的核心方法实现
     fn solver(
         agent: &Agent,
         image: serde_json::Value,
         referer: &str,
     ) -> Result<String, CaptchaError> {
-        let self_: Self = serde_json::from_value(image).unwrap();
+        let self_: Self = serde_json::from_value(image).log_unwrap();
         self_.solve(agent, referer)
     }
+
+    /// 该文档为AI生成。生成验证码所需的密钥实现
     fn generate_secrets(captcha_id: &str, server_time_stamp_mills: u128) -> (String, String) {
         let server_time_str = server_time_stamp_mills.to_string();
         let captcha_key = encode(hash(&(server_time_str.clone() + &uuid())));
@@ -197,6 +255,7 @@ where
         (captcha_key, tmp_token)
     }
 
+    /// 该文档为AI生成。生成初始化向量(IV)实现
     fn generate_iv(captcha_id: &str) -> String {
         let iv_uuid = uuid();
         encode(hash(
@@ -206,6 +265,8 @@ where
                 + &iv_uuid),
         ))
     }
+
+    /// 该文档为AI生成。获取验证码数据实现
     fn get_captcha<CaptchaProtocol: CaptchaProtocolTrait>(
         agent: &Agent,
         captcha_id: &str,
@@ -231,6 +292,8 @@ where
         .expect("Failed trim_response_to_json");
         Ok(GetCaptchaResult { iv, data: r_data })
     }
+
+    /// 该文档为AI生成。验证验证码结果实现
     fn check_captcha<CaptchaProtocol: CaptchaProtocolTrait>(
         agent: &Agent,
         (captcha_id, iv, token): (&str, &str, &str),
@@ -251,6 +314,10 @@ where
         debug!("验证结果：{v:?}");
         v.get_validate_info()
     }
+
+    /// 该文档为AI生成。完整的验证码解决流程实现
+    ///
+    /// 包含获取验证码、解决验证码和验证结果的全过程
     fn solve_captcha<CaptchaProtocol: CaptchaProtocolTrait>(
         agent: &Agent,
         captcha_id: &str,
@@ -258,6 +325,7 @@ where
     ) -> Result<String, CaptchaError> {
         let local_time = get_now_timestamp_mills();
         let server_time = get_server_time::<CaptchaProtocol>(agent, captcha_id, local_time)?;
+
         // 事不过三。
         for i in 0..3 {
             match Self::get_captcha::<CaptchaProtocol>(agent, captcha_id, server_time + i, referer)
@@ -277,14 +345,12 @@ where
                         })
                     },
                 ) {
-                r @ Ok(_) => {
-                    return r;
-                }
+                Ok(result) => return Ok(result),
                 Err(e) => {
                     if e.is_fatal() {
                         return Err(e);
                     } else {
-                        warn!("滑块验证失败：{e}，即将重试。");
+                        warn!("验证码验证失败：{e}，即将重试。");
                     }
                 }
             }
@@ -292,6 +358,8 @@ where
         Err(CaptchaError::VerifyFailed)
     }
 }
+
+/// 该文档为AI生成。测试模块
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -304,12 +372,16 @@ mod tests {
     use serde::de::DeserializeOwned;
 
     const REFERER: &str = "https%3A%2F%2Fmobilelearn.chaoxing.com";
+
+    /// 该文档为AI生成。测试自动解决验证码功能
     #[test]
     fn auto_solve_captcha_test() {
         let agent = ureq::Agent::new_with_defaults();
         let r = RotateImages::solve_captcha::<CaptchaProtocol>(&agent, CAPTCHA_ID, REFERER);
         println!("{r:?}");
     }
+
+    /// 该文档为AI生成。测试生成验证码密钥功能
     #[test]
     fn generate_captcha_key() {
         fn assert_eq_with_real_value<T>(
@@ -333,6 +405,8 @@ mod tests {
             "0062a52fa1d93307b2bc503883986cf9",
         )
     }
+
+    /// 该文档为AI生成。测试获取验证码功能
     #[test]
     fn get_captcha_test() {
         fn get_captcha_<T>()
