@@ -278,7 +278,7 @@ impl SignResult {
 //noinspection ALL
 /// 签到后状态。
 ///
-/// 可以为任意值。（原因为可以通过网络请求手动设置）
+/// 可以为任意值（签到发出端可以通过网络请求手动设置为任意值）。
 #[derive()]
 #[repr(i64)]
 #[non_exhaustive]
