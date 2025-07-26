@@ -19,6 +19,10 @@ impl<TypesProtocol> PhotoSign<TypesProtocol> {
             _p: PhantomData,
         }
     }
+
+    pub fn into_raw(self) -> RawSign {
+        self.raw_sign
+    }
 }
 impl<TypesProtocol> SignTrait for PhotoSign<TypesProtocol> {
     type PreSignData = ();

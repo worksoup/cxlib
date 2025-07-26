@@ -4,6 +4,7 @@ use crate::{
     NormalTableTrait, StoreError, database_guard::DatabaseGuard, error::Error,
 };
 use clap::{ArgMatches, FromArgMatches, Parser};
+use cxlib_error_utils::MaybeFatalError;
 use cxlib_internal::{
     captcha::CaptchaSolver,
     default_impl::{
@@ -16,7 +17,7 @@ use cxlib_internal::{
     protocol::collect::{
         CaptchaProtocolTrait, SignProtocolTrait, TypesProtocolTrait, UserProtocolTrait,
     },
-    sign::{SignResult, SignTrait, SignnerTrait},
+    sign::{SignError, SignResult, SignTrait, SignnerTrait},
     types::{
         Activity, Course, CourseWithInfo, LocationPreprocessorTrait, RawSign, Session,
         UntypedLoginSolver, ext::ActivityExt,
@@ -26,7 +27,9 @@ use cxlib_store::AppInfo;
 use log::{debug, error, info, warn};
 use redb::{Database, WriteTransaction};
 use ref_wrapper::Unit;
-use std::{collections::HashMap, marker::PhantomData, path::PathBuf, time::Duration};
+use std::{
+    borrow::Borrow, collections::HashMap, marker::PhantomData, path::PathBuf, time::Duration,
+};
 
 #[derive(Clone)]
 pub struct CliArgs {
@@ -103,7 +106,10 @@ pub struct SignParser {
     fresh: bool,
 }
 
-type CachedActivitiesResult<UserProtocol> = HashMap<String, (Activity, Vec<Session<UserProtocol>>)>;
+type CachedActivitiesResult<'s, UserProtocol> =
+    HashMap<String, (Activity, Vec<&'s Session<UserProtocol>>)>;
+type SignResultOrError<'s, UserProtocol> =
+    Result<HashMap<&'s Session<UserProtocol>, SignResult>, Error>;
 impl SignParser {
     pub fn notice_content(app_info: &AppInfo) -> String {
         let app = app_info.application();
@@ -127,14 +133,15 @@ impl SignParser {
 "#
         )
     }
-    pub fn match_signs<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, T>(
-        raw_sign: RawSign,
+    pub fn process_typed_sign<'s, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, T>(
+        sign_name: String,
+        typed_sign: &mut Sign<TypesProtocol>,
         location_getter: T,
         preprocessor: &impl LocationPreprocessorTrait,
-        sessions: &[Session<UserProtocol>],
+        sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
         captcha_solver: &'static CaptchaSolver,
         cli_args: &CliArgs,
-    ) -> Result<(), Error>
+    ) -> Result<HashMap<&'s Session<UserProtocol>, SignResult>, Error>
     where
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait + Send + 'static,
@@ -142,15 +149,7 @@ impl SignParser {
         UserProtocol: UserProtocolTrait + Send + 'static,
         T: LocationInfoGetterTrait,
     {
-        let sign_name = raw_sign.name().clone();
-        let mut sign = if sessions.is_empty() {
-            warn!("无法判断签到[{sign_name}]的签到类型。");
-            Sign::<TypesProtocol>::Unknown(raw_sign)
-        } else {
-            info!("成功判断签到[{sign_name}]的签到类型。");
-            Sign::from_raw::<SignProtocol, _>(raw_sign, &sessions[0])
-        };
-        let sign = &mut sign;
+        let sessions = sessions.into_iter();
         let CliArgs {
             location_str,
             image,
@@ -160,8 +159,7 @@ impl SignParser {
         } = cli_args;
         #[allow(clippy::mutable_key_type)]
         let mut sign_results = HashMap::new();
-        let sessions = sessions.iter();
-        match sign {
+        match typed_sign {
             Sign::Photo(ps) => {
                 info!("签到[{sign_name}]为拍照签到。");
                 sign_results =
@@ -247,20 +245,51 @@ impl SignParser {
                 )?;
             }
         }
-        if !sign_results.is_empty() {
-            info!(
-                "签到活动[{}]签到结果：",
-                sign.as_raw::<SignProtocol>().name()
+        Ok(sign_results)
+    }
+    pub fn match_signs<'s, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, T>(
+        raw_sign: RawSign,
+        location_getter: T,
+        preprocessor: &impl LocationPreprocessorTrait,
+        sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
+        captcha_solver: &'static CaptchaSolver,
+        cli_args: &CliArgs,
+    ) -> (
+        RawSign,
+        Result<HashMap<&'s Session<UserProtocol>, SignResult>, Error>,
+    )
+    where
+        CaptchaProtocol: CaptchaProtocolTrait,
+        SignProtocol: SignProtocolTrait + Send + 'static,
+        TypesProtocol: TypesProtocolTrait + 'static,
+        UserProtocol: UserProtocolTrait + Send + 'static,
+        T: LocationInfoGetterTrait,
+    {
+        let mut sessions = sessions.into_iter().peekable();
+        let sign_name = raw_sign.name().clone();
+        let mut typed_sign = if let Some(session) = sessions.peek() {
+            let typed_sign = Sign::<TypesProtocol>::from_raw(raw_sign, session);
+            info!("成功判断签到[{sign_name}]的签到类型。");
+            typed_sign
+        } else {
+            return (
+                raw_sign,
+                Err(SignError::SignDataNotFound(format!(
+                    "用户会话为空，无法处理签到[{sign_name}]."
+                ))
+                .into()),
             );
-            for (session, sign_result) in sign_results {
-                if let SignResult::Fail { msg } = sign_result {
-                    warn!("\t用户[{}]签到失败！失败信息：[{:?}]", session.name(), msg);
-                } else {
-                    info!("\t用户[{}]签到成功！", session.name(),);
-                }
-            }
-        }
-        Ok(())
+        };
+        let r = Self::process_typed_sign::<CaptchaProtocol, SignProtocol, _, _, _>(
+            sign_name,
+            &mut typed_sign,
+            location_getter,
+            preprocessor,
+            sessions,
+            captcha_solver,
+            cli_args,
+        );
+        (typed_sign.into_raw(), r)
     }
     pub fn get_sign_and_do_sign<
         CaptchaProtocol,
@@ -340,30 +369,33 @@ impl SignParser {
                 .into_iter()
                 .map(|(course, (info, _, sessions))| (CourseWithInfo::new(course, info), sessions))
                 .take(limit.unwrap_or(usize::MAX));
-            db_g.write(|w_cxt| {
-                let activities = Self::get_activities::<TypesProtocol, _>(w_cxt, iter)?.flat_map(
-                    |(activities, users)| {
+            db_g.write_map_err::<_, _, StoreError, _, _>(
+                |w_cxt| {
+                    let activities = Self::get_activities::<TypesProtocol, _>(w_cxt, iter)?;
+                    let activities = activities.flat_map(|(activities, users)| {
+                        let sessions = users.into_iter().filter_map(|s| sessions.get(s.uid()));
                         activities
                             .into_iter()
-                            .map(move |activity| (activity, users.clone()))
-                    },
-                );
+                            .map(move |activity| (activity, sessions.clone()))
+                    });
 
-                if list {
-                    Self::display_activities(all, active_id, activities);
-                } else {
-                    Self::do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
-                        all,
-                        active_id,
-                        has_uid_arg,
-                        location_cxt,
-                        captcha_solver,
-                        &arg,
-                        activities,
-                    );
-                }
-                Ok::<_, StoreError>(())
-            })?;
+                    if list {
+                        Self::display_activities(all, active_id, activities);
+                    } else {
+                        Self::do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
+                            all,
+                            active_id,
+                            has_uid_arg,
+                            location_cxt,
+                            captcha_solver,
+                            &arg,
+                            activities,
+                        )?;
+                    }
+                    Ok::<_, Error>(())
+                },
+                Error::from,
+            )?;
         } else {
             let activities = Self::get_cached_activities(cxt, sessions.values())?;
             let activities = if let Some(course) = course {
@@ -386,12 +418,13 @@ impl SignParser {
                     captcha_solver,
                     &arg,
                     activities,
-                );
+                )?;
             }
         };
         Ok(())
     }
     pub fn do_sign<
+        's,
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait + std::marker::Send + 'static,
         TypesProtocol: TypesProtocolTrait + 'static,
@@ -404,8 +437,13 @@ impl SignParser {
         (location_getter, preprocessor): (LocationGetter, &impl LocationPreprocessorTrait),
         captcha_solver: &'static CaptchaSolver,
         cli_args: &CliArgs,
-        activities: impl IntoIterator<Item = (Activity, Vec<Session<UserProtocol>>)>,
-    ) {
+        activities: impl IntoIterator<
+            Item = (
+                Activity,
+                impl IntoIterator<Item = &'s Session<UserProtocol>>,
+            ),
+        >,
+    ) -> Result<(), Error> {
         let signs = activities.into_iter().filter_map(|(activity, sessions)| {
             if let Activity::RawSign(raw_sign) = activity
                 && (all || raw_sign.is_valid())
@@ -431,17 +469,40 @@ impl SignParser {
                 raw_sign.course().id(),
                 raw_sign.course().name()
             );
+            let sessions = sessions.into_iter().collect::<Vec<_>>();
             let names = sessions.iter().map(|s| s.name()).collect::<Vec<_>>();
             info!("签到者：{names:?}");
-            Self::match_signs::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
-                raw_sign,
-                location_getter,
-                preprocessor,
-                &sessions,
-                captcha_solver,
-                cli_args,
-            )
-            .unwrap_or_else(|e| warn!("{e}"));
+            let (raw_sign, result) =
+                Self::match_signs::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
+                    raw_sign,
+                    location_getter,
+                    preprocessor,
+                    sessions,
+                    captcha_solver,
+                    cli_args,
+                );
+            match result {
+                Ok(sign_results) => {
+                    info!("签到活动[{}]签到结果：", raw_sign.name());
+                    for (session, sign_result) in sign_results {
+                        if let SignResult::Fail { msg } = sign_result {
+                            warn!("\t用户[{}]签到失败！失败信息：[{:?}]", session.name(), msg);
+                        } else {
+                            info!("\t用户[{}]签到成功！", session.name(),);
+                            // TODO: update activity status code.
+                            // let status = raw_sign.get_sign_state::<SignProtocol, _>(session);
+                        }
+                    }
+                }
+                Err(e) => {
+                    if e.is_fatal() {
+                        Err(e)?
+                    } else {
+                        warn!("`{e}`.");
+                        continue;
+                    }
+                }
+            }
         }
         if !have {
             if active_id.is_some() {
@@ -456,11 +517,17 @@ impl SignParser {
                 warn!("签到列表为空。");
             }
         }
+        Ok(())
     }
-    pub fn display_activities<UserProtocol>(
+    pub fn display_activities<'s, UserProtocol: 's>(
         all: bool,
         active_id: Option<i64>,
-        activities: impl IntoIterator<Item = (Activity, Vec<Session<UserProtocol>>)>,
+        activities: impl IntoIterator<
+            Item = (
+                Activity,
+                impl IntoIterator<Item = impl Borrow<Session<UserProtocol>> + 's>,
+            ),
+        >,
     ) {
         if let Some(active_id) = active_id {
             warn!("将忽略活动 ID 参数（{active_id}）。")
@@ -472,7 +539,7 @@ impl SignParser {
                     raw_sign,
                     sessions
                         .into_iter()
-                        .map(|s| s.name().to_owned())
+                        .map(|s| s.borrow().name().to_owned())
                         .collect::<Vec<_>>(),
                 )),
                 Activity::Other(_) => None,
@@ -485,7 +552,12 @@ impl SignParser {
     }
     pub fn update_activity_table<TypesProtocol: TypesProtocolTrait, UserProtocol>(
         w_cxt: &WriteTransaction,
-        courses: impl IntoIterator<Item = (CourseWithInfo, Vec<Session<UserProtocol>>)>,
+        courses: impl IntoIterator<
+            Item = (
+                CourseWithInfo,
+                impl IntoIterator<Item = Session<UserProtocol>>,
+            ),
+        >,
     ) -> Result<impl Iterator<Item = (Vec<Activity>, Vec<Session<UserProtocol>>)>, StoreError>
     where
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
@@ -510,7 +582,7 @@ impl SignParser {
     pub fn get_cached_activities<'a, Cxt, UserProtocol: 'a>(
         cxt: Cxt,
         sessions: impl IntoIterator<Item = &'a Session<UserProtocol>>,
-    ) -> Result<CachedActivitiesResult<UserProtocol>, Error>
+    ) -> Result<CachedActivitiesResult<'a, UserProtocol>, Error>
     where
         Cxt: AsRef<Database>,
     {
@@ -528,7 +600,7 @@ impl SignParser {
                         let sessions = users
                             .into_iter()
                             .filter_map(|uid| sessions.get(uid.as_str()))
-                            .map(|s| (*s).clone())
+                            .copied()
                             .collect::<Vec<_>>();
                         (key, (activity, sessions))
                     })

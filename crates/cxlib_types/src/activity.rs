@@ -1,4 +1,5 @@
 use bincode::{Decode, Encode};
+use getset2::Getset2;
 use serde::{Deserialize, Serialize};
 
 use crate::{CourseWithInfo, RawSign};
@@ -16,13 +17,26 @@ pub enum Activity {
 ///
 /// 除课程签到外的其他活动，如通知、作业等。
 #[derive(
-    Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Hash, Decode, Encode, Serialize, Deserialize,
+    Debug,
+    Clone,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Eq,
+    Hash,
+    Decode,
+    Encode,
+    Serialize,
+    Deserialize,
+    Getset2,
 )]
+#[getset2(get_ref(pub))]
 pub struct OtherActivity {
     pub id: String,
     pub name: String,
     pub course: CourseWithInfo,
-    pub status: i32,
+    #[getset2(set(pub))]
+    pub status_code: i32,
     pub start_time_mills: u64,
 }
 
@@ -38,6 +52,23 @@ impl Activity {
             Activity::RawSign(a) => a.course(),
             Activity::Other(a) => &a.course,
         }
+    }
+    pub fn status_code(&self) -> i32 {
+        *match self {
+            Activity::RawSign(raw_sign) => raw_sign.status_code(),
+            Activity::Other(other_activity) => other_activity.status_code(),
+        }
+    }
+    pub fn set_status_code(&mut self, status_code: i32) -> &mut Self {
+        match self {
+            Activity::RawSign(raw_sign) => {
+                raw_sign.set_status_code(status_code);
+            }
+            Activity::Other(other_activity) => {
+                other_activity.set_status_code(status_code);
+            }
+        };
+        self
     }
     pub fn start_time_mills(&self) -> u64 {
         match self {

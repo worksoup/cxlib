@@ -135,6 +135,31 @@ pub mod database_guard {
             let t = f(&r_cxt)?;
             Ok(ReadAccessGuard(self, r_cxt, t))
         }
+        pub fn write_map_err<
+            'a,
+            T,
+            N,
+            E,
+            F: FnOnce(&WriteTransaction) -> Result<T, N>,
+            M: FnOnce(E) -> N,
+        >(
+            &'a mut self,
+            f: F,
+            m: M,
+        ) -> Result<WriteAccessGuard<'a, 'b, T>, N>
+        where
+            'b: 'a,
+            E: From<redb::TransactionError> + From<redb::CommitError>,
+        {
+            match self.begin_write() {
+                Ok(w_cxt) => {
+                    let t = f(&w_cxt)?;
+                    w_cxt.commit().map_err(E::from).map_err(m)?;
+                    Ok(WriteAccessGuard(self, t))
+                }
+                Err(e) => Err(m(E::from(e))),
+            }
+        }
         pub fn write<'a, T, E, F: FnOnce(&WriteTransaction) -> Result<T, E>>(
             &'a mut self,
             f: F,

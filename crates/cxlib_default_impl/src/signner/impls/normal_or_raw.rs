@@ -18,7 +18,7 @@ where
 {
     sign.pre_sign_and_sign::<CaptchaProtocol, SignProtocol, U>(session, &(), captcha_solver, &())
 }
-fn sign_<'a, CaptchaProtocol, SignProtocol, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
+fn sign_<'a, CaptchaProtocol, SignProtocol, U, Sessions: Iterator<Item = &'a Session<U>>>(
     sign: &RawSign,
     sessions: Sessions,
     captcha_solver: &CaptchaSolver,
@@ -44,7 +44,7 @@ where
 {
     type ExtData<'e> = ();
 
-    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
+    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &NormalSign,
         sessions: Sessions,
@@ -76,7 +76,7 @@ where
 {
     type ExtData<'e> = ();
 
-    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
+    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &RawSign,
         sessions: Sessions,

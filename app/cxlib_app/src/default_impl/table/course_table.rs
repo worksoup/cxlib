@@ -5,7 +5,7 @@ use cxlib_internal::{
     protocol::collect::UserProtocolTrait,
     types::{__private::UnhandledGeoaddr, Course, CourseInfo, Session},
 };
-use redb::{Database, ReadTransaction, ReadableTable};
+use redb::{Database, ReadTransaction, ReadableTable, Table};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -132,24 +132,34 @@ impl CourseTable {
             w_cxt.commit().log_unwrap();
         }
     }
+    /// 更新最近活动时间，当入参大于原值才会更新。
+    ///
+    /// 注意，u64::MAX 被视为初始值。如果原值为初始值，将无条件更新。
     pub fn update_recently_used_time(
-        db: &Database,
+        table: &mut Table<
+            <Self as TableDefinitionTrait>::Key,
+            <Self as TableDefinitionTrait>::Value,
+        >,
         course: &Course,
         recently_used_timestamp_secs: u64,
-    ) {
-        let r_cxt = db.begin_read().log_unwrap();
-        let r = Self::read(&r_cxt).log_unwrap();
-        let course_data = r.get(course).log_unwrap();
-        if let Some(course_data) = course_data {
-            let mut course_data = course_data.value();
-            course_data
-                .1
-                .set_recently_used_timestamp(recently_used_timestamp_secs);
-            let w_cxt = db.begin_write().log_unwrap();
-            let mut w = Self::write(&w_cxt).log_unwrap();
-            w.insert(course, course_data).log_unwrap();
-            drop(w);
-            w_cxt.commit().log_unwrap();
+    ) -> Result<bool, StoreError> {
+        let (info, mut data) = {
+            let course_data_guard = table.get(course)?;
+            let Some(course_data_guard) = course_data_guard else {
+                return Ok(false);
+            };
+            let r = course_data_guard.value();
+            drop(course_data_guard);
+            r
+        };
+        if u64::MAX == *data.recently_used_timestamp()
+            || recently_used_timestamp_secs > *data.recently_used_timestamp()
+        {
+            data.set_recently_used_timestamp(recently_used_timestamp_secs);
+            table.insert(course, (info, data))?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
     }
     #[inline]

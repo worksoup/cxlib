@@ -33,7 +33,7 @@ where
 {
     type ExtData<'e> = &'e Photo<TypesProtocol>;
 
-    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
+    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &PhotoSign<TypesProtocol>,
         sessions: Sessions,
@@ -42,6 +42,7 @@ where
         let mut pic_map = HashMap::new();
         #[allow(clippy::mutable_key_type)]
         let mut session_to_index = HashMap::new();
+        let sessions = sessions.collect::<Vec<_>>();
         if let Some(pic) = self.path.as_ref() {
             for session in sessions.clone() {
                 let photo = Photo::get_from_file(session, pic);

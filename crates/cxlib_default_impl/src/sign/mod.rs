@@ -35,7 +35,7 @@ pub enum Sign<TypesProtocol> {
     Unknown(RawSign),
 }
 impl<TypesProtocol> Sign<TypesProtocol> {
-    pub fn detail<SignProtocol, UserProtocol>(
+    pub fn detail<UserProtocol>(
         &self,
         session: &Session<UserProtocol>,
     ) -> Result<SignDetail, SignError>
@@ -43,14 +43,9 @@ impl<TypesProtocol> Sign<TypesProtocol> {
         TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait,
     {
-        Ok(self
-            .as_raw::<SignProtocol>()
-            .get_detail::<TypesProtocol, _>(session)?)
+        Ok(self.as_raw().get_detail::<TypesProtocol, _>(session)?)
     }
-    pub fn from_raw<SignProtocol, UserProtocol>(
-        raw: RawSign,
-        session: &Session<UserProtocol>,
-    ) -> Self
+    pub fn from_raw<UserProtocol>(raw: RawSign, session: &Session<UserProtocol>) -> Self
     where
         TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait,
@@ -114,7 +109,7 @@ impl<TypesProtocol> Sign<TypesProtocol> {
             Sign::Unknown(raw)
         }
     }
-    pub fn as_raw<SignProtocol>(&self) -> &RawSign {
+    pub fn as_raw(&self) -> &RawSign {
         match self {
             Sign::Photo(a) => a.as_inner(),
             Sign::Normal(a) => a.as_inner(),
@@ -122,6 +117,16 @@ impl<TypesProtocol> Sign<TypesProtocol> {
             Sign::GestureOrSigncode(a) => a.as_inner(),
             Sign::Location(a) => a.as_inner(),
             Sign::Unknown(a) => a.as_inner(),
+        }
+    }
+    pub fn into_raw(self) -> RawSign {
+        match self {
+            Sign::Photo(a) => a.into_raw(),
+            Sign::Normal(a) => a.into_raw(),
+            Sign::QrCode(a) => a.into_raw(),
+            Sign::GestureOrSigncode(a) => a.into_raw(),
+            Sign::Location(a) => a.into_raw(),
+            Sign::Unknown(a) => a,
         }
     }
 }

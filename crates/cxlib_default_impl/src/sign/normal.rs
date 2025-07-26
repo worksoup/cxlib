@@ -8,7 +8,11 @@ use serde::Serialize;
 pub struct NormalSign {
     pub(crate) raw_sign: RawSign,
 }
-
+impl NormalSign {
+    pub fn into_raw(self) -> RawSign {
+        self.raw_sign
+    }
+}
 impl SignTrait for NormalSign {
     type PreSignData = ();
     type Data = ();

@@ -7,7 +7,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
-        mpsc::{Receiver, RecvError, SendError},
+        mpsc::{Receiver, RecvError},
     },
 };
 /// 类型别名，代表接收端所接受数据的类型。
@@ -19,7 +19,7 @@ pub enum ActivitiesReceiverError<UserProtocol> {
     #[error(transparent)]
     RecvError(#[from] RecvError),
     #[error(transparent)]
-    SendError(#[from] SendError<ActivitiesSessionsPair<UserProtocol>>),
+    SendError(#[from] ActivitiesSessionsPair<UserProtocol>),
     #[error(transparent)]
     ActivityError(#[from] ActivityError),
 }
@@ -33,7 +33,7 @@ pub struct ActivitiesReceiver<UserProtocol> {
     fatal_error_occurred: Arc<AtomicBool>,
     fatal_error: Arc<Mutex<Option<ActivitiesReceiverError<UserProtocol>>>>,
 }
-impl<T> MaybeFatalError for ActivitiesReceiver<T> {
+impl<T> MaybeFatalError for ActivitiesReceiverError<T> {
     /// 当前语境下均为不可恢复错误。
     #[inline]
     fn is_fatal(&self) -> bool {
@@ -91,9 +91,14 @@ pub trait ActivityExt {
     /// 通过 [`mpsc::channel`] 实现：多线程获取活动，获取的活动进入 Sender 中，返回值为 Receiver, 可以通过迭代器 API 处理。
     fn get_from_courses<
         TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait + Send + 'static,
+        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     >(
-        sorted_courses: impl Iterator<Item = (CourseWithInfo, Vec<Session<UserProtocol>>)>,
+        sorted_courses: impl Iterator<
+            Item = (
+                CourseWithInfo,
+                impl IntoIterator<Item = Session<UserProtocol>>,
+            ),
+        >,
     ) -> ActivitiesReceiver<UserProtocol> {
         let (sender, receiver) = std::sync::mpsc::channel();
         let fatal_error_occurred = Arc::new(AtomicBool::new(false));
@@ -108,11 +113,16 @@ pub trait ActivityExt {
             if fatal_error_occurred.load(Ordering::Relaxed) {
                 break;
             }
+            let courses: Vec<(CourseWithInfo, Vec<Session<UserProtocol>>)> = courses
+                .into_iter()
+                .map(|(course, sessions)| (course, sessions.into_iter().collect::<Vec<_>>()))
+                .collect::<Vec<_>>();
             std::thread::spawn(move || {
                 for (course, sessions) in courses {
                     if fatal_error_occurred.load(Ordering::Relaxed) {
                         break;
                     }
+                    let sessions = sessions.into_iter().collect::<Vec<_>>();
                     debug!("加载课程 [{course}] 的签到。");
                     if let Some(session) = sessions.first() {
                         let activities = course.get_activities::<TypesProtocol, _>(session);
@@ -128,7 +138,7 @@ pub trait ActivityExt {
                                             fatal_error
                                                 .lock()
                                                 .unwrap()
-                                                .replace(ActivitiesReceiverError::from(e));
+                                                .replace(ActivitiesReceiverError::from(e.0));
                                             return;
                                         }
                                     }

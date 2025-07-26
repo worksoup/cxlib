@@ -20,6 +20,9 @@ impl LocationSign {
             .as_ref()
             .map(|l| l.to_shifted_geoaddr(preprocessor))
     }
+    pub fn into_raw(self) -> RawSign {
+        self.raw_sign
+    }
 }
 impl SignTrait for LocationSign {
     type PreSignData = ();

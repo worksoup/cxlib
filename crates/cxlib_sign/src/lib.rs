@@ -312,7 +312,7 @@ where
     SignProtocol: SignProtocolTrait,
 {
     type ExtData<'e>;
-    fn sign<'a, U: Send + 'static, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
+    fn sign<'a, U: Send + 'static, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &T,
         sessions: Sessions,

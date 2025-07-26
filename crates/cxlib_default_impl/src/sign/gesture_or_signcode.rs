@@ -55,6 +55,9 @@ impl GestureOrSigncodeSign {
             }))
         }
     }
+    pub fn into_raw(self) -> RawSign {
+        self.raw_sign
+    }
 }
 
 impl SignTrait for GestureOrSigncodeSign {

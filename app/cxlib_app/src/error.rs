@@ -1,4 +1,5 @@
 use crate::StoreError;
+use cxlib_error_utils::MaybeFatalError;
 use cxlib_internal::{
     captcha::CaptchaError,
     protocol::{AgentError, ProtocolError},
@@ -25,4 +26,18 @@ pub enum Error {
     SignError(#[from] SignError),
     #[error(transparent)]
     StoreError(#[from] StoreError),
+}
+impl MaybeFatalError for Error {
+    fn is_fatal(&self) -> bool {
+        match self {
+            Error::AgentError(agent_error) => agent_error.is_fatal(),
+            Error::ActivityError(activity_error) => activity_error.is_fatal(),
+            Error::CaptchaError(_) => false,
+            Error::CourseError(course_error) => course_error.is_fatal(),
+            Error::LoginError(login_error) => login_error.is_fatal(),
+            Error::ProtocolError(_) => false,
+            Error::SignError(sign_error) => sign_error.is_fatal(),
+            Error::StoreError(store_error) => store_error.is_fatal(),
+        }
+    }
 }

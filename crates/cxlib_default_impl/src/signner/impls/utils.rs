@@ -19,15 +19,12 @@ pub(crate) trait SignRetry<I, O: Borrow<<Self as SignTrait>::Data>, SignProtocol
     }
     fn data_helper(data: I) -> O;
 }
-impl<SignProtocol> SignRetry<Geoaddr, <Self as SignTrait>::Data, SignProtocol>
-    for QrCodeSign
-{
+impl<SignProtocol> SignRetry<Geoaddr, <Self as SignTrait>::Data, SignProtocol> for QrCodeSign {
     fn data_helper(data: Geoaddr) -> <Self as SignTrait>::Data {
         Some(data)
     }
 }
-impl<'a, SignProtocol>
-    SignRetry<&'a Geoaddr, &'a <Self as SignTrait>::Data, SignProtocol>
+impl<'a, SignProtocol> SignRetry<&'a Geoaddr, &'a <Self as SignTrait>::Data, SignProtocol>
     for LocationSign
 {
     fn data_helper(data: &'a Geoaddr) -> &'a <Self as SignTrait>::Data {
@@ -46,10 +43,7 @@ pub(crate) fn sign_single_retry<
 >(
     sign: &Sign,
     session: &Session<U>,
-    (pre_sign_data, locations): (
-        &<Sign as SignTrait>::PreSignData,
-        InputDataIter,
-    ),
+    (pre_sign_data, locations): (&<Sign as SignTrait>::PreSignData, InputDataIter),
     captcha_solver: &CaptchaSolver,
 ) -> Result<SignResult, SignError>
 where

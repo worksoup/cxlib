@@ -44,6 +44,7 @@ pub struct RawSign {
     course: CourseWithInfo,
     name: String,
     other_id: String,
+    #[getset2(set(pub))]
     status_code: i32,
     start_time_mills: u64,
 }

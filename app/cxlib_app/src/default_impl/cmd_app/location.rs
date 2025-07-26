@@ -43,9 +43,7 @@ impl FromStr for GeolocationOrUnhandledGeoaddr {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.parse::<UnhandledGeoaddr>() {
             Ok(ok) => Ok(Self::UnhandledGeoaddr(ok)),
-            Err(_) => {
-                Ok(Self::Geolocation(s.parse::<Geolocation>()?))
-            }
+            Err(_) => Ok(Self::Geolocation(s.parse::<Geolocation>()?)),
         }
     }
 }

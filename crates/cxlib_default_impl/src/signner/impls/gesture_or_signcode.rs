@@ -22,7 +22,7 @@ where
 {
     type ExtData<'e> = &'e str;
 
-    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>> + Clone>(
+    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &GestureOrSigncodeSign,
         sessions: Sessions,

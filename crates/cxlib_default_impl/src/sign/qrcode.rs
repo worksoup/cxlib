@@ -24,6 +24,9 @@ impl QrCodeSign {
     pub fn is_refresh(&self) -> bool {
         self.is_refresh
     }
+    pub fn into_raw(self) -> RawSign {
+        self.raw_sign.into_raw()
+    }
 }
 impl SignTrait for QrCodeSign {
     type PreSignData = str;

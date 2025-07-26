@@ -34,17 +34,15 @@ where
 {
     type ExtData<'e> = &'e Vec<Geoaddr>;
 
-    fn sign<'b, U, Sessions: Iterator<Item = &'b Session<U>> + Clone>(
+    fn sign<'b, U, Sessions: Iterator<Item = &'b Session<U>>>(
         &mut self,
         sign: &LocationSign,
         sessions: Sessions,
         captcha_solver: &CaptchaSolver,
     ) -> Result<HashMap<&'b Session<U>, SignResult>, SignError> {
-        let locations = self.location_info_getter.get_locations(
-            sign,
-            self.location_str,
-            self.preprocessor,
-        );
+        let locations =
+            self.location_info_getter
+                .get_locations(sign, self.location_str, self.preprocessor);
         if locations.is_empty() {
             return Err(SignError::LocationError(
                 "未获取到位置信息，请检查位置列表或检查输入。".to_owned(),

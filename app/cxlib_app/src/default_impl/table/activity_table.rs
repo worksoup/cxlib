@@ -1,4 +1,6 @@
-use crate::{BinCode, ImportExportTrait, NormalTableTrait, StoreError, TableDefinitionTrait};
+use crate::{
+    BinCode, CourseTable, ImportExportTrait, NormalTableTrait, StoreError, TableDefinitionTrait,
+};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::types::Activity;
 use log::warn;
@@ -59,7 +61,23 @@ impl ActivityTable {
         };
         Ok(Some(r.value()))
     }
-    // TODO: update recently active time secs.
+    pub fn update_status(
+        activity_table: &mut Table<
+            <Self as TableDefinitionTrait>::Key,
+            <Self as TableDefinitionTrait>::Value,
+        >,
+        active_id: impl Borrow<String>,
+        status: i32,
+    ) -> Result<bool, StoreError> {
+        if let Some((old_activity, old_data)) = Self::get(activity_table, active_id.borrow())? {
+            let mut old_activity = old_activity;
+            old_activity.set_status_code(status);
+            let r = (old_activity, old_data);
+            activity_table.insert(active_id, &r)?;
+            return Ok(true);
+        };
+        Ok(false)
+    }
     pub fn merge(
         w_cxt: &WriteTransaction,
         key: impl Borrow<String>,
@@ -73,6 +91,21 @@ impl ActivityTable {
             }
             old_data.into_iter().collect::<Vec<_>>()
         } else {
+            let course_table = CourseTable::write(w_cxt);
+            if let Ok(mut course_table) = course_table
+                && let Ok(a) = {
+                    let course = activity.course().course();
+                    CourseTable::update_recently_used_time(
+                        &mut course_table,
+                        course,
+                        activity.start_time_mills(),
+                    )
+                }
+                && a
+            {
+            } else {
+                warn!("无法更新课程最近活动时间。");
+            }
             value
         };
         let r = (activity, users);

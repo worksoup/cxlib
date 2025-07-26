@@ -66,7 +66,7 @@ where
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError>
     where
         U: Send + 'static,
-        Sessions: Iterator<Item = &'a Session<U>> + Clone,
+        Sessions: Iterator<Item = &'a Session<U>>,
     {
         fn get_locations<T: LocationInfoGetterTrait, Preprocessor: LocationPreprocessorTrait>(
             self_: &DefaultQrCodeSignner<T, Preprocessor>,

@@ -193,10 +193,7 @@ struct GetActivityR {
 
 impl CourseWithInfo {
     /// 获取该课程的活动。
-    pub fn get_activities<
-        TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait,
-    >(
+    pub fn get_activities<TypesProtocol: TypesProtocolTrait, UserProtocol: UserProtocolTrait>(
         &self,
         session: &Session<UserProtocol>,
     ) -> Result<Vec<Activity>, ActivityError> {
@@ -246,7 +243,7 @@ impl CourseWithInfo {
                                     id: ar.id.to_string(),
                                     name: ar.name_one,
                                     course: c.clone(),
-                                    status: ar.status,
+                                    status_code: ar.status,
                                     start_time_mills: ar.start_time_mills,
                                 }))
                         }
