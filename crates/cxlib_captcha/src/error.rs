@@ -16,6 +16,7 @@ pub enum CaptchaError {
 }
 /// 注意，此处的 Canceled 是用户取消，仅在重试循环中视为致命错误。
 impl MaybeFatalError for CaptchaError {
+    #[inline]
     fn is_fatal(&self) -> bool {
         match self {
             CaptchaError::AgentError(e) => e.is_fatal(),

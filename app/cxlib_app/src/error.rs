@@ -28,6 +28,7 @@ pub enum Error {
     StoreError(#[from] StoreError),
 }
 impl MaybeFatalError for Error {
+    #[inline]
     fn is_fatal(&self) -> bool {
         match self {
             Error::AgentError(agent_error) => agent_error.is_fatal(),

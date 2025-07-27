@@ -11,6 +11,7 @@ pub enum ProtocolError {
 }
 
 impl MaybeFatalError for ProtocolError {
+    #[inline]
     fn is_fatal(&self) -> bool {
         match self {
             ProtocolError::IoError(_) => false,

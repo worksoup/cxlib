@@ -24,6 +24,7 @@ pub enum LoginError {
     UnsupportedProtocol,
 }
 impl MaybeFatalError for LoginError {
+    #[inline]
     fn is_fatal(&self) -> bool {
         match self {
             LoginError::AgentError(e) => e.is_fatal(),
@@ -53,6 +54,7 @@ pub enum CourseError {
     LoginError(#[from] LoginError),
 }
 impl MaybeFatalError for CourseError {
+    #[inline]
     fn is_fatal(&self) -> bool {
         match self {
             CourseError::AgentError(e) => e.is_fatal(),
@@ -71,6 +73,7 @@ pub enum ActivityError {
     // LoginError(#[from] LoginError),
 }
 impl MaybeFatalError for ActivityError {
+    #[inline]
     fn is_fatal(&self) -> bool {
         match self {
             ActivityError::AgentError(e) => e.is_fatal(),

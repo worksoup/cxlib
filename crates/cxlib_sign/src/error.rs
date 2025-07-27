@@ -16,6 +16,7 @@ pub enum SignError {
     SignDataNotFound(String),
 }
 impl MaybeFatalError for SignError {
+    #[inline]
     fn is_fatal(&self) -> bool {
         match self {
             SignError::AgentError(e) => e.is_fatal(),

@@ -50,6 +50,7 @@
 ///     42
 /// });
 /// ```
+#[inline(always)]
 pub fn time_it_and_print_result<R, F: FnOnce() -> R>(f: F) -> R {
     print_timed_result(time_it(f))
 }

@@ -13,6 +13,7 @@ impl SolverProviderTrait for DefaultSlideImagesSolverProvider {
 
     type O = u32;
 
+    #[inline]
     fn solver((big_image, small_image): Self::I) -> Result<Self::O, crate::CaptchaError> {
         use cx_debug_utils::time_it_and_print_result;
         use cxlib_imageproc::{
@@ -49,12 +50,14 @@ pub type TriplePoint<T> = (Point<T>, Point<T>, Point<T>);
 impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::DynamicImage), O = u32>>
     VerificationInfoTrait for SlideImages<SolverProvider>
 {
-    type I = (DynamicImage, DynamicImage);
-    type O = u32;
+    type I = SolverProvider::I;
+    type O = SolverProvider::O;
 
+    #[inline]
     fn captcha_type() -> &'static str {
         "slide"
     }
+    #[inline]
     fn prepare_data(
         self,
         agent: &Agent,
@@ -66,10 +69,12 @@ impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::Dynami
         let big_img = download_image(agent, self.big_img_url(), referer)?;
         Ok((big_img, small_img))
     }
+    #[inline]
     fn result_to_string(result: u32) -> String {
         debug!("本地滑块结果：{result}");
         format!("%5B%7B%22x%22%3A{result}%7D%5D",)
     }
+    #[inline]
     fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
         SolverProvider::solver(input)
     }

@@ -12,6 +12,7 @@ impl SolverProviderTrait for DefaultRotateImagesSolverProvider {
 
     type O = u32;
 
+    #[inline]
     fn solver(input: Self::I) -> Result<Self::O, crate::CaptchaError> {
         use cx_debug_utils::time_it_and_print_result;
         use cxlib_imageproc::{
@@ -47,11 +48,14 @@ pub struct RotateImages<SolverProvider = DefaultRotateImagesSolverProvider> {
 impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::DynamicImage), O = u32>>
     VerificationInfoTrait for RotateImages<SolverProvider>
 {
-    type I = (DynamicImage, DynamicImage);
-    type O = u32;
+    type I = SolverProvider::I;
+    type O = SolverProvider::O;
+
+    #[inline]
     fn captcha_type() -> &'static str {
         "rotate"
     }
+    #[inline]
     fn prepare_data(
         self,
         agent: &Agent,
@@ -69,10 +73,12 @@ impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::Dynami
     /// result 取值为 0-280.
     ///
     /// 目前与旋转角度的换算关系为 angle/1.8.
+    #[inline]
     fn result_to_string(result: u32) -> String {
         debug!("本地旋转结果：{result}");
         format!("%5B%7B%22x%22%3A{result}%7D%5D")
     }
+    #[inline]
     fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
         SolverProvider::solver(input)
     }
