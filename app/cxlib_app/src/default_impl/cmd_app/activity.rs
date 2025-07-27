@@ -6,7 +6,7 @@ use crate::{
 use clap::{ArgMatches, FromArgMatches, Parser};
 use cxlib_error_utils::MaybeFatalError;
 use cxlib_internal::{
-    captcha::CaptchaSolver,
+    captcha::CaptchaSolverTrait,
     default_impl::{
         sign::Sign,
         signner::{
@@ -148,6 +148,7 @@ impl SignParser {
     /// 每个会话的签到结果映射
     pub fn process_typed_sign<
         's,
+        CaptchaSolver: CaptchaSolverTrait,
         CaptchaProtocol,
         SignProtocol,
         TypesProtocol,
@@ -158,7 +159,6 @@ impl SignParser {
         typed_sign: &mut Sign<TypesProtocol>,
         (location_getter, preprocessor): (LocationGetter, &impl LocationPreprocessorTrait),
         sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
-        captcha_solver: &'static CaptchaSolver,
         cli_args: &CliArgs,
     ) -> Result<HashMap<&'s Session<UserProtocol>, SignResult>, Error>
     where
@@ -181,44 +181,45 @@ impl SignParser {
         match typed_sign {
             Sign::Photo(ps) => {
                 info!("签到[{sign_name}]为拍照签到。");
-                sign_results =
-                    <DefaultPhotoSignner as SignnerTrait<_, CaptchaProtocol, SignProtocol>>::sign(
-                        &mut DefaultPhotoSignner::new(image),
-                        ps,
-                        sessions,
-                        captcha_solver,
-                    )?;
-            }
-            Sign::Normal(ns) => {
-                info!("签到[{sign_name}]为普通签到。");
-                sign_results = <DefaultNormalOrRawSignner as SignnerTrait<
+                sign_results = <DefaultPhotoSignner as SignnerTrait<
                     _,
+                    CaptchaSolver,
                     CaptchaProtocol,
                     SignProtocol,
                 >>::sign(
-                    &mut DefaultNormalOrRawSignner, ns, sessions, captcha_solver
+                    &mut DefaultPhotoSignner::new(image), ps, sessions
                 )?;
+            }
+            Sign::Normal(ns) => {
+                info!("签到[{sign_name}]为普通签到。");
+                sign_results =
+                    <DefaultNormalOrRawSignner as SignnerTrait<
+                        _,
+                        CaptchaSolver,
+                        CaptchaProtocol,
+                        SignProtocol,
+                    >>::sign(&mut DefaultNormalOrRawSignner, ns, sessions)?;
             }
             Sign::QrCode(qs) => {
                 info!("签到[{sign_name}]为二维码签到。");
-                sign_results = SignnerTrait::<_, CaptchaProtocol, SignProtocol>::sign(
-                    &mut DefaultQrCodeSignner::new(
-                        location_getter,
-                        location_str,
-                        image,
-                        &None,
-                        #[cfg(any(
-                            target_os = "linux",
-                            target_os = "windows",
-                            target_os = "macos"
-                        ))]
-                        *precisely,
-                        preprocessor,
-                    ),
-                    qs,
-                    sessions,
-                    captcha_solver,
-                )?;
+                sign_results =
+                    SignnerTrait::<_, CaptchaSolver, CaptchaProtocol, SignProtocol>::sign(
+                        &mut DefaultQrCodeSignner::new(
+                            location_getter,
+                            location_str,
+                            image,
+                            &None,
+                            #[cfg(any(
+                                target_os = "linux",
+                                target_os = "windows",
+                                target_os = "macos"
+                            ))]
+                            *precisely,
+                            preprocessor,
+                        ),
+                        qs,
+                        sessions,
+                    )?;
             }
             Sign::GestureOrSigncode(goss) => {
                 if goss.is_gesture() {
@@ -227,12 +228,12 @@ impl SignParser {
                     info!("签到[{sign_name}]为签到码签到。");
                 }
                 if let Some(signcode) = signcode {
-                    sign_results = SignnerTrait::<_, CaptchaProtocol, SignProtocol>::sign(
-                        &mut DefaultGestureOrSigncodeSignner::new(signcode),
-                        goss,
-                        sessions,
-                        captcha_solver,
-                    )?;
+                    sign_results =
+                        SignnerTrait::<_, CaptchaSolver, CaptchaProtocol, SignProtocol>::sign(
+                            &mut DefaultGestureOrSigncodeSignner::new(signcode),
+                            goss,
+                            sessions,
+                        )?;
                 } else if goss.is_gesture() {
                     warn!(
                         "所有用户在手势签到[{}]中签到失败！需要提供签到码！",
@@ -247,21 +248,25 @@ impl SignParser {
             }
             Sign::Location(ls) => {
                 info!("签到[{sign_name}]为位置签到。");
-                sign_results = SignnerTrait::<_, CaptchaProtocol, SignProtocol>::sign(
-                    &mut DefaultLocationSignner::new(location_getter, location_str, preprocessor),
-                    ls,
-                    sessions,
-                    captcha_solver,
-                )?;
+                sign_results =
+                    SignnerTrait::<_, CaptchaSolver, CaptchaProtocol, SignProtocol>::sign(
+                        &mut DefaultLocationSignner::new(
+                            location_getter,
+                            location_str,
+                            preprocessor,
+                        ),
+                        ls,
+                        sessions,
+                    )?;
             }
             Sign::Unknown(us) => {
                 warn!("签到[{}]为无效签到类型！", us.name());
-                sign_results = SignnerTrait::<_, CaptchaProtocol, SignProtocol>::sign(
-                    &mut DefaultNormalOrRawSignner,
-                    us,
-                    sessions,
-                    captcha_solver,
-                )?;
+                sign_results =
+                    SignnerTrait::<_, CaptchaSolver, CaptchaProtocol, SignProtocol>::sign(
+                        &mut DefaultNormalOrRawSignner,
+                        us,
+                        sessions,
+                    )?;
             }
         }
         Ok(sign_results)
@@ -282,6 +287,7 @@ impl SignParser {
     /// 元组包含处理后的原始签到数据和签到结果
     pub fn match_signs<
         's,
+        CaptchaSolver: CaptchaSolverTrait,
         CaptchaProtocol,
         SignProtocol,
         TypesProtocol,
@@ -291,7 +297,6 @@ impl SignParser {
         raw_sign: RawSign,
         location_cxt: (LocationGetter, &impl LocationPreprocessorTrait),
         sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
-        captcha_solver: &'static CaptchaSolver,
         cli_args: &CliArgs,
     ) -> (
         RawSign,
@@ -319,12 +324,11 @@ impl SignParser {
                 .into()),
             );
         };
-        let r = Self::process_typed_sign::<CaptchaProtocol, SignProtocol, _, _, _>(
+        let r = Self::process_typed_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, _, _, _>(
             sign_name,
             &mut typed_sign,
             location_cxt,
             sessions,
-            captcha_solver,
             cli_args,
         );
         (typed_sign.into_raw(), r)
@@ -336,6 +340,7 @@ impl SignParser {
     /// 核心业务逻辑：处理命令行参数，从数据库获取数据，
     /// 根据参数执行签到或显示签到信息
     pub fn get_sign_and_do_sign<
+        CaptchaSolver: CaptchaSolverTrait,
         CaptchaProtocol,
         SignProtocol,
         TypesProtocol,
@@ -347,7 +352,6 @@ impl SignParser {
         self,
         cxt: &Cxt,
         location_cxt: (LocationGetter, &impl LocationPreprocessorTrait),
-        captcha_solver: &'static CaptchaSolver,
     ) -> Result<(), Error>
     where
         CaptchaProtocol: CaptchaProtocolTrait,
@@ -426,14 +430,15 @@ impl SignParser {
                     if list {
                         Self::display_activities(all, active_id, activities);
                     } else {
-                        Self::do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
-                            all,
-                            active_id,
-                            has_uid_arg,
-                            location_cxt,
-                            captcha_solver,
-                            &arg,
-                            activities,
+                        Self::do_sign::<
+                            CaptchaSolver,
+                            CaptchaProtocol,
+                            SignProtocol,
+                            TypesProtocol,
+                            _,
+                            _,
+                        >(
+                            all, active_id, has_uid_arg, location_cxt, &arg, activities
                         )?;
                     }
                     Ok::<_, Error>(())
@@ -454,12 +459,11 @@ impl SignParser {
             if list {
                 Self::display_activities(all, active_id, activities);
             } else {
-                Self::do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
+                Self::do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
                     all,
                     active_id,
                     has_uid_arg,
                     location_cxt,
-                    captcha_solver,
                     &arg,
                     activities,
                 )?;
@@ -484,6 +488,7 @@ impl SignParser {
     /// 操作结果(成功或错误)
     pub fn do_sign<
         's,
+        CaptchaSolver: CaptchaSolverTrait,
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait + std::marker::Send + 'static,
         TypesProtocol: TypesProtocolTrait + 'static,
@@ -494,7 +499,6 @@ impl SignParser {
         active_id: Option<i64>,
         has_uid_arg: bool,
         location_cxt: (LocationGetter, &impl LocationPreprocessorTrait),
-        captcha_solver: &'static CaptchaSolver,
         cli_args: &CliArgs,
         activities: impl IntoIterator<
             Item = (
@@ -531,14 +535,14 @@ impl SignParser {
             let sessions = sessions.into_iter().collect::<Vec<_>>();
             let names = sessions.iter().map(|s| s.name()).collect::<Vec<_>>();
             info!("签到者：{names:?}");
-            let (raw_sign, result) =
-                Self::match_signs::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _>(
-                    raw_sign,
-                    location_cxt,
-                    sessions,
-                    captcha_solver,
-                    cli_args,
-                );
+            let (raw_sign, result) = Self::match_signs::<
+                CaptchaSolver,
+                CaptchaProtocol,
+                SignProtocol,
+                TypesProtocol,
+                _,
+                _,
+            >(raw_sign, location_cxt, sessions, cli_args);
             match result {
                 Ok(sign_results) => {
                     info!("签到活动[{}]签到结果：", raw_sign.name());
@@ -732,6 +736,7 @@ impl SignParser {
 /// - `Preprocessor`: 位置预处理器
 /// - `T`: 课程数据处理策略
 pub struct SignMainApp<
+    CaptchaSolver = cxlib_internal::captcha::SlideImages,
     CaptchaProtocol = cxlib_internal::protocol::collect::CaptchaProtocol,
     SignProtocol = cxlib_internal::protocol::collect::SignProtocol,
     TypesProtocol = cxlib_internal::protocol::collect::TypesProtocol,
@@ -739,6 +744,7 @@ pub struct SignMainApp<
     Preprocessor = Unit,
     T = DefaultCourseDataSorter,
 > {
+    _c: PhantomData<CaptchaSolver>,
     /// 以下文档由 AI 生成。
     ///
     ///  泛型标记(用于类型推导)
@@ -759,6 +765,7 @@ impl<C, S, Ty, U, T> Default for SignMainApp<C, S, Ty, U, T> {
     #[inline]
     fn default() -> Self {
         SignMainApp {
+            _c: PhantomData,
             _p: PhantomData,
             _lp: PhantomData,
             _t: PhantomData,
@@ -768,15 +775,30 @@ impl<C, S, Ty, U, T> Default for SignMainApp<C, S, Ty, U, T> {
 /// 以下文档由 AI 生成。
 ///
 ///  实现应用接口的签到主应用
-impl<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, Context, T>
-    AppTrait<Context>
-    for SignMainApp<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, T>
+impl<
+    CaptchaSolver: CaptchaSolverTrait,
+    CaptchaProtocol,
+    SignProtocol,
+    TypesProtocol,
+    UserProtocol,
+    Preprocessor,
+    Context,
+    T,
+> AppTrait<Context>
+    for SignMainApp<
+        CaptchaSolver,
+        CaptchaProtocol,
+        SignProtocol,
+        TypesProtocol,
+        UserProtocol,
+        Preprocessor,
+        T,
+    >
 where
     Context: AsRef<Database>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
-        + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
-        + AsRef<&'static CaptchaSolver>,
+        + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
     T: CourseDataFilterAndSorterTrait<Context>,
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     CaptchaProtocol: CaptchaProtocolTrait,
@@ -795,21 +817,40 @@ where
     #[inline]
     fn run(&self, cxt: &Context, data: Self::OwnedData) {
         warn!("{}", SignParser::notice_content(cxt.as_ref()));
-        data.get_sign_and_do_sign::<CaptchaProtocol, SignProtocol, TypesProtocol, _, _, _, T>(
+        data.get_sign_and_do_sign::<
+    CaptchaSolver,CaptchaProtocol, SignProtocol, TypesProtocol, _, _, _, T>(
             cxt,
             (
                 DefaultLocationInfoGetter::from(cxt.as_ref()),
                 AsRef::<Preprocessor>::as_ref(&cxt),
-            ),
-            AsRef::<&'static CaptchaSolver>::as_ref(&cxt),
+            ), 
         )
         .unwrap_or_else(|e| error!("签到失败！错误信息：{e}."));
+    }
+
+    fn meta_app<MetaApp>(self) -> Self
+    where
+        Self: Sized,
+        MetaApp:
+            crate::ConstructFromTrait<Self, Context, ()> + crate::MetaAppTrait<Self, Context, ()>,
+    {
+        let meta_app = MetaApp::construct_from(&self);
+        meta_app.register(self)
+    }
+
+    fn register_meta_app<MetaApp>(self, meta_app: MetaApp) -> Self
+    where
+        Self: Sized,
+        MetaApp: crate::MetaAppTrait<Self, Context, ()>,
+    {
+        meta_app.register(self)
     }
 }
 /// 以下文档由 AI 生成。
 ///
 ///  实现命令行元应用接口
 impl<
+    CaptchaSolver,
     CaptchaProtocol,
     SignProtocol,
     TypesProtocol,
@@ -819,13 +860,20 @@ impl<
     OwnedData,
     T,
 > CmdMetaAppTrait<Context, OwnedData>
-    for SignMainApp<CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, T>
+    for SignMainApp<
+        CaptchaSolver,
+        CaptchaProtocol,
+        SignProtocol,
+        TypesProtocol,
+        UserProtocol,
+        Preprocessor,
+        T,
+    >
 where
     Context: AsRef<Database>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
-        + AsRef<&'static CaptchaSolver>
         + 'static,
     OwnedData: 'static,
     T: CourseDataFilterAndSorterTrait<Context> + 'static,
@@ -834,6 +882,7 @@ where
     SignProtocol: Send + SignProtocolTrait + 'static,
     TypesProtocol: TypesProtocolTrait + 'static,
     Preprocessor: LocationPreprocessorTrait + 'static,
+    CaptchaSolver: CaptchaSolverTrait + 'static,
 {
     /// 以下文档由 AI 生成。
     ///

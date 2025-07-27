@@ -1,6 +1,8 @@
 use crate::{
     AccountTable, AppTrait, CmdMetaAppTrait, CourseData, CourseTable, GlobalMultimap,
-    NormalTableTrait, StoreError, TableDefinitionTrait, error,
+    NormalTableTrait, StoreError, TableDefinitionTrait,
+    database_guard::{DatabaseGuard, ReadAccessGuard},
+    error,
 };
 use clap::{ArgMatches, FromArgMatches, Parser};
 use cxlib_error_utils::CxlibResultUtils;
@@ -89,17 +91,40 @@ where
     type OwnedData = CoursesParser;
 
     fn run(&self, cxt: &Context, data: CoursesParser) {
-        // TODO: 刷新时删除原表。
-        let courses = if data.fresh {
-            let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
-            Self::update_course_table(cxt.as_ref(), login_solvers.clone()).log_unwrap_or_default()
+        let CoursesParser { uid, fresh } = data;
+        let mut database_guard = DatabaseGuard::new(cxt.as_ref());
+        let courses = if fresh {
+            || -> Result<HashMap<Course, (CourseInfo, CourseData)>, error::Error> {
+                {
+                    let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
+                    let sessions = if let Some(uid) = &uid {
+                        AccountTable::get_sessions_by_uid_list_str(
+                            &database_guard,
+                            uid,
+                            login_solvers,
+                        )?
+                    } else {
+                        // 删除旧的课程数据表。
+                        _ = database_guard.write(CourseTable::delete).log_ok();
+                        AccountTable::get_all_sessions(&database_guard, login_solvers)?
+                    };
+                    Self::update_sessions_courses(&database_guard, sessions.values())
+                }
+            }()
+            .log_unwrap_or_default()
         } else {
-            let db: &Database = cxt.as_ref();
-            let r_cxt = db.begin_read().log_unwrap();
-            let course_table = CourseTable::read(&r_cxt).log_unwrap();
-            CourseTable::get_courses(&course_table).unwrap_or_default()
+            database_guard
+                .read(|r_cxt| {
+                    let course_table = CourseTable::read(r_cxt).log_unwrap();
+                    CourseTable::get_courses(&course_table)
+                })
+                .map(ReadAccessGuard::into_inner)
+                .log_unwrap_or_default()
         };
-        if let Some(uid) = &data.uid {
+        if let Some(uid) = &uid
+            && !fresh
+        // 刷新的情况下，获取的课程本就是用户的课程。
+        {
             let set = uid.split(',').map(|s| s.trim()).collect::<HashSet<&str>>();
             for (course, (info, _)) in courses.into_iter().filter(|(_, (_, data))| {
                 let set_ = data.users().collect::<HashSet<_>>();

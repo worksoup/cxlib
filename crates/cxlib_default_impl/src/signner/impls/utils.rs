@@ -1,7 +1,7 @@
 //! 写了 8 行导入语句、3 行辅助特型、8 行特型实现，只为复用 40 行的代码。
 //! 好，还有 2 行调侃。
 use crate::sign::{LocationSign, QrCodeSign};
-use cxlib_captcha::CaptchaSolver;
+use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
 use cxlib_sign::{PreSignResult, SignError, SignResult, SignTrait};
 use cxlib_types::{Geoaddr, Session};
@@ -33,6 +33,7 @@ impl<'a, SignProtocol> SignRetry<&'a Geoaddr, &'a <Self as SignTrait>::Data, Sig
 }
 /// 提供数据，不断进行签到，成功则返回。其通过失败时的 msg 判断是否需要重试，若无需重试，则签到失败。
 pub(crate) fn sign_single_retry<
+    CaptchaSolver: CaptchaSolverTrait,
     CaptchaProtocol,
     SignProtocol,
     U,
@@ -44,7 +45,6 @@ pub(crate) fn sign_single_retry<
     sign: &Sign,
     session: &Session<U>,
     (pre_sign_data, locations): (&<Sign as SignTrait>::PreSignData, InputDataIter),
-    captcha_solver: &CaptchaSolver,
 ) -> Result<SignResult, SignError>
 where
     SignProtocol: SignProtocolTrait,
@@ -65,12 +65,11 @@ where
             data: ref pre_sign_result_data,
         } => {
             for location in locations {
-                match sign.sign::<CaptchaProtocol, SignProtocol, U>(
+                match sign.sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
                     session,
                     url,
                     pre_sign_result_data,
                     pre_sign_data,
-                    captcha_solver,
                     Sign::data_helper(location).borrow(),
                 )? {
                     r @ (SignResult::Success | SignResult::PartialSuccess { .. }) => return Ok(r),

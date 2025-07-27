@@ -1,6 +1,6 @@
 use crate::{PreSignResult, SignError, SignResult, SignTrait};
 use cx_gizmo_types::OptionPair;
-use cxlib_captcha::{CaptchaId, CaptchaSolver, utils::find_captcha};
+use cxlib_captcha::{CaptchaId, CaptchaSolverTrait, utils::find_captcha};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{
     collect::{CaptchaProtocolTrait, SignProtocolTrait},
@@ -67,11 +67,10 @@ pub fn analysis_after_presign<
         data: captcha_id_and_location,
     })
 }
-pub fn secondary_verification<CaptchaProtocol, S>(
+pub fn secondary_verification<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, S>(
     agent: &Agent,
     url: PPTSignHelper,
     captcha_id: Option<&CaptchaId>,
-    captcha_solver: &CaptchaSolver,
     referer: &str,
 ) -> Result<SignResult, SignError>
 where
@@ -83,7 +82,7 @@ where
         warn!("未找到 CaptchaId, 使用内建值。");
         cxlib_protocol::collect::CAPTCHA_ID
     };
-    let url_param = captcha_solver(agent, captcha_id, referer)?;
+    let url_param = CaptchaSolver::solve_captcha::<CaptchaProtocol>(agent, captcha_id, referer)?;
     let r = {
         let url = url.with_validate(&url_param);
         let r = url.get(agent)?;
@@ -91,11 +90,10 @@ where
     };
     Ok(r)
 }
-pub fn try_secondary_verification<CaptchaProtocol, S, Sign>(
+pub fn try_secondary_verification<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, S, Sign>(
     agent: &Agent,
     url: PPTSignHelper,
     captcha_id: Option<&CaptchaId>,
-    captcha_solver: &CaptchaSolver,
     referer: &str,
 ) -> Result<SignResult, SignError>
 where
@@ -108,12 +106,8 @@ where
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。
                 let url = url.patch_enc_by_pre_sign_result_msg(msg);
-                secondary_verification::<CaptchaProtocol, S>(
-                    agent,
-                    url,
-                    captcha_id,
-                    captcha_solver,
-                    referer,
+                secondary_verification::<CaptchaSolver, CaptchaProtocol, S>(
+                    agent, url, captcha_id, referer,
                 )
             } else {
                 Ok(SignResult::Failure { msg })

@@ -1,6 +1,6 @@
 use crate::utils::try_secondary_verification;
 use cx_gizmo_types::OptionPair;
-use cxlib_captcha::{CaptchaId, CaptchaSolver};
+use cxlib_captcha::{CaptchaId, CaptchaSolverTrait};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{
     collect::{CaptchaProtocolTrait, SignProtocolTrait},
@@ -168,13 +168,12 @@ pub trait SignTrait: Ord {
     /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
     /// 调用 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 进行判断，如果真，则调用 [`sign_unchecked`](SignTrait::sign_unchecked), 否则返回
     /// [`SignResult::Fail`]{msg: "签到未准备好！".to_string()}
-    fn sign<CaptchaProtocol, SignProtocol, U>(
+    fn sign<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
         pre_sign_url: &str,
         pre_sign_result_data: &OptionPair<CaptchaId, LocationWithRange>,
         pre_sign_data: &Self::PreSignData,
-        captcha_solver: &CaptchaSolver,
         data: &Self::Data,
     ) -> Result<SignResult, SignError>
     where
@@ -184,11 +183,10 @@ pub trait SignTrait: Ord {
         match self.pre_check_data(session, data)? {
             Ok(_) => {
                 let url = self.sign_url::<SignProtocol, U>(session, pre_sign_data, data);
-                try_secondary_verification::<CaptchaProtocol, SignProtocol, Self>(
+                try_secondary_verification::<CaptchaSolver, CaptchaProtocol, SignProtocol, Self>(
                     session,
                     url,
                     pre_sign_result_data.first(),
-                    captcha_solver,
                     pre_sign_url,
                 )
             }
@@ -196,11 +194,15 @@ pub trait SignTrait: Ord {
         }
     }
     /// 检查签到状态，如果需要签到，则预签到并签到。
-    fn check_state_and_do_sign<CaptchaProtocol, SignProtocol, U>(
+    fn check_state_and_do_sign<
+        CaptchaSolver: CaptchaSolverTrait,
+        CaptchaProtocol,
+        SignProtocol,
+        U,
+    >(
         &self,
         session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
-        captcha_solver: &CaptchaSolver,
         data: &Self::Data,
     ) -> Result<SignResult, SignError>
     where
@@ -219,12 +221,11 @@ pub trait SignTrait: Ord {
             PreSignResult::Data {
                 ref url,
                 data: ref pre_sign_result_data,
-            } => self.sign::<CaptchaProtocol, SignProtocol, U>(
+            } => self.sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
                 session,
                 url,
                 pre_sign_result_data,
                 pre_sign_data,
-                captcha_solver,
                 data,
             ),
         }
@@ -368,24 +369,23 @@ pub struct SignActivityRaw {
     pub start_time_secs: i64,
 }
 /// 针对同一个签到，但不同 Session 的处理程序。
-pub trait SignnerTrait<T, CaptchaProtocol, SignProtocol>
+pub trait SignnerTrait<T, CaptchaSolver, CaptchaProtocol, SignProtocol>
 where
     T: SignTrait,
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
+    CaptchaSolver: CaptchaSolverTrait,
 {
     type ExtData<'e>;
     fn sign<'a, U: Send + 'static, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &T,
         sessions: Sessions,
-        captcha_solver: &'static CaptchaSolver,
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError>;
     /// 此处不使用 self, 方便多线程实现。
     fn sign_single<U>(
         sign: &T,
         session: &Session<U>,
-        captcha_solver: &CaptchaSolver,
         extra_data: Self::ExtData<'_>,
     ) -> Result<SignResult, SignError>;
 }

@@ -1,5 +1,5 @@
 use crate::{sign::LocationSign, signner::LocationInfoGetterTrait};
-use cxlib_captcha::CaptchaSolver;
+use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
 use cxlib_sign::{SignError, SignResult, SignnerTrait};
 use cxlib_types::{Geoaddr, LocationPreprocessorTrait, Session};
@@ -26,8 +26,14 @@ impl<'a, T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait>
         }
     }
 }
-impl<CaptchaProtocol, SignProtocol, T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait>
-    SignnerTrait<LocationSign, CaptchaProtocol, SignProtocol> for DefaultLocationSignner<'_, T, PP>
+impl<
+    CaptchaSolver: CaptchaSolverTrait,
+    CaptchaProtocol,
+    SignProtocol,
+    T: LocationInfoGetterTrait,
+    PP: LocationPreprocessorTrait,
+> SignnerTrait<LocationSign, CaptchaSolver, CaptchaProtocol, SignProtocol>
+    for DefaultLocationSignner<'_, T, PP>
 where
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
@@ -38,7 +44,6 @@ where
         &mut self,
         sign: &LocationSign,
         sessions: Sessions,
-        captcha_solver: &CaptchaSolver,
     ) -> Result<HashMap<&'b Session<U>, SignResult>, SignError> {
         let locations =
             self.location_info_getter
@@ -51,13 +56,12 @@ where
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
-            let r =
-                <Self as SignnerTrait<LocationSign, CaptchaProtocol, SignProtocol>>::sign_single(
-                    sign,
-                    session,
-                    captcha_solver,
-                    &locations,
-                )?;
+            let r = <Self as SignnerTrait<
+                LocationSign,
+                CaptchaSolver,
+                CaptchaProtocol,
+                SignProtocol,
+            >>::sign_single(sign, session, &locations)?;
             map.insert(session, r);
         }
         Ok(map)
@@ -66,10 +70,10 @@ where
     fn sign_single<U>(
         sign: &LocationSign,
         session: &Session<U>,
-        captcha_solver: &CaptchaSolver,
         locations: &Vec<Geoaddr>,
     ) -> Result<SignResult, SignError> {
         crate::signner::impls::utils::sign_single_retry::<
+            CaptchaSolver,
             CaptchaProtocol,
             SignProtocol,
             _,
@@ -77,6 +81,6 @@ where
             _,
             _,
             _,
-        >(sign, session, (&(), locations), captcha_solver)
+        >(sign, session, (&(), locations))
     }
 }

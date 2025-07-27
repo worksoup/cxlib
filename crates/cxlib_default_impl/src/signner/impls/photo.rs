@@ -1,5 +1,5 @@
 use crate::sign::PhotoSign;
-use cxlib_captcha::CaptchaSolver;
+use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait, TypesProtocolTrait};
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::{Photo, Session};
@@ -24,8 +24,9 @@ impl DefaultPhotoSignner {
         Self { path }
     }
 }
-impl<CaptchaProtocol, SignProtocol, TypesProtocol>
-    SignnerTrait<PhotoSign<TypesProtocol>, CaptchaProtocol, SignProtocol> for DefaultPhotoSignner
+impl<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, SignProtocol, TypesProtocol>
+    SignnerTrait<PhotoSign<TypesProtocol>, CaptchaSolver, CaptchaProtocol, SignProtocol>
+    for DefaultPhotoSignner
 where
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
@@ -37,7 +38,6 @@ where
         &mut self,
         sign: &PhotoSign<TypesProtocol>,
         sessions: Sessions,
-        captcha_solver: &CaptchaSolver,
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
         let mut pic_map = HashMap::new();
         #[allow(clippy::mutable_key_type)]
@@ -74,9 +74,10 @@ where
             if let Some(photo) = pic_map.get(&index).cloned() {
                 let a = <Self as SignnerTrait<
                     PhotoSign<TypesProtocol>,
+                    CaptchaSolver,
                     CaptchaProtocol,
                     SignProtocol,
-                >>::sign_single(sign, session, captcha_solver, &photo)?;
+                >>::sign_single(sign, session, &photo)?;
                 map.insert(session, a);
             } else {
                 map.insert(
@@ -93,13 +94,11 @@ where
     fn sign_single<U>(
         sign: &PhotoSign<TypesProtocol>,
         session: &Session<U>,
-        captcha_solver: &CaptchaSolver,
         photo: &Photo<TypesProtocol>,
     ) -> Result<SignResult, SignError> {
-        sign.check_state_and_do_sign::<CaptchaProtocol, SignProtocol, U>(
+        sign.check_state_and_do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
             session,
             &(),
-            captcha_solver,
             photo,
         )
     }

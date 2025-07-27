@@ -24,7 +24,7 @@ pub use completions::*;
 use crate::{AliasTable, CourseData, CourseTable, GlobalMultimap, NormalTableTrait};
 use clap::Command;
 use cxlib_internal::{
-    captcha::{CaptchaSolver, utils::get_now_timestamp_mills},
+    captcha::utils::get_now_timestamp_mills,
     default_impl::{sign::LocationSign, signner::LocationInfoGetterTrait},
     sign::SignTrait,
     types::{
@@ -42,7 +42,6 @@ pub struct CmdAppContext<UserProtocol = cxlib_internal::protocol::collect::UserP
     command: Command,
     login_solvers: GlobalMultimap<UntypedLoginSolver<UserProtocol>>,
     app_info: AppInfo,
-    captcha_solver: &'static CaptchaSolver,
 }
 impl<U> CmdAppContext<U> {
     pub fn new(
@@ -50,7 +49,6 @@ impl<U> CmdAppContext<U> {
         command: Command,
         login_solvers: GlobalMultimap<UntypedLoginSolver<U>>,
         app_info: AppInfo,
-        captcha_solver: &'static CaptchaSolver,
     ) -> Self {
         let db = Database::builder().create(dir.get_database_dir()).unwrap();
         Self {
@@ -59,7 +57,6 @@ impl<U> CmdAppContext<U> {
             command,
             app_info,
             login_solvers,
-            captcha_solver,
         }
     }
 }
@@ -81,16 +78,6 @@ impl<U> AsRef<AppInfo> for CmdAppContext<U> {
 impl<U> AsRef<GlobalMultimap<UntypedLoginSolver<U>>> for CmdAppContext<U> {
     fn as_ref(&self) -> &GlobalMultimap<UntypedLoginSolver<U>> {
         &self.login_solvers
-    }
-}
-impl<U> AsRef<&'static CaptchaSolver> for CmdAppContext<U> {
-    fn as_ref(&self) -> &&'static CaptchaSolver {
-        &self.captcha_solver
-    }
-}
-impl<U> AsRef<CaptchaSolver> for CmdAppContext<U> {
-    fn as_ref(&self) -> &CaptchaSolver {
-        self.captcha_solver
     }
 }
 impl<U> AsRef<Unit> for CmdAppContext<U> {
