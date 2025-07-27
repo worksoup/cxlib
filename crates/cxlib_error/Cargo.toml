@@ -8,4 +8,3 @@ authors.workspace = true
 cxlib_error_utils = { path = "../cxlib_error_utils" }
 thiserror.workspace = true
 ureq.workspace = true
-ureq-proto.workspace = true

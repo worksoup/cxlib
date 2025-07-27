@@ -42,7 +42,6 @@ thiserror = "2.0"
 toml = "0.9"
 unicode-width = "0.2"
 ureq = "3.0"
-ureq-proto = "0.4"
 xcap = { version = "0.6" }
 yapt = { git = "https://github.com/worksoup/yapt.git" }
 ############### cxlib_app ###############
