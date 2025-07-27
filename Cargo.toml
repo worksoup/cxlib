@@ -55,13 +55,6 @@ completion-nu = ["cxlib_app/completion-nu"]
 completion-carapace = ["cxlib_app/completion-carapace"]
 completion-fig = ["cxlib_app/completion-fig"]
 
-all_ui_solver = ["slide_ui_solver", "ui_solver", "obstacle_ui_solver", "rotate_ui_solver"]
-ui_solver = ["icon_click_ui_solver", "text_click_ui_solver"]
-slide_ui_solver = ["cxlib_internal/slide_ui_solver"]
-rotate_ui_solver = ["cxlib_internal/rotate_ui_solver"]
-obstacle_ui_solver = ["cxlib_internal/obstacle_ui_solver"]
-icon_click_ui_solver = ["cxlib_internal/icon_click_ui_solver"]
-text_click_ui_solver = ["cxlib_internal/text_click_ui_solver"]
 [dependencies]
 cxlib_app = { path = "app/cxlib_app" }
 cxlib_internal = { path = "crates/cxlib_internal" }

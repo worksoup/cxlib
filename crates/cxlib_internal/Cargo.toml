@@ -5,11 +5,6 @@ version.workspace = true
 authors.workspace = true
 
 [features]
-slide_ui_solver = ["cxlib_captcha/slide_ui_solver"]
-rotate_ui_solver = ["cxlib_captcha/rotate_ui_solver"]
-obstacle_ui_solver = ["cxlib_captcha/obstacle_ui_solver"]
-icon_click_ui_solver = ["cxlib_captcha/icon_click_ui_solver"]
-text_click_ui_solver = ["cxlib_captcha/text_click_ui_solver"]
 
 [dependencies]
 cxlib_captcha = { path = "../cxlib_captcha" }

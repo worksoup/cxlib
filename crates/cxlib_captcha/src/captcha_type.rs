@@ -236,8 +236,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        CaptchaSolverTrait, IconClickImage, ObstacleImage, RotateImages, SlideImages,
-        TextClickInfo, VerificationInfoTrait,
+        CaptchaSolverTrait, RotateImages, SlideImages, VerificationInfoTrait,
         hash::{encode, hash},
         utils::{get_now_timestamp_mills, get_server_time},
     };
@@ -250,7 +249,7 @@ mod tests {
     #[test]
     fn auto_solve_captcha_test() {
         let agent = ureq::Agent::new_with_defaults();
-        let r = RotateImages::solve_captcha::<CaptchaProtocol>(&agent, CAPTCHA_ID, REFERER);
+        let r = <RotateImages>::solve_captcha::<CaptchaProtocol>(&agent, CAPTCHA_ID, REFERER);
         println!("{r:?}");
     }
 
@@ -271,7 +270,7 @@ mod tests {
                 + (server_time + 300000_u128).to_string().as_str();
             assert_eq!(real_value, tmp_token);
         }
-        assert_eq_with_real_value::<IconClickImage>(
+        assert_eq_with_real_value::<SlideImages>(
             "21d29919dc55f9a25b25a9aec531682e%3A1733129174649",
             1733128874649,
             CAPTCHA_ID,
@@ -296,10 +295,7 @@ mod tests {
                     .unwrap();
             println!("{validate_info:?}");
         }
-        get_captcha_::<IconClickImage>();
-        get_captcha_::<ObstacleImage>();
         get_captcha_::<RotateImages>();
         get_captcha_::<SlideImages>();
-        get_captcha_::<TextClickInfo>();
     }
 }
