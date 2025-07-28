@@ -1,5 +1,7 @@
 use image::{GenericImage, GenericImageView, ImageBuffer, Pixel};
 use imageproc::definitions::Image;
+
+use crate::my_sync_unsafe_cell::MySyncUnsafeCell;
 pub fn map_colors_to<I, J, P, Q, F>(image: &I, out: &mut J, f: F)
 where
     I: GenericImageView<Pixel = P>,
@@ -52,13 +54,12 @@ where
     use rayon::prelude::*;
     let (width, height) = image.dimensions();
     let map = |out: &mut J| {
-        let out = &*out;
+        let out = MySyncUnsafeCell::from_mut(out);
         (0..height).into_par_iter().for_each(|y| {
             for x in 0..width {
                 unsafe {
                     let pix = image.unsafe_get_pixel(x, y);
-                    let out: *const _ = out as *const _;
-                    let out: *mut _ = std::mem::transmute::<_, *mut J>(out);
+                    let out: *mut _ = out.get();
                     (*out).unsafe_put_pixel(x, y, f(x, y, pix));
                 }
             }
@@ -156,14 +157,13 @@ where
     use rayon::prelude::*;
     let (width, height) = image1.dimensions();
     let map = |out: &mut K| {
-        let out = &*out;
+        let out = MySyncUnsafeCell::from_mut(out);
         (0..height).into_par_iter().for_each(|y| {
             for x in 0..width {
                 unsafe {
                     let p = image1.unsafe_get_pixel(x, y);
                     let q = image2.unsafe_get_pixel(x, y);
-                    let out: *const _ = out as *const _;
-                    let out: *mut _ = std::mem::transmute::<_, *mut K>(out);
+                    let out: *mut _ = out.get();
                     (*out).unsafe_put_pixel(x, y, f(x, y, p, q));
                 }
             }

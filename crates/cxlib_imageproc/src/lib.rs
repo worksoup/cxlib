@@ -1,5 +1,7 @@
 pub mod map;
 
+mod my_sync_unsafe_cell;
+
 use crate::map::map_colors;
 use image::{
     DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, ImageError, Luma, LumaA,
@@ -216,7 +218,9 @@ pub mod click_captcha_utils {
     }
 }
 pub mod rotate_captcha_utils {
-    use crate::{map::map_colors2_parallel, rgb_alpha_channel};
+    use crate::{
+        map::map_colors2_parallel, my_sync_unsafe_cell::MySyncUnsafeCell, rgb_alpha_channel,
+    };
     use image::{
         DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, Luma, Rgba,
         buffer::ConvertBuffer,
@@ -291,11 +295,11 @@ pub mod rotate_captcha_utils {
         let outer_edge = get_edge::<SPLIT_COUNT>(outer, &mask);
         let inner_edge = get_edge::<SPLIT_COUNT>(inner, &mask);
         let wh = inner_edge.height();
-        let inner: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(wh, wh);
+        let inner: MySyncUnsafeCell<ImageBuffer<Rgba<u8>, Vec<u8>>> =
+            ImageBuffer::new(wh, wh).into();
         use rayon::prelude::*;
         (0..wh).into_par_iter().for_each(|y| {
-            let inner = &inner as *const _;
-            let inner: *mut ImageBuffer<Rgba<u8>, Vec<u8>> = unsafe { std::mem::transmute(inner) };
+            let inner = inner.get();
             for x in 0..wh {
                 unsafe {
                     let pix = inner_edge.unsafe_get_pixel(0, (wh + y - x) % wh);
@@ -303,6 +307,6 @@ pub mod rotate_captcha_utils {
                 }
             }
         });
-        matcher(&inner.convert(), &outer_edge.convert()) * 200 / SPLIT_COUNT
+        matcher(&inner.into_inner().convert(), &outer_edge.convert()) * 200 / SPLIT_COUNT
     }
 }
