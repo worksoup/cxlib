@@ -1,21 +1,20 @@
-use std::marker::PhantomData;
+use clap::{ArgMatches, Parser};
+use cxlib_store::ConfigDir;
 
 use crate::{AppTrait, CmdMetaAppTrait};
-use clap::{ArgMatches, Parser};
-use cxlib_store::DirTrait;
 #[derive(Debug, Parser, Clone)]
 // TODO: build.rs 中通过环境变量设置 alias.
 #[command(name = "where-is-config", alias = "w")]
 /// 显示配置文件夹位置。
 pub struct WhereIsConfigParser;
-pub struct WhereIsConfigCmdApp<D = cxlib_store::Dir>(PhantomData<D>);
-impl<D> Default for WhereIsConfigCmdApp<D> {
+pub struct WhereIsConfigCmdApp {}
+impl Default for WhereIsConfigCmdApp {
     #[inline]
     fn default() -> Self {
-        Self(Default::default())
+        Self {}
     }
 }
-impl<D: DirTrait, Context: AsRef<D>> AppTrait<Context> for WhereIsConfigCmdApp<D> {
+impl<Context: AsRef<ConfigDir>> AppTrait<Context> for WhereIsConfigCmdApp {
     type OwnedData = WhereIsConfigParser;
 
     #[inline]
@@ -24,14 +23,14 @@ impl<D: DirTrait, Context: AsRef<D>> AppTrait<Context> for WhereIsConfigCmdApp<D
             "{}",
             &cxt.as_ref()
                 .get_config_dir()
-                .into_os_string()
+                .as_os_str()
                 .to_string_lossy()
                 .to_string()
         );
     }
 }
-impl<D: DirTrait + 'static, Context: 'static + std::convert::AsRef<D>, OwnedData: 'static>
-    CmdMetaAppTrait<Context, OwnedData> for WhereIsConfigCmdApp<D>
+impl<Context: 'static + AsRef<ConfigDir>, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
+    for WhereIsConfigCmdApp
 {
     #[inline]
     fn read_owned_data(

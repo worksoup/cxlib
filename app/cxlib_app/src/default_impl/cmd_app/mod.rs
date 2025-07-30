@@ -10,7 +10,7 @@ pub use account::*;
 pub use accounts::*;
 pub use activity::*;
 pub use course::*;
-use cxlib_store::{AppInfo, Dir, DirTrait};
+use cxlib_store::{AppInfo, ConfigDir};
 pub use location::*;
 pub use locations::*;
 use ref_wrapper::{UNIT, Unit};
@@ -34,10 +34,10 @@ use cxlib_internal::{
 };
 use log::warn;
 use redb::Database;
-use std::cmp;
+use std::{cmp, path::Path};
 
 pub struct CmdAppContext<UserProtocol = cxlib_internal::protocol::collect::UserProtocol> {
-    dir: Dir,
+    dir: ConfigDir,
     db: Database,
     command: Command,
     login_solvers: GlobalMultimap<UntypedLoginSolver<UserProtocol>>,
@@ -45,14 +45,17 @@ pub struct CmdAppContext<UserProtocol = cxlib_internal::protocol::collect::UserP
 }
 impl<U> CmdAppContext<U> {
     pub fn new(
-        dir: Dir,
+        config_dir: ConfigDir,
+        db_file_name: impl AsRef<Path>,
         command: Command,
         login_solvers: GlobalMultimap<UntypedLoginSolver<U>>,
         app_info: AppInfo,
     ) -> Self {
-        let db = Database::builder().create(dir.get_database_dir()).unwrap();
+        let db = Database::builder()
+            .create(config_dir.get_config_dir().join(db_file_name))
+            .unwrap();
         Self {
-            dir,
+            dir: config_dir,
             db,
             command,
             app_info,
@@ -61,32 +64,38 @@ impl<U> CmdAppContext<U> {
     }
 }
 impl<U> AsRef<Command> for CmdAppContext<U> {
+    #[inline]
     fn as_ref(&self) -> &Command {
         &self.command
     }
 }
 impl<U> AsRef<Database> for CmdAppContext<U> {
+    #[inline]
     fn as_ref(&self) -> &Database {
         &self.db
     }
 }
 impl<U> AsRef<AppInfo> for CmdAppContext<U> {
+    #[inline]
     fn as_ref(&self) -> &AppInfo {
         &self.app_info
     }
 }
 impl<U> AsRef<GlobalMultimap<UntypedLoginSolver<U>>> for CmdAppContext<U> {
+    #[inline]
     fn as_ref(&self) -> &GlobalMultimap<UntypedLoginSolver<U>> {
         &self.login_solvers
     }
 }
 impl<U> AsRef<Unit> for CmdAppContext<U> {
+    #[inline]
     fn as_ref(&self) -> &Unit {
         &UNIT
     }
 }
-impl<U> AsRef<Dir> for CmdAppContext<U> {
-    fn as_ref(&self) -> &Dir {
+impl<U> AsRef<ConfigDir> for CmdAppContext<U> {
+    #[inline]
+    fn as_ref(&self) -> &ConfigDir {
         &self.dir
     }
 }
@@ -100,6 +109,7 @@ pub trait CourseDataFilterAndSorterTrait<Context> {
 }
 pub struct DefaultCourseDataSorter;
 impl<T> CourseDataFilterAndSorterTrait<T> for DefaultCourseDataSorter {
+    #[inline]
     fn filter(a: (&Course, &CourseInfo, &CourseData)) -> bool {
         !a.1.ended()
             && (u64::MAX == *a.2.recently_used_timestamp() || {
@@ -130,11 +140,13 @@ impl<T> CourseDataFilterAndSorterTrait<T> for DefaultCourseDataSorter {
 #[derive(Clone, Copy)]
 pub struct DefaultLocationInfoGetter<'a>(&'a Database);
 impl<'a> DefaultLocationInfoGetter<'a> {
+    #[inline]
     pub fn new(db: &'a Database) -> Self {
         Self(db)
     }
 }
 impl<'a> From<&'a Database> for DefaultLocationInfoGetter<'a> {
+    #[inline]
     fn from(db: &'a Database) -> Self {
         Self::new(db)
     }
