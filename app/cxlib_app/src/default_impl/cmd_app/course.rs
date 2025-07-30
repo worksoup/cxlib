@@ -65,7 +65,7 @@ impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
     }
     #[inline]
     pub fn update_course_table<Cxt>(
-        db: &Database,
+        db: &mut DatabaseGuard,
         cxt: Cxt,
     ) -> Result<HashMap<Course, (CourseInfo, CourseData)>, error::Error>
     where
@@ -99,14 +99,14 @@ where
                     let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
                     let sessions = if let Some(uid) = &uid {
                         AccountTable::get_sessions_by_uid_list_str(
-                            &database_guard,
+                            &mut database_guard,
                             uid,
                             login_solvers,
                         )?
                     } else {
                         // 删除旧的课程数据表。
                         _ = database_guard.write(CourseTable::delete).log_ok();
-                        AccountTable::get_all_sessions(&database_guard, login_solvers)?
+                        AccountTable::get_all_sessions(&mut database_guard, login_solvers)?
                     };
                     Self::update_sessions_courses(&database_guard, sessions.values())
                 }

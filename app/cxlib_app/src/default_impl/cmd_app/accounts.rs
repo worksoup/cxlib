@@ -1,4 +1,6 @@
-use crate::{AccountTable, AppTrait, CmdMetaAppTrait, GlobalMultimap};
+use crate::{
+    AccountTable, AppTrait, CmdMetaAppTrait, GlobalMultimap, database_guard::DatabaseGuard,
+};
 use clap::{ArgMatches, FromArgMatches, Parser, arg};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::{protocol::collect::UserProtocolTrait, types::UntypedLoginSolver};
@@ -32,15 +34,16 @@ where
 
     fn run(&self, cxt: &Context, AccountsParser { fresh }: Self::OwnedData) {
         let solver_cxt = cxt.as_ref();
-        let db: &Database = cxt.as_ref();
+        let mut db = DatabaseGuard::new(cxt.as_ref());
         let sessions = if fresh {
-            let w_cxt = db.begin_write().log_unwrap();
-            AccountTable::<UserProtocol>::relogin_all(&w_cxt, cxt)
+            db.write(|w_cxt| AccountTable::<UserProtocol>::relogin_all(w_cxt, cxt))
+                .log_unwrap()
+                .into_inner()
         } else {
             // 列出所有账号。
-            AccountTable::get_all_sessions(db, solver_cxt)
+            AccountTable::get_all_sessions(&mut db, solver_cxt).log_unwrap()
         };
-        for session in sessions.log_unwrap().into_values() {
+        for session in sessions.into_values() {
             println!("{}, {}, {}", session.uname(), session.name(), session.uid());
         }
         // TODO: 更新课程信息。

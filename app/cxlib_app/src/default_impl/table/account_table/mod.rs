@@ -6,6 +6,7 @@ pub use account_data::*;
 use crate::{
     CommonDataTable, GlobalMultimap, ImportExportTrait, KeyType, LoginSolverGetter,
     NormalTableTrait, StoreError, TableDefinitionTrait,
+    database_guard::DatabaseGuard,
     default_impl::table::{account_table::internal_data::AccountDataInternal, utils::BinCode},
 };
 use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
@@ -14,7 +15,7 @@ use cxlib_internal::{
     types::{LoginError, LoginSolverTrait, Session, UntypedLoginSolver},
 };
 use log::{error, info, warn};
-use redb::{Database, ReadTransaction, ReadableTable, WriteTransaction};
+use redb::{Database, ReadTransaction, ReadableTable, TableError, WriteTransaction};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -24,6 +25,7 @@ use std::{
 };
 use try_from_with_context::TryFromWithContext;
 
+// TODO: update api.
 pub struct AccountTable<UserProtocol>(PhantomData<UserProtocol>);
 
 impl<UserProtocol> AccountTable<UserProtocol> {
@@ -160,15 +162,25 @@ where
         'cxt,
         Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>,
     >(
-        db: &Database,
+        db: &mut DatabaseGuard,
         uid_list_str: &str,
         cxt: Cxt,
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
         let str_list = uid_list_str.split(',').map(|a| a.trim());
-        let r_cxt = db.begin_read()?;
-        let account_data = Self::get_accounts(&Self::read(&r_cxt)?, str_list);
-        drop(r_cxt);
-        Self::loop_collect(db, account_data, cxt.borrow(), Self::get_session_internal)
+        let account_table = match db.read(AccountTable::<UserProtocol>::read) {
+            Ok(account_table) => account_table.into_inner(),
+            Err(StoreError::TableError(TableError::TableDoesNotExist(e))) => {
+                warn!("数据表不存在：{e}。");
+                db.write(|w_cxt| {
+                    AccountTable::<UserProtocol>::write(w_cxt)?;
+                    Ok::<_, StoreError>(())
+                })?;
+                db.read(AccountTable::<UserProtocol>::read)?.into_inner()
+            }
+            Err(e) => Err(e)?,
+        };
+        let accounts = Self::get_accounts(&account_table, str_list);
+        Self::loop_collect(&**db, accounts, cxt.borrow(), Self::get_session_internal)
     }
     #[inline]
     fn none2result(s: impl Display) -> impl FnOnce() -> StoreError {
@@ -280,13 +292,23 @@ where
     }
     #[inline]
     pub fn get_all_sessions<'cxt, Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>>(
-        db: &Database,
+        db: &mut DatabaseGuard,
         cxt: Cxt,
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
-        let r_cxt = db.begin_read()?;
-        let account_table = AccountTable::<UserProtocol>::read(&r_cxt)?;
+        let account_table = match db.read(AccountTable::<UserProtocol>::read) {
+            Ok(account_table) => account_table.into_inner(),
+            Err(StoreError::TableError(TableError::TableDoesNotExist(e))) => {
+                warn!("数据表不存在：{e}。");
+                db.write(|w_cxt| {
+                    AccountTable::<UserProtocol>::write(w_cxt)?;
+                    Ok::<_, StoreError>(())
+                })?;
+                db.read(AccountTable::<UserProtocol>::read)?.into_inner()
+            }
+            Err(e) => Err(e)?,
+        };
         let accounts = Self::get_all_accounts(&account_table);
-        Self::loop_collect(db, accounts, cxt.borrow(), Self::get_session_internal)
+        Self::loop_collect(&**db, accounts, cxt.borrow(), Self::get_session_internal)
     }
     #[inline]
     fn store_cookies(

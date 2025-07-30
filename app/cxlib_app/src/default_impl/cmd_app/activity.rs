@@ -383,10 +383,11 @@ impl SignParser {
         };
         let has_uid_arg = uid_list_str.is_some();
         let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
+        // 两分支均能自动新建数据表。
         let sessions = if let Some(uid_list_str) = &uid_list_str {
-            AccountTable::get_sessions_by_uid_list_str(&db_g, uid_list_str, login_solvers)?
+            AccountTable::get_sessions_by_uid_list_str(&mut db_g, uid_list_str, login_solvers)?
         } else {
-            AccountTable::get_all_sessions(&db_g, login_solvers)?
+            AccountTable::get_all_sessions(&mut db_g, login_solvers)?
         };
         if fresh {
             let mut courses = CourseTable::courses_to_course_sessions_map_with_current_sessions(
