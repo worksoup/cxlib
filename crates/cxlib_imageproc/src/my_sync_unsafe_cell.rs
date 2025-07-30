@@ -27,6 +27,7 @@ impl<T: ?Sized> MySyncUnsafeCell<T> {
     }
 }
 impl<T> From<T> for MySyncUnsafeCell<T> {
+    #[inline]
     fn from(t: T) -> MySyncUnsafeCell<T> {
         MySyncUnsafeCell::new(t)
     }
