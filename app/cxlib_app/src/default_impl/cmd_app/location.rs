@@ -51,9 +51,11 @@ impl FromStr for GeolocationOrUnhandledGeoaddr {
 // TODO: build.rs 中通过环境变量设置 alias.
 #[command(name = "location", alias = "l")]
 /// 位置相关操作（添加、删除、批量删除、导入、导出）。
+// TODO: 需要重新设计。文档需要更新。
 pub enum LocationParser {
     /// 添加位置或别名。
     #[command(alias = "+")]
+    // TODO: 也许需要添加默认别名。
     Add {
         /// 地址名称、经纬度与海拔。
         /// 格式为：`addr,lon,lat,alt`.
@@ -119,6 +121,7 @@ pub enum LocationParser {
         course: Option<Course>,
     },
 }
+// TODO: 需要重新设计。
 #[derive(Subcommand, Debug, Clone)]
 pub enum ReduceType {
     /// 位置。

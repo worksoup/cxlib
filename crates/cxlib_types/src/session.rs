@@ -235,9 +235,9 @@ impl<UserProtocol: UserProtocolTrait> Session<UserProtocol> {
         #[derive(Deserialize, Debug)]
         struct CourseContent {
             // TODO: 该字段不应为 Option.
-            // TODO: 深层原因为，Class 与 Course 并非一对多的关系。
-            // TODO: 而是多对多的关系。
-            // TODO: 同时，当前实现混淆了两者的 ID, 可能会出现一些错误。
+            //       深层原因为，Class 与 Course 并非一对多的关系。
+            //       而是多对多的关系。
+            //       同时，当前实现混淆了两者的 ID, 可能会出现一些错误。
             course: Option<Courses>,
             #[serde(rename = "clazz")]
             classes: Option<Vec<RawClass>>,
