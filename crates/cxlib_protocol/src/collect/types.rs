@@ -1,27 +1,40 @@
 use cxlib_error::AgentError;
 use log::debug;
-use std::{fmt::Display, fs::File, path::Path};
+use std::{
+    borrow::{Borrow, Cow},
+    ffi::{OsStr, OsString},
+    fmt::Display,
+    fs::File,
+    path::Path,
+};
 use ureq::{Agent, Body, SendBody, http::Response};
 
 pub trait TypesProtocolTrait {
+    #[inline]
     fn active_list_url() -> &'static str {
         TypesProtocol::ACTIVE_LIST
     }
+    #[inline]
     fn get_location_log_url() -> &'static str {
         TypesProtocol::GET_LOCATION_LOG
     }
+    #[inline]
     fn sign_detail_url() -> &'static str {
         TypesProtocol::SIGN_DETAIL
     }
+    #[inline]
     fn pan_chaoxing_url() -> &'static str {
         TypesProtocol::PAN_CHAOXING
     }
+    #[inline]
     fn pan_list_url() -> &'static str {
         TypesProtocol::PAN_LIST
     }
+    #[inline]
     fn pan_token_url() -> &'static str {
         TypesProtocol::PAN_TOKEN
     }
+    #[inline]
     fn pan_upload_url() -> &'static str {
         TypesProtocol::PAN_UPLOAD
     }
@@ -57,6 +70,7 @@ pub trait TypesProtocolTrait {
     }
 
     // 签到信息获取
+    #[inline]
     fn sign_detail(client: &Agent, active_id: &str) -> Result<Response<Body>, AgentError> {
         let url = Self::sign_detail_url();
         let url = format!("{url}?activePrimaryId={active_id}&type=1",);
@@ -64,12 +78,14 @@ pub trait TypesProtocolTrait {
         Ok(client.get(&url).call()?)
     }
     // 超星网盘页
+    #[inline]
     fn pan_chaoxing(client: &Agent) -> Result<Response<Body>, AgentError> {
         let url = Self::pan_chaoxing_url();
         Ok(client.get(url).call()?)
     }
 
     // 网盘列表
+    #[inline]
     fn pan_list(client: &Agent, parent_id: &str, enc: &str) -> Result<Response<Body>, AgentError> {
         let url = Self::pan_list_url();
         Ok(client
@@ -80,6 +96,7 @@ pub trait TypesProtocolTrait {
     }
 
     // 获取超星云盘的 token
+    #[inline]
     fn pan_token(client: &Agent) -> Result<Response<Body>, AgentError> {
         let url = Self::pan_token_url();
         Ok(client.get(url).call()?)
@@ -91,15 +108,56 @@ pub trait TypesProtocolTrait {
         file: &File,
         uid: &str,
         token: &str,
-        file_name: &str,
+        file_name: impl AsRef<Path>,
     ) -> Result<Response<Body>, AgentError> {
         use crate::multipart::{Field, PreparedFields};
         let url = Self::pan_upload_url();
-        let file_ext: &Path = file_name.as_ref();
-        let file_ext = file_ext.extension().and_then(|s| s.to_str()).unwrap_or("");
+        let file_as_path: &Path = file_name.as_ref();
+        let file_ext = file_as_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
         let mime = mime_guess::from_ext(file_ext).first_or_octet_stream();
-        let mut fields = Vec::<Field>::default();
-        Field::add_stream(&mut fields, "file", file, Some(file_name), Some(mime));
+        #[repr(transparent)]
+        struct DisplayOsString(OsString);
+        impl Borrow<DisplayOsStr> for DisplayOsString {
+            #[inline]
+            fn borrow(&self) -> &DisplayOsStr {
+                let s: &OsStr = self.0.borrow();
+                unsafe { &*(s as *const _ as *const DisplayOsStr) }
+            }
+        }
+        #[repr(transparent)]
+        struct DisplayOsStr(OsStr);
+        impl ToOwned for DisplayOsStr {
+            type Owned = DisplayOsString;
+
+            #[inline]
+            fn to_owned(&self) -> Self::Owned {
+                DisplayOsString(self.0.to_owned())
+            }
+        }
+        impl<'a> From<&'a DisplayOsStr> for Cow<'a, DisplayOsStr> {
+            /// Converts the string reference into a [`Cow::Borrowed`].
+            #[inline]
+            fn from(s: &'a DisplayOsStr) -> Cow<'a, DisplayOsStr> {
+                Cow::Borrowed(s)
+            }
+        }
+        impl Display for DisplayOsStr {
+            #[inline]
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.display().fmt(f)
+            }
+        }
+        let mut fields = Vec::<Field<DisplayOsStr>>::default();
+        Field::add_stream(
+            &mut fields,
+            "file",
+            file,
+            Some(unsafe { &*(file_as_path.as_os_str() as *const _ as *const _) }),
+            Some(mime),
+        );
         Field::add_text(&mut fields, "puid", uid);
         let mut multipart = PreparedFields::from_fields(&mut fields).unwrap();
         Ok(client

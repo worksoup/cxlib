@@ -6,6 +6,7 @@ use mime_guess::{Mime, mime};
 use rand::Rng;
 use std::{
     borrow::Cow,
+    fmt::Display,
     io::{Cursor, Read, Write},
 };
 
@@ -19,6 +20,7 @@ pub struct PreparedFields<'d> {
     end_boundary: Cursor<String>,
 }
 impl Read for PreparedField<'_> {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         debug!("PreparedField::read()");
 
@@ -60,16 +62,20 @@ impl Read for PreparedFields<'_> {
     }
 }
 impl<'d> PreparedFields<'d> {
+    #[inline]
     pub fn get_boundary(&self) -> &str {
         let boundary = self.end_boundary.get_ref();
         &boundary[4..boundary.len() - 2]
     }
-    pub fn from_fields<'n>(fields: &mut Vec<Field<'n, 'd>>) -> Result<Self, std::io::Error> {
+    #[inline]
+    pub fn from_fields<'n, FileName: ToOwned + Display + ?Sized>(
+        fields: &mut Vec<Field<'n, 'd, FileName>>,
+    ) -> Result<Self, std::io::Error> {
         fn from_stream<'d>(
             name: &str,
             boundary: &str,
             content_type: &Mime,
-            filename: Option<&str>,
+            filename: Option<impl Display>,
             stream: Box<dyn Read + 'd>,
         ) -> PreparedField<'d> {
             let mut header = Vec::new();
@@ -81,7 +87,7 @@ impl<'d> PreparedFields<'d> {
             .unwrap();
 
             if let Some(filename) = filename {
-                write!(header, "; filename=\"{filename}\"",).unwrap();
+                write!(header, "; filename=\"{filename}\"").unwrap();
             }
 
             write!(header, "\r\nContent-Type: {content_type}\r\n\r\n",).unwrap();
@@ -139,25 +145,26 @@ impl<'d> PreparedFields<'d> {
         })
     }
 }
-struct Stream<'n, 'd> {
-    filename: Option<Cow<'n, str>>,
+struct Stream<'n, 'd, FileName: ToOwned + ?Sized> {
+    filename: Option<Cow<'n, FileName>>,
     content_type: Mime,
     stream: Box<dyn Read + 'd>,
 }
-enum Data<'n, 'd> {
+enum Data<'n, 'd, FileName: ToOwned + ?Sized> {
     Text(Cow<'d, str>),
-    Stream(Stream<'n, 'd>),
+    Stream(Stream<'n, 'd, FileName>),
 }
-pub struct Field<'n, 'd> {
+pub struct Field<'n, 'd, FileName: ToOwned + ?Sized> {
     name: Cow<'n, str>,
-    data: Data<'n, 'd>,
+    data: Data<'n, 'd, FileName>,
 }
+#[inline]
 fn cursor_at_end<T: AsRef<[u8]>>(cursor: &Cursor<T>) -> bool {
     cursor.position() == (cursor.get_ref().as_ref().len() as u64)
 }
-impl<'n, 'd> Field<'n, 'd> {
+impl<'n, 'd, FileName: ToOwned + ?Sized> Field<'n, 'd, FileName> {
     pub fn add_stream<N, R, F>(
-        fields: &mut Vec<Field<'n, 'd>>,
+        fields: &mut Vec<Field<'n, 'd, FileName>>,
         name: N,
         stream: R,
         filename: Option<F>,
@@ -165,7 +172,7 @@ impl<'n, 'd> Field<'n, 'd> {
     ) where
         N: Into<Cow<'n, str>>,
         R: Read + 'd,
-        F: Into<Cow<'n, str>>,
+        F: Into<Cow<'n, FileName>>,
     {
         fields.push(Field {
             name: name.into(),
@@ -176,7 +183,8 @@ impl<'n, 'd> Field<'n, 'd> {
             }),
         });
     }
-    pub fn add_text<N, T>(fields: &mut Vec<Field<'n, 'd>>, name: N, text: T)
+    #[inline]
+    pub fn add_text<N, T>(fields: &mut Vec<Field<'n, 'd, FileName>>, name: N, text: T)
     where
         N: Into<Cow<'n, str>>,
         T: Into<Cow<'d, str>>,

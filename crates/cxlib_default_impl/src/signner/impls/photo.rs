@@ -1,5 +1,6 @@
 use crate::sign::PhotoSign;
 use cxlib_captcha::CaptchaSolverTrait;
+use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait, TypesProtocolTrait};
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::{Photo, Session};
@@ -7,6 +8,7 @@ use log::warn;
 use std::{collections::HashMap, path::PathBuf};
 
 pub struct DefaultPhotoSignner {
+    // TODO: 改为Vec, 每一个用户对应一个图片位置。
     path: Option<PathBuf>,
 }
 
@@ -39,23 +41,26 @@ where
         sign: &PhotoSign<TypesProtocol>,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
-        let mut pic_map = HashMap::new();
-        #[allow(clippy::mutable_key_type)]
+        let mut pic_map = Vec::new();
         let mut session_to_index = HashMap::new();
         let sessions = sessions.collect::<Vec<_>>();
         if let Some(pic) = self.path.as_ref() {
+            // TODO: 需要测试多个用户能否用同一个photo token签到。
             for session in sessions.clone() {
-                let photo = Photo::get_from_file(session, pic);
-                pic_map.insert(0, photo);
-                for session in sessions.clone() {
-                    session_to_index.insert(session, 0);
+                let photo = Photo::get_from_file(session, pic).log_ok();
+                if let Some(photo) = photo {
+                    pic_map.push(photo);
+                    for session in sessions.clone() {
+                        session_to_index.insert(session.uid(), 0);
+                    }
+                    break;
                 }
             }
         } else {
             let mut index = 0;
             for session in sessions.clone() {
                 let photo = Photo::default(session);
-                session_to_index.insert(session, index);
+                session_to_index.insert(session.uid(), index);
                 if let Some(photo) = photo {
                     pic_map.insert(index, photo);
                     index += 1;
@@ -70,8 +75,8 @@ where
         #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
-            let index = session_to_index[session];
-            if let Some(photo) = pic_map.get(&index).cloned() {
+            let index = session_to_index[session.uid()];
+            if let Some(photo) = pic_map.get(index).cloned() {
                 let a = <Self as SignnerTrait<
                     PhotoSign<TypesProtocol>,
                     CaptchaSolver,
