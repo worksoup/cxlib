@@ -6,7 +6,6 @@ use derive_where::derive_where;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, marker::PhantomData, path::Path};
 
-// TODO: 删除 unwrap
 #[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 #[derive(Serialize)]
 pub struct Photo<TypesProtocol> {
