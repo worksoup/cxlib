@@ -32,6 +32,7 @@ pub fn log_default<T: Default>(e: impl std::fmt::Debug) -> T {
 }
 
 pub trait CxlibResultUtils<T, E> {
+    fn log_ignore(self);
     fn log_unwrap(self) -> T;
     fn log_unwrap_or_default(self) -> T
     where
@@ -56,6 +57,14 @@ impl<T, E: std::fmt::Debug> CxlibResultUtils<T, E> for Result<T, E> {
     #[inline]
     fn log_ok(self) -> Option<T> {
         self.ok_or_else(log_none)
+    }
+
+    #[inline]
+    fn log_ignore(self) {
+        match self {
+            Ok(_) => {}
+            Err(e) => log::warn!("{e:?}, 将使用空值。",),
+        }
     }
 
     #[inline]

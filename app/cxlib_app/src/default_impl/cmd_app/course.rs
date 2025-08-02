@@ -14,7 +14,8 @@ use redb::Database;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
-    marker::PhantomData, sync::Arc,
+    marker::PhantomData,
+    sync::Arc,
 };
 
 #[derive(Parser, Debug, Clone)]
@@ -35,7 +36,7 @@ pub struct CoursesCmdApp<UserProtocol = cxlib_internal::protocol::collect::UserP
 );
 impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
     pub fn update_sessions_courses<'a>(
-        db: &Database,
+        db: &mut DatabaseGuard,
         sessions: impl Iterator<Item = &'a Session<UserProtocol>>,
     ) -> Result<HashMap<Course, (CourseInfo, CourseData)>, error::Error>
     where
@@ -43,25 +44,32 @@ impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
     {
         // 获取课程信息。
         let courses = CourseWithInfo::get_from_sessions(sessions)?;
-        let w_cxt = db.begin_write().map_err(StoreError::from)?;
-        let mut course_table = CourseTable::write(&w_cxt)?;
-        let mut updated = HashMap::new();
-        for (course, users) in courses.iter() {
-            let course_data = (
-                course.info().clone(),
-                CourseData::new(
-                    u64::MAX,
-                    users.iter().map(|s| s.uid().to_owned()).collect(),
-                    vec![],
-                ),
-            );
-            let r =
-                CourseTable::merge_course(&mut course_table, course.course(), course_data, false)?;
-            updated.insert(course.course().clone(), r);
-        }
-        drop(course_table);
-        w_cxt.commit().log_unwrap();
-        Ok(updated)
+        db.write_once_map_err(
+            |w_cxt| {
+                let mut course_table = CourseTable::write(w_cxt)?;
+                let mut updated = HashMap::new();
+                for (course, users) in courses.iter() {
+                    let course_data = (
+                        course.info().clone(),
+                        CourseData::new(
+                            u64::MAX,
+                            users.iter().map(|s| s.uid().to_owned()).collect(),
+                            vec![],
+                        ),
+                    );
+                    let r = CourseTable::merge_course(
+                        &mut course_table,
+                        course.course(),
+                        course_data,
+                        false,
+                    )?;
+                    updated.insert(course.course().clone(), r);
+                }
+                drop(course_table);
+                Ok(updated)
+            },
+            StoreError::into,
+        )
     }
     #[inline]
     pub fn update_course_table<Cxt>(
@@ -105,10 +113,10 @@ where
                         )?
                     } else {
                         // 删除旧的课程数据表。
-                        _ = database_guard.write(CourseTable::delete).log_ok();
+                        database_guard.write_once(CourseTable::delete).log_ignore();
                         AccountTable::get_all_sessions(&mut database_guard, login_solvers)?
                     };
-                    Self::update_sessions_courses(&database_guard, sessions.values())
+                    Self::update_sessions_courses(&mut database_guard, sessions.values())
                 }
             }()
             .log_unwrap_or_default()
@@ -118,7 +126,7 @@ where
                     let course_table = CourseTable::read(r_cxt).log_unwrap();
                     CourseTable::get_courses(&course_table)
                 })
-                .map(ReadAccessGuard::into_inner)
+                .map(ReadAccessGuard::unwrap_inner)
                 .log_unwrap_or_default()
         };
         if let Some(uid) = &uid
@@ -145,7 +153,8 @@ impl<UserProtocol, Context, OwnedData> CmdMetaAppTrait<Context, OwnedData>
     for CoursesCmdApp<UserProtocol>
 where
     UserProtocol: std::marker::Send + UserProtocolTrait + 'static,
-    Context: AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
+    Context:
+        AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
     OwnedData: 'static,
 {
     fn read_owned_data(

@@ -1,10 +1,11 @@
 use crate::{
     BinCode, CourseTable, ImportExportTrait, NormalTableTrait, StoreError, TableDefinitionTrait,
+    database_guard::DatabaseGuard,
 };
-use cxlib_error_utils::CxlibResultUtils;
+use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
 use cxlib_internal::types::Activity;
 use log::warn;
-use redb::{Database, ReadableTable, Table, WriteTransaction};
+use redb::{ReadableTable, Table, WriteTransaction};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -115,34 +116,43 @@ impl ActivityTable {
     }
 }
 impl ImportExportTrait for ActivityTable {
-    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, _: Cxt, data: &str) {
+    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(
+        db: &mut DatabaseGuard,
+        _: Cxt,
+        data: &str,
+    ) {
         let data = toml::from_str::<HashMap<String, (Activity, Vec<String>)>>(data).log_unwrap();
-        let w_cxt = db.begin_write().log_unwrap();
-        let mut table = Self::write(&w_cxt).log_unwrap();
-        for (key, value) in data {
-            match Self::insert(&mut table, key, value) {
-                Ok(r) => {
-                    if let Some(r) = r {
-                        warn!("数据已更新，原数据为：{r:?}");
+        db.write_once(|w_cxt| {
+            let mut table = Self::write(w_cxt).log_unwrap();
+            for (key, value) in data {
+                match Self::insert(&mut table, key, value) {
+                    Ok(r) => {
+                        if let Some(r) = r {
+                            warn!("数据已更新，原数据为：{r:?}");
+                        }
                     }
-                }
-                Err(e) => {
-                    warn!("activity 数据行写入出错：`{e}`, 已跳过。");
-                }
-            };
-        }
-        drop(table);
-        w_cxt.commit().log_unwrap();
+                    Err(e) => {
+                        if e.is_fatal() {
+                            warn!("activity 数据行写入出错：`{e}`, 已终止。");
+                            return Err(e);
+                        }
+                        warn!("activity 数据行写入出错：`{e}`, 已跳过。");
+                    }
+                };
+            }
+            drop(table);
+            Ok(())
+        })
+        .log_unwrap();
     }
 
-    fn export_text(db: &Database) -> String {
-        let export = if let Ok(r_cxt) = db.begin_read()
-            && let Ok(table) = Self::read(&r_cxt)
-        {
-            Self::iter(&table).unwrap_or_default()
-        } else {
-            HashMap::new()
-        };
+    fn export_text(db: &mut DatabaseGuard) -> String {
+        let export = db
+            .read_once(|r_cxt| {
+                let table = Self::read(r_cxt)?;
+                Self::iter(&table)
+            })
+            .log_unwrap_or_default();
         toml::to_string_pretty(&export).unwrap_or_default()
     }
 }

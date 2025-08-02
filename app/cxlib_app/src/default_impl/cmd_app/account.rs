@@ -59,7 +59,7 @@ where
             AccountParser::Add { uname, passwd } => {
                 let pwd = cx_interact::inquire_pwd(passwd);
                 let login_type_and_uname = uname.split_once(":");
-                let session = db.write(|w_cxt| {
+                let session = db.write_once(|w_cxt| {
                     if let Some((login_type, uname)) = login_type_and_uname {
                         AccountTable::<UserProtocol>::login(
                             w_cxt,
@@ -85,7 +85,7 @@ where
                     Ok(session) => {
                         info!("添加账号[{uname}]（用户名：{}）成功！", session.name());
                         if let Ok(courses) = session.get_courses() {
-                            db.write(|w_cxt| {
+                            db.write_once(|w_cxt| {
                                 let users = vec![session.uid().to_owned()];
                                 for course in courses {
                                     let data = CourseData::new(u64::MAX, users.clone(), vec![]);
@@ -100,7 +100,7 @@ where
                                 }
                                 Ok::<_, StoreError>(())
                             })
-                            .log_ok();
+                            .log_ignore();
                         } else {
                             warn!("获取用户[{}]课程失败。", session.name());
                         }

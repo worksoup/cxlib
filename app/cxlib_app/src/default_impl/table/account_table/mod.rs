@@ -15,7 +15,7 @@ use cxlib_internal::{
     types::{LoginError, LoginSolverTrait, Session, UntypedLoginSolver},
 };
 use log::{error, info, warn};
-use redb::{Database, ReadTransaction, ReadableTable, TableError, WriteTransaction};
+use redb::{ReadTransaction, ReadableTable, TableError, WriteTransaction};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -106,6 +106,88 @@ impl<UserProtocol> AccountTable<UserProtocol> {
         table.get(&uid.to_owned()).log_unwrap().map(|a| a.value())
     }
 }
+trait LoopCollect {
+    type SelfType<'a>;
+    fn loop_collect_base<
+        TransactionRef,
+        Cxt: Copy,
+        T,
+        F: Fn(TransactionRef, &str, AccountData, Cxt) -> Result<T, StoreError>,
+    >(
+        s: &mut HashMap<String, T>,
+        transaction: TransactionRef,
+        uid: String,
+        account_data: AccountData,
+        cxt: Cxt,
+        f: F,
+    ) -> Result<(), StoreError> {
+        match f(transaction, &uid, account_data, cxt) {
+            Ok(session) => {
+                s.insert(uid, session);
+            }
+            Err(e) => {
+                if e.is_fatal() {
+                    Err(e)?;
+                } else {
+                    warn!("账号加载失败：`{uid}`, `{e}`, 跳过。");
+                }
+            }
+        }
+        Ok(())
+    }
+    fn loop_collect<
+        Cxt: Copy,
+        T,
+        F: Fn(Self::SelfType<'_>, &str, AccountData, Cxt) -> Result<T, StoreError>,
+    >(
+        self,
+        uid_and_account_data: impl IntoIterator<Item = (String, AccountData)>,
+        cxt: Cxt,
+        f: F,
+    ) -> Result<HashMap<String, T>, StoreError>;
+}
+impl<P: 'static> LoopCollect for &mut P {
+    type SelfType<'a> = &'a mut P;
+
+    #[inline]
+    fn loop_collect<
+        Cxt: Copy,
+        T,
+        F: Fn(Self::SelfType<'_>, &str, AccountData, Cxt) -> Result<T, StoreError>,
+    >(
+        self,
+        uid_and_account_data: impl IntoIterator<Item = (String, AccountData)>,
+        cxt: Cxt,
+        f: F,
+    ) -> Result<HashMap<String, T>, StoreError> {
+        let mut s = HashMap::new();
+        for (uid, account_data) in uid_and_account_data {
+            Self::loop_collect_base(&mut s, &mut *self, uid, account_data, cxt, &f)?;
+        }
+        Ok(s)
+    }
+}
+impl<P: 'static> LoopCollect for &P {
+    type SelfType<'a> = &'a P;
+
+    #[inline]
+    fn loop_collect<
+        Cxt: Copy,
+        T,
+        F: Fn(Self::SelfType<'_>, &str, AccountData, Cxt) -> Result<T, StoreError>,
+    >(
+        self,
+        uid_and_account_data: impl IntoIterator<Item = (String, AccountData)>,
+        cxt: Cxt,
+        f: F,
+    ) -> Result<HashMap<String, T>, StoreError> {
+        let mut s = HashMap::new();
+        for (uid, account_data) in uid_and_account_data {
+            Self::loop_collect_base(&mut s, self, uid, account_data, cxt, &f)?;
+        }
+        Ok(s)
+    }
+}
 impl<UserProtocol> AccountTable<UserProtocol>
 where
     UserProtocol: 'static + UserProtocolTrait,
@@ -120,41 +202,13 @@ where
             )))
         }
     }
-    fn loop_collect<
-        Transaction,
-        Cxt: Copy,
-        T,
-        F: Fn(&Transaction, &str, AccountData, Cxt) -> Result<T, StoreError>,
-    >(
-        transaction: &Transaction,
-        uid_and_account_data: impl IntoIterator<Item = (String, AccountData)>,
-        cxt: Cxt,
-        f: F,
-    ) -> Result<HashMap<String, T>, StoreError> {
-        let mut s = HashMap::new();
-        for (uid, account_data) in uid_and_account_data {
-            match f(transaction, &uid, account_data, cxt) {
-                Ok(session) => {
-                    s.insert(uid, session);
-                }
-                Err(e) => {
-                    if e.is_fatal() {
-                        Err(e)?;
-                    } else {
-                        warn!("账号加载失败：`{uid}`, `{e}`, 跳过。");
-                    }
-                }
-            }
-        }
-        Ok(s)
-    }
     pub fn load_sessions_by_uid_list_str(
         r_cxt: &ReadTransaction,
         uid_list_str: &str,
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
         let str_list = uid_list_str.split(',').map(|a| a.trim());
         let account_data = Self::get_accounts(&Self::read(r_cxt)?, str_list);
-        Self::loop_collect(r_cxt, account_data, (), |r_cxt, uid, account_data, _| {
+        LoopCollect::loop_collect(r_cxt, account_data, (), |r_cxt, uid, account_data, _| {
             Self::load_session_internal(r_cxt, uid, &account_data)
         })
     }
@@ -169,21 +223,21 @@ where
         let str_list = uid_list_str.split(',').map(|a| a.trim());
         let account_table = db
             .read(AccountTable::<UserProtocol>::read)
-            .map(|account_table| account_table.into_inner());
+            .map(|account_table| account_table.unwrap_inner());
         let account_table = match account_table {
             Ok(account_table) => account_table,
             Err(StoreError::TableError(TableError::TableDoesNotExist(e))) => {
                 warn!("数据表不存在：{e}。");
-                db.write(|w_cxt| {
+                db.write_once(|w_cxt| {
                     AccountTable::<UserProtocol>::write(w_cxt)?;
                     Ok::<_, StoreError>(())
                 })?;
-                db.read(AccountTable::<UserProtocol>::read)?.into_inner()
+                db.read(AccountTable::<UserProtocol>::read)?.unwrap_inner()
             }
             Err(e) => Err(e)?,
         };
         let accounts = Self::get_accounts(&account_table, str_list);
-        Self::loop_collect(&**db, accounts, cxt.borrow(), Self::get_session_internal)
+        LoopCollect::loop_collect(db, accounts, cxt.borrow(), Self::get_session_internal)
     }
     #[inline]
     fn none2result(s: impl Display) -> impl FnOnce() -> StoreError {
@@ -242,18 +296,17 @@ where
         'cxt,
         Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>,
     >(
-        db: &Database,
+        db: &mut DatabaseGuard,
         uid: &str,
         account_data: AccountData,
         cxt: Cxt,
     ) -> Result<Session<UserProtocol>, StoreError> {
-        let r_cxt = db.begin_read()?;
-        match Self::load_session_internal(&r_cxt, uid, &account_data) {
+        let session = db.read_once(|r_cxt| Self::load_session_internal(r_cxt, uid, &account_data));
+
+        match session {
             Ok(session) => Ok(session),
             Err(e) => match e {
-                StoreError::LoginError(LoginError::LoginExpired(_)) => {
-                    drop(r_cxt);
-                    let w_cxt = db.begin_write()?;
+                StoreError::LoginError(LoginError::LoginExpired(_)) => db.write_once(|w_cxt| {
                     warn!(
                         "账号 [{}] 的 cookies 加载失败，尝试重新登录。",
                         account_data.uname()
@@ -261,11 +314,11 @@ where
                     Ok(
                         <AccountDataInternal<UserProtocol> as TryFromWithContext<_>>::try_from(
                             account_data,
-                            (cxt.borrow().clone(), &w_cxt),
+                            (cxt.borrow().clone(), w_cxt),
                         )?
                         .session,
                     )
-                }
+                }),
                 e => {
                     error!("账号 [{}] 的 cookies 加载失败：{e}", account_data.uname());
                     Err(e)?
@@ -275,12 +328,11 @@ where
     }
     #[inline]
     pub fn get_session<'cxt, Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>>(
-        db: &Database,
+        db: &mut DatabaseGuard,
         uid: &str,
         cxt: Cxt,
     ) -> Result<Session<UserProtocol>, StoreError> {
-        let r_cxt = db.begin_read()?;
-        let account = Self::get_account_data(&Self::read(&r_cxt)?, uid)?;
+        let account = db.read_once(|r_cxt| Self::get_account_data(&Self::read(r_cxt)?, uid))?;
         Self::get_session_internal(db, uid, account, cxt)
     }
     #[inline]
@@ -289,7 +341,7 @@ where
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
         let account_table = AccountTable::<UserProtocol>::read(r_cxt)?;
         let accounts = Self::get_all_accounts(&account_table);
-        Self::loop_collect(r_cxt, accounts, (), |w_cxt, uid, account_data, _| {
+        LoopCollect::loop_collect(r_cxt, accounts, (), |w_cxt, uid, account_data, _| {
             Self::load_session_internal(w_cxt, uid, &account_data)
         })
     }
@@ -300,21 +352,21 @@ where
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
         let account_table = db
             .read(AccountTable::<UserProtocol>::read)
-            .map(|account_table| account_table.into_inner());
+            .map(|account_table| account_table.unwrap_inner());
         let account_table = match account_table {
             Ok(account_table) => account_table,
             Err(StoreError::TableError(TableError::TableDoesNotExist(e))) => {
                 warn!("数据表不存在：{e}。");
-                db.write(|w_cxt| {
+                db.write_once(|w_cxt| {
                     AccountTable::<UserProtocol>::write(w_cxt)?;
                     Ok::<_, StoreError>(())
                 })?;
-                db.read(AccountTable::<UserProtocol>::read)?.into_inner()
+                db.read(AccountTable::<UserProtocol>::read)?.unwrap_inner()
             }
             Err(e) => Err(e)?,
         };
         let accounts = Self::get_all_accounts(&account_table);
-        Self::loop_collect(&**db, accounts, cxt.borrow(), Self::get_session_internal)
+        LoopCollect::loop_collect(db, accounts, cxt.borrow(), Self::get_session_internal)
     }
     #[inline]
     fn store_cookies(
@@ -397,7 +449,7 @@ where
         let table = Self::write(w_cxt)?;
         let account_data = Self::get_all_accounts(&table);
         drop(table);
-        Self::loop_collect(w_cxt, account_data, &cxt, |w_cxt, _, account_data, cxt| {
+        LoopCollect::loop_collect(w_cxt, account_data, &cxt, |w_cxt, _, account_data, cxt| {
             Self::relogin_internal(w_cxt, cxt, account_data)
         })
     }
@@ -413,36 +465,49 @@ impl<UserProtocol> ImportExportTrait for AccountTable<UserProtocol>
 where
     UserProtocol: UserProtocolTrait + 'static,
 {
-    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, cxt: Cxt, data: &str) {
+    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(
+        db: &mut DatabaseGuard,
+        cxt: Cxt,
+        data: &str,
+    ) {
         let data: Vec<AccountData> =
             crate::default_impl::table::utils::parse_lines::<_, _>(data, ());
-        let w_cxt = db.begin_write().log_unwrap();
-        for account in data {
-            let uname = account.uname();
-            match <AccountDataInternal<_> as TryFromWithContext<_>>::try_from(
-                account.clone(),
-                (cxt.borrow().clone(), &w_cxt),
-            ) {
-                Ok(data) => {
-                    info!(
-                        "账号 [{}]（用户名：{}）导入成功！",
-                        uname,
-                        data.session.name()
-                    );
-                    Self::add_account(&w_cxt, data.uid(), &account).log_unwrap();
-                }
-                Err(e) => {
-                    warn!("账号 [{uname}] 导入失败！错误信息：{e}.",);
-                    continue;
-                }
-            };
-        }
-        w_cxt.commit().log_unwrap();
+        db.write_once(|w_cxt| {
+            for account in data {
+                let uname = account.uname();
+                match <AccountDataInternal<_> as TryFromWithContext<_>>::try_from(
+                    account.clone(),
+                    (cxt.borrow().clone(), w_cxt),
+                ) {
+                    Ok(data) => {
+                        info!(
+                            "账号 [{}]（用户名：{}）导入成功！",
+                            uname,
+                            data.session.name()
+                        );
+                        Self::add_account(w_cxt, data.uid(), &account).log_unwrap();
+                    }
+                    Err(e) => {
+                        if e.is_fatal() {
+                            return Err(e);
+                        }
+                        warn!("账号 [{uname}] 导入失败！错误信息：{e}.",);
+                        continue;
+                    }
+                };
+            }
+            Ok(())
+        })
+        .log_unwrap();
     }
 
-    fn export_text(db: &Database) -> String {
-        let r_cxt = db.begin_read().log_unwrap();
-        let table = Self::read(&r_cxt).log_unwrap();
-        crate::default_impl::table::utils::to_string_lines(Self::get_all_accounts(&table).values())
+    fn export_text(db: &mut DatabaseGuard) -> String {
+        db.read_once(|r_cxt| {
+            let table = Self::read(r_cxt)?;
+            Ok::<_, StoreError>(crate::default_impl::table::utils::to_string_lines(
+                Self::get_all_accounts(&table).values(),
+            ))
+        })
+        .log_unwrap()
     }
 }

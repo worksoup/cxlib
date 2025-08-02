@@ -28,7 +28,8 @@ use log::{debug, error, info, warn};
 use redb::{Database, WriteTransaction};
 use ref_wrapper::Unit;
 use std::{
-    borrow::Borrow, collections::HashMap, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration
+    borrow::Borrow, collections::HashMap, marker::PhantomData, path::PathBuf, sync::Arc,
+    time::Duration,
 };
 
 #[derive(Clone)]
@@ -391,7 +392,7 @@ impl SignParser {
         };
         if fresh {
             let mut courses = CourseTable::courses_to_course_sessions_map_with_current_sessions(
-                CoursesCmdApp::update_sessions_courses(&db_g, sessions.values())?,
+                CoursesCmdApp::update_sessions_courses(&mut db_g, sessions.values())?,
                 &sessions,
             )
             .collect::<HashMap<_, _>>();
@@ -418,7 +419,7 @@ impl SignParser {
                 .into_iter()
                 .map(|(course, (info, _, sessions))| (CourseWithInfo::new(course, info), sessions))
                 .take(limit.unwrap_or(usize::MAX));
-            db_g.write_map_err::<_, _, StoreError, _, _>(
+            db_g.write_once_map_err::<_, _, StoreError, _, _>(
                 |w_cxt| {
                     let activities = Self::get_activities::<TypesProtocol, _>(w_cxt, iter)?;
                     let activities = activities.flat_map(|(activities, users)| {
@@ -702,7 +703,7 @@ impl SignParser {
                     .collect::<HashMap<_, _>>();
                 Ok::<_, StoreError>(activities)
             })?
-            .into_inner())
+            .unwrap_inner())
     }
     /// 以下文档由 AI 生成。
     ///

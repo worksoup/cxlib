@@ -2,13 +2,13 @@ mod internal_data;
 
 use crate::{
     AliasTable, BinCode, CourseTable, ImportExportTrait, NormalTableTrait, StoreError,
-    TableDefinitionTrait,
+    TableDefinitionTrait, database_guard::DatabaseGuard,
     default_impl::table::location_table::internal_data::LocationAndAliasesPairInternal,
 };
 use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
 use cxlib_internal::types::{__private::UnhandledGeoaddr, Course, Geolocation};
 use log::warn;
-use redb::{Database, ReadableTable, WriteTransaction};
+use redb::{ReadableTable, WriteTransaction};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -261,49 +261,67 @@ impl TableDefinitionTrait for LocationTable {
     const NAME: &'static str = "location";
 }
 impl ImportExportTrait for LocationTable {
-    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, cxt: Cxt, content: &str) {
+    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(
+        db: &mut DatabaseGuard,
+        cxt: Cxt,
+        content: &str,
+    ) {
         let data: Vec<LocationAndAliasesPairInternal> =
             crate::default_impl::parse_lines::<_, _>(content, cxt);
-        let w_cxt = db.begin_write().log_unwrap();
-        for location_and_aliases_pair_internal in data {
-            let LocationAndAliasesPairInternal {
-                unhandled_geoaddr:
-                    UnhandledGeoaddr {
-                        unhandled_place_name,
-                        geolocation,
-                    },
-                courses,
-                aliases,
-            } = location_and_aliases_pair_internal;
-            _ = Self::insert_location(&w_cxt, geolocation, unhandled_place_name, courses, &aliases);
-        }
-        w_cxt.commit().log_unwrap();
+        db.write_once(|w_cxt| {
+            for location_and_aliases_pair_internal in data {
+                let LocationAndAliasesPairInternal {
+                    unhandled_geoaddr:
+                        UnhandledGeoaddr {
+                            unhandled_place_name,
+                            geolocation,
+                        },
+                    courses,
+                    aliases,
+                } = location_and_aliases_pair_internal;
+                _ = Self::insert_location(
+                    w_cxt,
+                    geolocation,
+                    unhandled_place_name,
+                    courses,
+                    &aliases,
+                );
+            }
+            Ok::<_, StoreError>(())
+        })
+        .log_unwrap();
     }
 
-    fn export_text(db: &Database) -> String {
-        let r_cxt = db.begin_read().log_unwrap();
-        let mut data = HashSet::new();
+    fn export_text(db: &mut DatabaseGuard) -> String {
+        db.read_once(|r_cxt| {
+            let mut data = HashSet::new();
 
-        let alias_table = AliasTable::read(&r_cxt).log_unwrap();
-        let location_table = LocationTable::read(&r_cxt).log_unwrap();
-        for (location, (unhandled_addr, courses)) in
-            Self::get_locations(&location_table).log_unwrap()
-        {
-            match AliasTable::get_aliases(&alias_table, &location) {
-                Ok(aliases) => {
-                    let unhandled_addr = UnhandledGeoaddr {
-                        unhandled_place_name: unhandled_addr,
-                        geolocation: location,
-                    };
-                    let datum =
-                        LocationAndAliasesPairInternal::new(unhandled_addr, courses, aliases);
-                    data.insert(datum);
-                }
-                Err(e) => {
-                    warn!("{e}");
-                }
-            };
-        }
-        crate::default_impl::to_string_lines(data)
+            let alias_table = AliasTable::read(r_cxt).log_unwrap();
+            let location_table = LocationTable::read(r_cxt).log_unwrap();
+            for (location, (unhandled_addr, courses)) in
+                Self::get_locations(&location_table).log_unwrap()
+            {
+                match AliasTable::get_aliases(&alias_table, &location) {
+                    Ok(aliases) => {
+                        let unhandled_addr = UnhandledGeoaddr {
+                            unhandled_place_name: unhandled_addr,
+                            geolocation: location,
+                        };
+                        let datum =
+                            LocationAndAliasesPairInternal::new(unhandled_addr, courses, aliases);
+                        data.insert(datum);
+                    }
+                    Err(e) => {
+                        if e.is_fatal() {
+                            warn!("{e}, 数据已终止导入。");
+                            return Err(e);
+                        }
+                        warn!("{e}");
+                    }
+                };
+            }
+            Ok(crate::default_impl::to_string_lines(data))
+        })
+        .log_unwrap()
     }
 }

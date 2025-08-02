@@ -57,7 +57,7 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
                         CourseTable::get_course(&course_table, &course)
                     })
                     .log_unwrap()
-                    .into_inner();
+                    .unwrap_inner();
                 let locations = binding.iter().flat_map(|(_, data)| data.locations());
                 for location in locations {
                     println!("{location}")
@@ -69,7 +69,7 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
                         LocationTable::get_geoaddrs(&location_table)
                     })
                     .log_unwrap()
-                    .into_inner()
+                    .unwrap_inner()
                     .into_keys();
                 for geoaddr in geoaddrs {
                     println!("{geoaddr}")
@@ -83,14 +83,14 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
                     CourseTable::get_course(&course_table, &course)
                 })
                 .log_unwrap()
-                .into_inner();
+                .unwrap_inner();
             let aliases = g
                 .read(|r_cxt| {
                     let alias_table = AliasTable::read(r_cxt)?;
                     AliasTable::get_all_aliases(&alias_table)
                 })
                 .log_unwrap()
-                .into_inner();
+                .unwrap_inner();
             if let Some((_, data)) = locations {
                 for location in data.locations() {
                     let aliases = aliases
@@ -118,14 +118,14 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
                     LocationTable::get_geoaddrs(&course_table)
                 })
                 .log_unwrap()
-                .into_inner();
+                .unwrap_inner();
             let aliases = g
                 .read(|r_cxt| {
                     let alias_table = AliasTable::read(r_cxt)?;
                     AliasTable::get_all_aliases(&alias_table)
                 })
                 .log_unwrap()
-                .into_inner();
+                .unwrap_inner();
             for (location, courses) in locations {
                 let aliases = aliases
                     .iter()

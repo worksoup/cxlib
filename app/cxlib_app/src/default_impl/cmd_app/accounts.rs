@@ -36,7 +36,7 @@ where
         let solver_cxt = cxt.as_ref();
         let mut db = DatabaseGuard::new(cxt.as_ref());
         let sessions = if fresh {
-            db.write(|w_cxt| AccountTable::<UserProtocol>::relogin_all(w_cxt, cxt))
+            db.write_once(|w_cxt| AccountTable::<UserProtocol>::relogin_all(w_cxt, cxt))
                 .log_unwrap()
         } else {
             // 列出所有账号。

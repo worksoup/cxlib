@@ -200,7 +200,7 @@ impl LocationParser {
                     .collect::<HashSet<_>>();
                     courses.insert(course);
                     database_guard
-                        .write(|w_cxt| {
+                        .write_once(|w_cxt| {
                             let UnhandledGeoaddr {
                                 unhandled_place_name,
                                 geolocation,
@@ -218,7 +218,7 @@ impl LocationParser {
                 }
             } else {
                 database_guard
-                    .write(|w_cxt| {
+                    .write_once(|w_cxt| {
                         let UnhandledGeoaddr {
                             unhandled_place_name,
                             geolocation,
@@ -245,7 +245,7 @@ impl LocationParser {
                     AliasTable::get_location(&alias_table, location_str.trim())
                 })
                 .log_unwrap();
-            if let Some(location) = location.into_inner() {
+            if let Some(location) = location.unwrap_inner() {
                 location
             } else {
                 warn!("无法确定所要操作的位置对象！");
@@ -254,7 +254,7 @@ impl LocationParser {
         };
         if let Some(alias) = alias {
             database_guard
-                .write(|w_cxt| {
+                .write_once(|w_cxt| {
                     let mut alias_table = AliasTable::write(w_cxt)?;
                     AliasTable::update_alias_and(&mut alias_table, &alias, &location, |_w, a, l| {
                         let app = app_info.application();
@@ -290,32 +290,29 @@ impl LocationParser {
                                     )
                                 })
                                 .log_unwrap()
-                                .into_inner()
+                                .unwrap_inner()
                         })
                     });
                 if let Some(location) = location {
-                    let contains = database_guard
+                    let (contains, g) = database_guard
                         .read(|r_cxt| {
                             let location_table = LocationTable::read(r_cxt)?;
                             LocationTable::has_location(&location_table, &location)
                         })
-                        .log_unwrap();
-                    if *contains {
-                        let aliases = contains.read_once(|r_cxt| {
+                        .log_unwrap()
+                        .into_inner();
+                    if contains {
+                        let aliases = g.read_once(|r_cxt| {
                             let alias_table = AliasTable::read(r_cxt)?;
                             AliasTable::get_aliases(&alias_table, &location)
                         });
-                        let aliases = if let Ok((_, aliases)) = aliases {
-                            aliases
-                        } else {
-                            Default::default()
-                        };
+                        let aliases = aliases.log_unwrap_or_default();
                         database_guard
-                            .write(|w_cxt| LocationTable::delete_location(w_cxt, &location))
+                            .write_once(|w_cxt| LocationTable::delete_location(w_cxt, &location))
                             .log_unwrap();
                         for alias in aliases.iter() {
                             database_guard
-                                .write(|w_cxt| {
+                                .write_once(|w_cxt| {
                                     let mut alias_table = AliasTable::write(w_cxt)?;
                                     AliasTable::delete_alias(&mut alias_table, alias)
                                 })
@@ -337,7 +334,7 @@ impl LocationParser {
                     .log_unwrap();
                 if contains {
                     database_guard
-                        .write(|w_cxt| {
+                        .write_once(|w_cxt| {
                             let mut alias_table = AliasTable::write(w_cxt)?;
                             AliasTable::delete_alias(&mut alias_table, &alias)
                         })
@@ -374,7 +371,7 @@ impl LocationParser {
                     CourseTable::get_course(&course_table, &course)
                 })
                 .log_unwrap()
-                .into_inner();
+                .unwrap_inner();
             if let Some((_, data)) = course {
                 data.decompose()
                     .2
@@ -391,7 +388,7 @@ impl LocationParser {
                     LocationTable::get_locations(&location_table)
                 })
                 .log_unwrap()
-                .into_inner()
+                .unwrap_inner()
                 .into_keys()
                 .collect()
         } else {
@@ -423,7 +420,7 @@ impl LocationParser {
                     AliasTable::get_aliases(&alias_table, location)
                 })
                 .log_unwrap();
-            for alias in aliases_.into_inner() {
+            for alias in aliases_.unwrap_inner() {
                 aliases.push(alias)
             }
         }
@@ -438,7 +435,7 @@ impl LocationParser {
             }
         }
         database_guard
-            .write(|w_cxt| {
+            .write_once(|w_cxt| {
                 if delete_locations {
                     for location in locations {
                         if let Err(e) = LocationTable::delete_location(w_cxt, &location) {
@@ -497,7 +494,7 @@ impl LocationParser {
                             warn!("没有从该课程中获取到位置信息。");
                         } else {
                             database_guard
-                                .write(|w_cxt| {
+                                .write_once(|w_cxt| {
                                     for (_, l) in locations {
                                         let UnhandledGeoaddr {
                                             unhandled_place_name,

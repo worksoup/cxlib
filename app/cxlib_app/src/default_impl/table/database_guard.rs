@@ -1,23 +1,16 @@
 //! 也许能防止一个块内试图同时获取读事务与写事务。
-use std::{
-    mem::MaybeUninit,
-    ops::Deref,
-    sync::{Arc, RwLock, RwLockReadGuard, atomic::AtomicUsize},
-};
+use std::{ops::Deref, sync::Arc};
 
+use cxlib_error_utils::CxlibResultUtils;
 use redb::{Database, ReadTransaction, WriteTransaction};
+
+use crate::StoreError;
 pub struct DatabaseGuard {
     db: Arc<Database>,
-    w_cxt: Arc<RwLock<Option<WriteTransaction>>>,
-    waiting_for_w_cxt: Arc<AtomicUsize>,
 }
 impl DatabaseGuard {
     pub fn new(db: &Arc<Database>) -> Self {
-        Self {
-            db: Arc::clone(db),
-            w_cxt: Default::default(),
-            waiting_for_w_cxt: Arc::new(AtomicUsize::new(0)),
-        }
+        Self { db: Arc::clone(db) }
     }
     pub fn read_once_map_err<
         T,
@@ -33,10 +26,8 @@ impl DatabaseGuard {
     where
         E: From<redb::TransactionError>,
     {
-        let read_lock = self.w_cxt.read().unwrap();
-        let r_cxt = self.begin_read().map_err(|e| m(E::from(e)))?;
+        let r_cxt = self.db.begin_read().map_err(|e| m(E::from(e)))?;
         let t = f(&r_cxt)?;
-        drop(read_lock);
         Ok(t)
     }
     #[inline]
@@ -46,42 +37,35 @@ impl DatabaseGuard {
     {
         Self::read_once_map_err(self, f, |e| e)
     }
-    pub fn read_map_err<
-        's: 'g,
-        'g,
-        T,
-        N,
-        E,
-        F: FnOnce(&ReadTransaction) -> Result<T, N>,
-        M: FnOnce(E) -> N,
-    >(
-        &'s self,
+    pub fn read_map_err<T, N, E, F: FnOnce(&ReadTransaction) -> Result<T, N>, M: FnOnce(E) -> N>(
+        &self,
         f: F,
         m: M,
-    ) -> Result<ReadAccessGuard<'g, T>, N>
+    ) -> Result<ReadAccessGuard<T>, N>
     where
         E: From<redb::TransactionError>,
     {
-        let read_lock = self.w_cxt.read().unwrap();
-        let r_cxt = self.begin_read().map_err(|e| m(E::from(e)))?;
+        let r_cxt = self.db.begin_read().map_err(|e| m(E::from(e)))?;
         let t = f(&r_cxt)?;
-        Ok(ReadAccessGuard {
-            r_cxt,
-            t,
-            read_lock,
-        })
+        Ok(ReadAccessGuard { r_cxt, t })
     }
     #[inline]
-    pub fn read<'s: 'g, 'g, T, E, F: FnOnce(&ReadTransaction) -> Result<T, E>>(
-        &'s self,
+    pub fn read<T, E, F: FnOnce(&ReadTransaction) -> Result<T, E>>(
+        &self,
         f: F,
-    ) -> Result<ReadAccessGuard<'g, T>, E>
+    ) -> Result<ReadAccessGuard<T>, E>
     where
         E: From<redb::TransactionError>,
     {
         Self::read_map_err(self, f, |e| e)
     }
-    pub fn write_map_err<T, N, E, F: FnOnce(&WriteTransaction) -> Result<T, N>, M: FnOnce(E) -> N>(
+    pub fn write_once_map_err<
+        T,
+        N,
+        E,
+        F: FnOnce(&WriteTransaction) -> Result<T, N>,
+        M: FnOnce(E) -> N,
+    >(
         &mut self,
         f: F,
         m: M,
@@ -89,115 +73,98 @@ impl DatabaseGuard {
     where
         E: From<redb::TransactionError> + From<redb::CommitError>,
     {
-        let e = 'e: {
-            self.waiting_for_w_cxt
-                .fetch_add(1, std::sync::atomic::Ordering::Release);
-            let mut w_cxt_mutex_guard: std::sync::RwLockWriteGuard<'_, Option<WriteTransaction>> =
-                self.w_cxt.write().unwrap();
-            self.waiting_for_w_cxt
-                .fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
-            let mut w_cxt_owned = MaybeUninit::uninit();
-            let w_cxt = if let Some(w_cxt) = w_cxt_mutex_guard.as_ref() {
-                w_cxt
-            } else {
-                let w_cxt = match self.begin_write().map_err(E::from) {
-                    Ok(w_cxt) => w_cxt,
-                    Err(e) => {
-                        break 'e e;
-                    }
-                };
-                w_cxt_owned.write(w_cxt);
-                unsafe { &w_cxt_owned.assume_init_read() }
-            };
-            let t = f(w_cxt)?;
-            let waiting_for_w_cxt = self
-                .waiting_for_w_cxt
-                .load(std::sync::atomic::Ordering::Acquire);
-            if waiting_for_w_cxt == 0 {
-                let w_cxt = if let Some(w_cxt) = w_cxt_mutex_guard.take() {
-                    w_cxt
-                } else {
-                    unsafe { w_cxt_owned.assume_init() }
-                };
-                if let Err(e) = w_cxt.commit().map_err(E::from) {
-                    break 'e e;
-                }
-            } else if w_cxt_mutex_guard.as_ref().is_none() {
-                let w_cxt = unsafe { w_cxt_owned.assume_init() };
-                w_cxt_mutex_guard.replace(w_cxt);
+        match self.db.begin_write().map_err(E::from) {
+            Ok(w_cxt) => {
+                let t = f(&w_cxt)?;
+                w_cxt.commit().map_err(|e| m(E::from(e)))?;
+                Ok(t)
             }
-            drop(w_cxt_mutex_guard);
-            return Ok(t);
-        };
-        Err(m(e))
+            Err(e) => Err(m(e)),
+        }
     }
     #[inline]
-    pub fn write<T, E, F: FnOnce(&WriteTransaction) -> Result<T, E>>(
+    pub fn write_once<T, E, F: FnOnce(&WriteTransaction) -> Result<T, E>>(
         &mut self,
         f: F,
     ) -> Result<T, E>
     where
         E: From<redb::TransactionError> + From<redb::CommitError>,
     {
+        Self::write_once_map_err(self, f, |e| e)
+    }
+    pub fn write_map_err<T, N, E, F: FnOnce(&WriteTransaction) -> Result<T, N>, M: FnOnce(E) -> N>(
+        &mut self,
+        f: F,
+        m: M,
+    ) -> Result<WriteAccessGuard<T>, N>
+    where
+        E: From<redb::TransactionError> + From<redb::CommitError>,
+    {
+        match self.db.begin_write().map_err(E::from) {
+            Ok(w_cxt) => {
+                let t = f(&w_cxt)?;
+                Ok(WriteAccessGuard { w_cxt, t })
+            }
+            Err(e) => Err(m(e)),
+        }
+    }
+    #[inline]
+    pub fn write<T, E, F: FnOnce(&WriteTransaction) -> Result<T, E>>(
+        &mut self,
+        f: F,
+    ) -> Result<WriteAccessGuard<T>, E>
+    where
+        E: From<redb::TransactionError> + From<redb::CommitError>,
+    {
         Self::write_map_err(self, f, |e| e)
     }
 }
-impl Deref for DatabaseGuard {
-    type Target = Database;
+// impl Deref for DatabaseGuard {
+//     type Target = Database;
 
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.db
-    }
-}
-pub struct ReadAccessGuard<'g, T> {
+//     #[inline]
+//     fn deref(&self) -> &Self::Target {
+//         &self.db
+//     }
+// }
+pub struct ReadAccessGuard<T> {
     r_cxt: ReadTransaction,
     t: T,
-    read_lock: RwLockReadGuard<'g, Option<WriteTransaction>>,
 }
-impl<T> ReadAccessGuard<'_, T> {
+impl<T> ReadAccessGuard<T> {
     #[inline]
-    pub fn into_inner(self) -> T {
+    pub fn unwrap_inner(self) -> T {
         self.t
     }
 }
-impl<'g, R> ReadAccessGuard<'g, R> {
+impl<T> ReadAccessGuard<T> {
+    #[inline]
+    pub fn into_inner(self) -> (T, ReadAccessGuard<()>) {
+        let Self { r_cxt, t } = self;
+        (t, ReadAccessGuard { r_cxt, t: () })
+    }
+}
+impl ReadAccessGuard<()> {
     #[inline]
     pub fn read_once<T, E, F: FnOnce(&ReadTransaction) -> Result<T, E>>(
         self,
         f: F,
-    ) -> Result<(R, T), E> {
-        let Self {
-            r_cxt,
-            t: r,
-            read_lock,
-        } = self;
+    ) -> Result<T, E> {
+        let Self { r_cxt, .. } = self;
         let t = f(&r_cxt)?;
-        drop(read_lock);
-        Ok((r, t))
+        Ok(t)
     }
     #[inline]
     pub fn read<T, E, F: FnOnce(&ReadTransaction) -> Result<T, E>>(
         self,
         f: F,
-    ) -> Result<(R, ReadAccessGuard<'g, T>), E> {
-        let Self {
-            r_cxt,
-            t: r,
-            read_lock,
-        } = self;
+    ) -> Result<ReadAccessGuard<T>, E> {
+        let Self { r_cxt, .. } = self;
         let t = f(&r_cxt)?;
-        Ok((
-            r,
-            ReadAccessGuard {
-                r_cxt,
-                t,
-                read_lock,
-            },
-        ))
+        Ok(ReadAccessGuard { r_cxt, t })
     }
 }
-impl<T> Deref for ReadAccessGuard<'_, T> {
+impl<T> Deref for ReadAccessGuard<T> {
     type Target = T;
 
     #[inline]
@@ -205,9 +172,97 @@ impl<T> Deref for ReadAccessGuard<'_, T> {
         &self.t
     }
 }
-impl<T> AsRef<ReadTransaction> for ReadAccessGuard<'_, T> {
+impl<T> AsRef<ReadTransaction> for ReadAccessGuard<T> {
     #[inline]
     fn as_ref(&self) -> &ReadTransaction {
         &self.r_cxt
+    }
+}
+#[must_use = "如不处理则会造成数据未提交。"]
+pub struct WriteAccessGuard<T> {
+    w_cxt: WriteTransaction,
+    t: T,
+}
+impl<T> WriteAccessGuard<T> {
+    #[inline]
+    pub fn commit(self) -> Result<T, StoreError> {
+        let Self { w_cxt, t, .. } = self;
+        w_cxt.commit()?;
+        Ok(t)
+    }
+    #[inline]
+    pub fn unwrap_inner(self) -> T {
+        let Self { w_cxt, t, .. } = self;
+        w_cxt.commit().log_unwrap();
+        t
+    }
+    #[inline]
+    pub fn get_inner(self) -> T {
+        let Self { w_cxt, t, .. } = self;
+        w_cxt.commit().log_ignore();
+        t
+    }
+}
+impl<T> WriteAccessGuard<T> {
+    #[inline]
+    pub fn into_inner(self) -> (T, WriteAccessGuard<()>) {
+        let Self { w_cxt, t } = self;
+        (t, WriteAccessGuard { w_cxt, t: () })
+    }
+}
+impl WriteAccessGuard<()> {
+    #[inline]
+    pub fn write_once<T, E, F: FnOnce(&WriteTransaction) -> Result<T, E>>(
+        self,
+        f: F,
+    ) -> Result<T, E>
+    where
+        E: From<redb::CommitError>,
+    {
+        let Self { w_cxt, .. } = self;
+        let t = match f(&w_cxt) {
+            Ok(t) => {
+                w_cxt.commit().log_ignore();
+                t
+            }
+            Err(e) => {
+                w_cxt.commit()?;
+                Err(e)?
+            }
+        };
+        Ok(t)
+    }
+}
+impl WriteAccessGuard<()> {
+    #[inline]
+    pub fn write<T, E, F: FnOnce(&WriteTransaction) -> Result<T, E>>(
+        self,
+        f: F,
+    ) -> Result<WriteAccessGuard<T>, E>
+    where
+        E: From<redb::CommitError>,
+    {
+        let Self { w_cxt, .. } = self;
+        match f(&w_cxt) {
+            Ok(t) => Ok(WriteAccessGuard { w_cxt, t }),
+            Err(e) => {
+                w_cxt.commit()?;
+                Err(e)
+            }
+        }
+    }
+}
+impl<T> Deref for WriteAccessGuard<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.t
+    }
+}
+impl<T> AsRef<WriteTransaction> for WriteAccessGuard<T> {
+    #[inline]
+    fn as_ref(&self) -> &WriteTransaction {
+        &self.w_cxt
     }
 }

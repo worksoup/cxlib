@@ -1,4 +1,8 @@
 //! redb 使用细节。
+//!
+//! RTrans 会获取最近提交的内容（但也许没有更新机制？）
+//!
+//! WTrans 会在有其他 WTrans 时阻塞线程。
 
 mod account_table;
 mod activity_table;
@@ -25,11 +29,13 @@ pub use location_table::*;
 pub use utils::*;
 
 use redb::{
-    Database, Key, MultimapTable, MultimapTableDefinition, ReadOnlyMultimapTable, ReadOnlyTable,
+    Key, MultimapTable, MultimapTableDefinition, ReadOnlyMultimapTable, ReadOnlyTable,
     ReadTransaction, ReadableMultimapTable, ReadableTable, Table, TableDefinition,
     UntypedMultimapTableHandle, UntypedTableHandle, Value, WriteTransaction,
 };
 use std::borrow::Borrow;
+
+use crate::database_guard::DatabaseGuard;
 
 pub trait TableDefinitionTrait {
     type Key: Key + 'static;
@@ -112,6 +118,10 @@ where
     }
 }
 pub trait ImportExportTrait: TableDefinitionTrait {
-    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, cxt: Cxt, content: &str);
-    fn export_text(db: &Database) -> String;
+    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(
+        db: &mut DatabaseGuard,
+        cxt: Cxt,
+        content: &str,
+    );
+    fn export_text(db: &mut DatabaseGuard) -> String;
 }

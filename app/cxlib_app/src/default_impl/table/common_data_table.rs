@@ -1,8 +1,11 @@
-use crate::{BinCode, ImportExportTrait, NormalTableTrait, StoreError, TableDefinitionTrait};
+use crate::{
+    BinCode, ImportExportTrait, NormalTableTrait, StoreError, TableDefinitionTrait,
+    database_guard::DatabaseGuard,
+};
 use bincode::{Decode, Encode};
-use cxlib_error_utils::CxlibResultUtils;
+use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
 use log::warn;
-use redb::{Database, ReadTransaction, ReadableTable, WriteTransaction};
+use redb::{ReadTransaction, ReadableTable, WriteTransaction};
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, collections::HashMap};
 #[derive(
@@ -57,30 +60,36 @@ impl CommonDataTable {
     }
 }
 impl ImportExportTrait for CommonDataTable {
-    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, _: Cxt, data: &str) {
+    fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(
+        db: &mut DatabaseGuard,
+        _: Cxt,
+        data: &str,
+    ) {
         let data = toml::from_str::<HashMap<KeyType, String>>(data).log_unwrap();
-        let w_cxt = db.begin_write().log_unwrap();
-        for (key, value) in data {
-            match Self::insert(&w_cxt, key, value) {
-                Ok(r) => {
-                    if let Some(r) = r {
-                        warn!("数据已更新，原数据为：{r:?}");
+        db.write_once(|w_cxt| {
+            for (key, value) in data {
+                match Self::insert(w_cxt, key, value) {
+                    Ok(r) => {
+                        if let Some(r) = r {
+                            warn!("数据已更新，原数据为：{r:?}");
+                        }
                     }
-                }
-                Err(e) => {
-                    warn!("common_data 数据行写入出错：`{e}`, 已跳过。");
-                }
-            };
-        }
-        w_cxt.commit().log_unwrap();
+                    Err(e) => {
+                        if e.is_fatal() {
+                            warn!("common_data 数据行写入出错：`{e}`, 终止导入。");
+                            return Err(e);
+                        }
+                        warn!("common_data 数据行写入出错：`{e}`, 已跳过。");
+                    }
+                };
+            }
+            Ok(())
+        })
+        .log_unwrap();
     }
 
-    fn export_text(db: &Database) -> String {
-        let export = if let Ok(r_cxt) = db.begin_read() {
-            Self::iter(&r_cxt).unwrap_or_default()
-        } else {
-            HashMap::new()
-        };
+    fn export_text(db: &mut DatabaseGuard) -> String {
+        let export = db.read_once(Self::iter).log_unwrap_or_default();
         toml::to_string_pretty(&export).unwrap_or_default()
     }
 }
