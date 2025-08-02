@@ -10,7 +10,7 @@ use cxlib_internal::{
 };
 use log::{info, warn};
 use redb::Database;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 // TODO: build.rs 中通过环境变量设置 alias.
 #[derive(Parser, Debug, Clone)]
@@ -49,7 +49,7 @@ impl<U> Default for AccountCmdApp<U> {
 impl<'cxt, Context, UserProtocol> AppTrait<Context> for AccountCmdApp<UserProtocol>
 where
     Context: AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
-        + AsRef<Database>,
+        + AsRef<Arc<Database>>,
     UserProtocol: Send + Sync + UserProtocolTrait + 'static,
 {
     type OwnedData = AccountParser;
@@ -83,7 +83,6 @@ where
                 // 添加账号。
                 match session {
                     Ok(session) => {
-                        let session = session.into_inner();
                         info!("添加账号[{uname}]（用户名：{}）成功！", session.name());
                         if let Ok(courses) = session.get_courses() {
                             db.write(|w_cxt| {
@@ -122,7 +121,7 @@ where
                         return;
                     }
                 }
-                let db: &Database = context.as_ref();
+                let db: &Arc<Database> = context.as_ref();
                 // 删除指定账号。
                 let w_cxt = db.begin_write().log_unwrap();
                 AccountTable::<UserProtocol>::delete_account(&w_cxt, &uid);
@@ -137,7 +136,7 @@ impl<'cxt, Context, OwnedData, UserProtocol> CmdMetaAppTrait<Context, OwnedData>
     for AccountCmdApp<UserProtocol>
 where
     Context: AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
-        + AsRef<Database>
+        + AsRef<Arc<Database>>
         + 'static,
     OwnedData: 'static,
     UserProtocol: Send + Sync + UserProtocolTrait + 'static,

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     AliasTable, AppTrait, CmdMetaAppTrait, CourseTable, LocationTable, NormalTableTrait,
     database_guard::DatabaseGuard,
@@ -28,7 +30,7 @@ pub struct LocationsParser {
 #[derive(Default)]
 pub struct LocationsCmdApp;
 
-impl<Context: AsRef<Database>> AppTrait<Context> for LocationsCmdApp {
+impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
     type OwnedData = LocationsParser;
 
     fn run(
@@ -153,8 +155,8 @@ impl<Context: AsRef<Database>> AppTrait<Context> for LocationsCmdApp {
         }
     }
 }
-impl<Context: AsRef<Database> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
-    for LocationsCmdApp
+impl<Context: AsRef<Arc<Database>> + 'static, OwnedData: 'static>
+    CmdMetaAppTrait<Context, OwnedData> for LocationsCmdApp
 {
     fn read_owned_data(&self, _: &Context, matches: &[&ArgMatches]) -> Self::OwnedData {
         let matches = matches.last().unwrap();

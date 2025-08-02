@@ -14,7 +14,7 @@ use redb::Database;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
-    marker::PhantomData,
+    marker::PhantomData, sync::Arc,
 };
 
 #[derive(Parser, Debug, Clone)]
@@ -86,7 +86,7 @@ impl<U> Default for CoursesCmdApp<U> {
 impl<UserProtocol, Context> AppTrait<Context> for CoursesCmdApp<UserProtocol>
 where
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    Context: AsRef<Database> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
+    Context: AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
 {
     type OwnedData = CoursesParser;
 
@@ -145,7 +145,7 @@ impl<UserProtocol, Context, OwnedData> CmdMetaAppTrait<Context, OwnedData>
     for CoursesCmdApp<UserProtocol>
 where
     UserProtocol: std::marker::Send + UserProtocolTrait + 'static,
-    Context: AsRef<Database> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
+    Context: AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
     OwnedData: 'static,
 {
     fn read_owned_data(

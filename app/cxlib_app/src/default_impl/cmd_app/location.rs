@@ -21,6 +21,7 @@ use std::{
     marker::PhantomData,
     path::PathBuf,
     str::FromStr,
+    sync::Arc,
 };
 #[derive(Debug, Clone)]
 pub enum GeolocationOrUnhandledGeoaddr {
@@ -177,19 +178,19 @@ impl LocationParser {
         }
         let location = location_str.parse::<UnhandledGeoaddr>();
         let location = if let Ok(location) = location {
-            let contains = database_guard.read(|r_cxt| {
+            let contains = database_guard.read_once(|r_cxt| {
                 let location_table = LocationTable::read(r_cxt)?;
                 LocationTable::has_location(&location_table, &location)
             });
             if let Ok(contains) = contains
-                && contains.into_inner()
+                && contains
             {
                 if let Some(course) = course {
-                    let mut courses = match database_guard.read(|r_cxt| {
+                    let mut courses = match database_guard.read_once(|r_cxt| {
                         let location_table = LocationTable::read(r_cxt)?;
                         LocationTable::get_courses(&location_table, &location)
                     }) {
-                        Ok(courses) => courses.into_inner(),
+                        Ok(courses) => courses,
                         Err(e) => {
                             warn!("`{e}`.");
                             Vec::new()
@@ -300,12 +301,12 @@ impl LocationParser {
                         })
                         .log_unwrap();
                     if *contains {
-                        let aliases = contains.read(|r_cxt| {
+                        let aliases = contains.read_once(|r_cxt| {
                             let alias_table = AliasTable::read(r_cxt)?;
                             AliasTable::get_aliases(&alias_table, &location)
                         });
                         let aliases = if let Ok((_, aliases)) = aliases {
-                            aliases.into_inner()
+                            aliases
                         } else {
                             Default::default()
                         };
@@ -329,12 +330,12 @@ impl LocationParser {
             }
             Remove::Aliases { alias } => {
                 let contains = database_guard
-                    .read(|r_cxt| {
+                    .read_once(|r_cxt| {
                         let alias_table = AliasTable::read(r_cxt)?;
                         AliasTable::has_alias(&alias_table, &alias)
                     })
                     .log_unwrap();
-                if *contains {
+                if contains {
                     database_guard
                         .write(|w_cxt| {
                             let mut alias_table = AliasTable::write(w_cxt)?;
@@ -594,7 +595,7 @@ impl LocationParser {
         Cxt: Borrow<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
     >(
         self,
-        database: &Database,
+        database: &Arc<Database>,
         cxt: Cxt,
         app_info: &AppInfo,
     ) {
@@ -643,7 +644,7 @@ impl<T, U> Default for LocationCmdApp<T, U> {
 impl<
     TypesProtocol: TypesProtocolTrait,
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    Context: AsRef<Database> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<AppInfo>,
+    Context: AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<AppInfo>,
 > AppTrait<Context> for LocationCmdApp<TypesProtocol, UserProtocol>
 {
     type OwnedData = LocationParser;
@@ -656,7 +657,7 @@ impl<
     'cxt,
     TypesProtocol: TypesProtocolTrait + 'static,
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    Context: AsRef<Database>
+    Context: AsRef<Arc<Database>>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
         + AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
         + AsRef<AppInfo>

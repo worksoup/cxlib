@@ -167,8 +167,11 @@ where
         cxt: Cxt,
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
         let str_list = uid_list_str.split(',').map(|a| a.trim());
-        let account_table = match db.read(AccountTable::<UserProtocol>::read) {
-            Ok(account_table) => account_table.into_inner(),
+        let account_table = db
+            .read(AccountTable::<UserProtocol>::read)
+            .map(|account_table| account_table.into_inner());
+        let account_table = match account_table {
+            Ok(account_table) => account_table,
             Err(StoreError::TableError(TableError::TableDoesNotExist(e))) => {
                 warn!("数据表不存在：{e}。");
                 db.write(|w_cxt| {
@@ -295,8 +298,11 @@ where
         db: &mut DatabaseGuard,
         cxt: Cxt,
     ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
-        let account_table = match db.read(AccountTable::<UserProtocol>::read) {
-            Ok(account_table) => account_table.into_inner(),
+        let account_table = db
+            .read(AccountTable::<UserProtocol>::read)
+            .map(|account_table| account_table.into_inner());
+        let account_table = match account_table {
+            Ok(account_table) => account_table,
             Err(StoreError::TableError(TableError::TableDoesNotExist(e))) => {
                 warn!("数据表不存在：{e}。");
                 db.write(|w_cxt| {

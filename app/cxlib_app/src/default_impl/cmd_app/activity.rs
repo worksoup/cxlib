@@ -28,7 +28,7 @@ use log::{debug, error, info, warn};
 use redb::{Database, WriteTransaction};
 use ref_wrapper::Unit;
 use std::{
-    borrow::Borrow, collections::HashMap, marker::PhantomData, path::PathBuf, time::Duration,
+    borrow::Borrow, collections::HashMap, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration
 };
 
 #[derive(Clone)]
@@ -358,7 +358,7 @@ impl SignParser {
         SignProtocol: std::marker::Send + SignProtocolTrait + 'static,
         TypesProtocol: TypesProtocolTrait + 'static,
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-        Cxt: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Database>,
+        Cxt: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Arc<Database>>,
         LocationGetter: LocationInfoGetterTrait + Copy,
     {
         let mut db_g = DatabaseGuard::new(cxt.as_ref());
@@ -679,7 +679,7 @@ impl SignParser {
         sessions: impl IntoIterator<Item = &'a Session<UserProtocol>>,
     ) -> Result<CachedActivitiesResult<'a, UserProtocol>, Error>
     where
-        Cxt: AsRef<Database>,
+        Cxt: AsRef<Arc<Database>>,
     {
         let database_guard = DatabaseGuard::new(cxt.as_ref());
         let sessions = sessions
@@ -796,7 +796,7 @@ impl<
         T,
     >
 where
-    Context: AsRef<Database>
+    Context: AsRef<Arc<Database>>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
@@ -822,7 +822,7 @@ where
     CaptchaSolver,CaptchaProtocol, SignProtocol, TypesProtocol, _, _, _, T>(
             cxt,
             (
-                DefaultLocationInfoGetter::from(cxt.as_ref()),
+                DefaultLocationInfoGetter::from(&**AsRef::<Arc<Database>>::as_ref(cxt)),
                 AsRef::<Preprocessor>::as_ref(&cxt),
             ), 
         )
@@ -871,7 +871,7 @@ impl<
         T,
     >
 where
-    Context: AsRef<Database>
+    Context: AsRef<Arc<Database>>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>

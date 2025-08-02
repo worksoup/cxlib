@@ -5,7 +5,7 @@ use clap::{ArgMatches, FromArgMatches, Parser, arg};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::{protocol::collect::UserProtocolTrait, types::UntypedLoginSolver};
 use redb::Database;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 #[derive(Parser, Debug, Clone)]
 // TODO: build.rs 中通过环境变量设置 alias.
@@ -27,7 +27,7 @@ impl<U> Default for AccountsCmdApp<U> {
 }
 impl<Context, UserProtocol> AppTrait<Context> for AccountsCmdApp<UserProtocol>
 where
-    Context: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Database>,
+    Context: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Arc<Database>>,
     UserProtocol: UserProtocolTrait + 'static,
 {
     type OwnedData = AccountsParser;
@@ -38,7 +38,6 @@ where
         let sessions = if fresh {
             db.write(|w_cxt| AccountTable::<UserProtocol>::relogin_all(w_cxt, cxt))
                 .log_unwrap()
-                .into_inner()
         } else {
             // 列出所有账号。
             AccountTable::get_all_sessions(&mut db, solver_cxt).log_unwrap()
@@ -52,7 +51,8 @@ where
 impl<Context, OwnedData, UserProtocol> CmdMetaAppTrait<Context, OwnedData>
     for AccountsCmdApp<UserProtocol>
 where
-    Context: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Database> + 'static,
+    Context:
+        AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Arc<Database>> + 'static,
     OwnedData: 'static,
     UserProtocol: UserProtocolTrait + 'static,
 {

@@ -11,6 +11,8 @@ mod location_table;
 // mod table_base;
 mod utils;
 
+pub mod database_guard;
+
 pub use account_table::*;
 pub use activity_table::*;
 pub use alias_table::*;
@@ -112,118 +114,4 @@ where
 pub trait ImportExportTrait: TableDefinitionTrait {
     fn import_text<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(db: &Database, cxt: Cxt, content: &str);
     fn export_text(db: &Database) -> String;
-}
-pub mod database_guard {
-    //! 也许能防止一个块内试图同时获取读事务与写事务。
-    use std::ops::Deref;
-
-    use redb::{Database, ReadTransaction, WriteTransaction};
-    pub struct DatabaseGuard<'a>(&'a Database);
-    impl<'b> DatabaseGuard<'b> {
-        pub fn new(db: &'b Database) -> Self {
-            Self(db)
-        }
-        pub fn read<'a, T, E, F: FnOnce(&ReadTransaction) -> Result<T, E>>(
-            &'a self,
-            f: F,
-        ) -> Result<ReadAccessGuard<'a, 'b, T>, E>
-        where
-            'b: 'a,
-            E: From<redb::TransactionError>,
-        {
-            let r_cxt = self.begin_read()?;
-            let t = f(&r_cxt)?;
-            Ok(ReadAccessGuard(self, r_cxt, t))
-        }
-        pub fn write_map_err<
-            'a,
-            T,
-            N,
-            E,
-            F: FnOnce(&WriteTransaction) -> Result<T, N>,
-            M: FnOnce(E) -> N,
-        >(
-            &'a mut self,
-            f: F,
-            m: M,
-        ) -> Result<WriteAccessGuard<'a, 'b, T>, N>
-        where
-            'b: 'a,
-            E: From<redb::TransactionError> + From<redb::CommitError>,
-        {
-            match self.begin_write() {
-                Ok(w_cxt) => {
-                    let t = f(&w_cxt)?;
-                    w_cxt.commit().map_err(E::from).map_err(m)?;
-                    Ok(WriteAccessGuard(self, t))
-                }
-                Err(e) => Err(m(E::from(e))),
-            }
-        }
-        pub fn write<'a, T, E, F: FnOnce(&WriteTransaction) -> Result<T, E>>(
-            &'a mut self,
-            f: F,
-        ) -> Result<WriteAccessGuard<'a, 'b, T>, E>
-        where
-            'b: 'a,
-            E: From<redb::TransactionError> + From<redb::CommitError>,
-        {
-            let w_cxt = self.begin_write()?;
-            let t = f(&w_cxt)?;
-            w_cxt.commit()?;
-            Ok(WriteAccessGuard(self, t))
-        }
-    }
-    impl Deref for DatabaseGuard<'_> {
-        type Target = Database;
-
-        fn deref(&self) -> &Self::Target {
-            self.0
-        }
-    }
-    pub struct ReadAccessGuard<'a, 'b: 'a, T>(&'a DatabaseGuard<'b>, ReadTransaction, T);
-    impl<T> ReadAccessGuard<'_, '_, T> {
-        pub fn into_inner(self) -> T {
-            self.2
-        }
-    }
-    impl<'a, 'b: 'a, R> ReadAccessGuard<'a, 'b, R> {
-        pub fn read<T, E, F: FnOnce(&ReadTransaction) -> Result<T, E>>(
-            self,
-            f: F,
-        ) -> Result<(R, ReadAccessGuard<'a, 'b, T>), E>
-        where
-            'b: 'a,
-            E: From<redb::TransactionError>,
-        {
-            let Self(g, r_cxt, r) = self;
-            let t = f(&r_cxt)?;
-            Ok((r, ReadAccessGuard(g, r_cxt, t)))
-        }
-    }
-    impl<T> Deref for ReadAccessGuard<'_, '_, T> {
-        type Target = T;
-
-        fn deref(&self) -> &Self::Target {
-            &self.2
-        }
-    }
-    impl<T> AsRef<ReadTransaction> for ReadAccessGuard<'_, '_, T> {
-        fn as_ref(&self) -> &ReadTransaction {
-            &self.1
-        }
-    }
-    pub struct WriteAccessGuard<'a, 'b: 'a, T>(#[allow(dead_code)] &'a mut DatabaseGuard<'b>, T);
-    impl<T> Deref for WriteAccessGuard<'_, '_, T> {
-        type Target = T;
-
-        fn deref(&self) -> &Self::Target {
-            &self.1
-        }
-    }
-    impl<T> WriteAccessGuard<'_, '_, T> {
-        pub fn into_inner(self) -> T {
-            self.1
-        }
-    }
 }
