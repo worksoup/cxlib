@@ -548,12 +548,13 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
         let mut have = false;
         for (raw_sign, sessions) in signs {
             have = true;
+            let mills = raw_sign.start_time_mills().unwrap_or(u64::MAX);
             info!(
                 "即将处理签到：[{}], id 为 {}, 开始时间为 {}, 课程为 {} / {} / {}",
                 raw_sign.name(),
                 raw_sign.active_id(),
                 chrono::DateTime::<chrono::Local>::from(
-                    std::time::UNIX_EPOCH + Duration::from_millis(*raw_sign.start_time_mills())
+                    std::time::UNIX_EPOCH + Duration::from_millis(mills)
                 )
                 .format("%+"),
                 raw_sign.course().class_id(),

@@ -136,14 +136,14 @@ impl CourseTable {
     }
     /// 更新最近活动时间，当入参大于原值才会更新。
     ///
-    /// 注意，u64::MAX 被视为初始值。如果原值为初始值，将无条件更新。
+    /// 注意，None 被视为初始值。如果原值为初始值，将无条件更新。
     pub fn update_recently_used_time(
         table: &mut Table<
             <Self as TableDefinitionTrait>::Key,
             <Self as TableDefinitionTrait>::Value,
         >,
         course: &Course,
-        recently_used_timestamp_secs: u64,
+        recently_used_timestamp_secs: Option<u64>,
     ) -> Result<bool, StoreError> {
         let (info, mut data) = {
             let course_data_guard = table.get(course)?;
@@ -154,8 +154,9 @@ impl CourseTable {
             drop(course_data_guard);
             r
         };
-        if u64::MAX == *data.recently_used_timestamp()
-            || recently_used_timestamp_secs > *data.recently_used_timestamp()
+        // None 比较大小会无条件返回 false.
+        if data.recently_used_timestamp().is_none()
+            || *data.recently_used_timestamp() < recently_used_timestamp_secs
         {
             data.set_recently_used_timestamp(recently_used_timestamp_secs);
             table.insert(course, (info, data))?;
@@ -301,13 +302,13 @@ impl TableDefinitionTrait for CourseTable {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Decode, Encode, Clone)]
 pub struct CourseData {
-    recently_used_timestamp_secs: u64,
+    recently_used_timestamp_secs: Option<u64>,
     users: Vec<String>,
     locations: Vec<UnhandledGeoaddr>,
 }
 impl CourseData {
     pub fn new(
-        recently_used_timestamp_secs: u64,
+        recently_used_timestamp_secs: Option<u64>,
         users: Vec<String>,
         locations: Vec<UnhandledGeoaddr>,
     ) -> Self {
@@ -317,7 +318,7 @@ impl CourseData {
             locations,
         }
     }
-    pub fn recently_used_timestamp(&self) -> &u64 {
+    pub fn recently_used_timestamp(&self) -> &Option<u64> {
         &self.recently_used_timestamp_secs
     }
     pub fn users(&self) -> impl Iterator<Item = &str> {
@@ -326,7 +327,7 @@ impl CourseData {
     pub fn locations(&self) -> impl Iterator<Item = &UnhandledGeoaddr> {
         self.locations.iter()
     }
-    pub fn decompose(self) -> (u64, Vec<String>, Vec<UnhandledGeoaddr>) {
+    pub fn decompose(self) -> (Option<u64>, Vec<String>, Vec<UnhandledGeoaddr>) {
         let Self {
             recently_used_timestamp_secs,
             users,
@@ -334,7 +335,7 @@ impl CourseData {
         } = self;
         (recently_used_timestamp_secs, users, locations)
     }
-    pub fn set_recently_used_timestamp(&mut self, recently_used_timestamp_secs: u64) {
+    pub fn set_recently_used_timestamp(&mut self, recently_used_timestamp_secs: Option<u64>) {
         self.recently_used_timestamp_secs = recently_used_timestamp_secs;
     }
     pub fn set_users(&mut self, users: HashSet<&str>) {

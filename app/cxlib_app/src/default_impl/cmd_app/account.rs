@@ -116,7 +116,7 @@ impl<LoginTypeEnum, UserProtocol> AccountCmdApp<LoginTypeEnum, UserProtocol> {
                     db.write_once(|w_cxt| {
                         let users = vec![session.uid().to_owned()];
                         for course in courses {
-                            let data = CourseData::new(u64::MAX, users.clone(), vec![]);
+                            let data = CourseData::new(None, users.clone(), vec![]);
                             let mut table = CourseTable::write(w_cxt)?;
                             let (course, info) = course.unwrap();
                             CourseTable::merge_course(&mut table, course, (info, data), true)?;

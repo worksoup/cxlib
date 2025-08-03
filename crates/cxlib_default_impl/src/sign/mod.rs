@@ -13,7 +13,7 @@ pub use qrcode::*;
 use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
 use cxlib_sign::{PreSignResult, SignError, SignTrait};
 use cxlib_types::{RawSign, Session, SignDetail};
-use log::{error, warn};
+use log::warn;
 use std::collections::HashMap;
 
 pub type CaptchaId = String;
@@ -51,12 +51,12 @@ impl<TypesProtocol> Sign<TypesProtocol> {
         UserProtocol: UserProtocolTrait,
     {
         if let Ok(sign_detail) = raw.get_detail::<TypesProtocol, _>(session) {
-            let r#else = |e| {
-                error!("{}", raw.other_id());
-                error!("{}", raw.course().name());
-                panic!("{e}")
-            };
-            match raw.other_id().parse::<u8>().unwrap_or_else(r#else) {
+            // let r#else = |e| {
+            //     log::error!("{}", raw.other_id());
+            //     log::error!("{}", raw.course().name());
+            //     panic!("{e}")
+            // };
+            match raw.other_id() {
                 0 => {
                     if sign_detail.is_photo() {
                         Sign::Photo(PhotoSign::new(raw))

@@ -43,10 +43,11 @@ pub struct RawSign {
     active_id: String,
     course: CourseWithInfo,
     name: String,
-    other_id: String,
+    other_id: i64,
     #[getset2(set(pub))]
     status_code: i32,
-    start_time_mills: u64,
+    start_time_mills: Option<u64>,
+    class_ended: bool,
 }
 fn time_string_from_mills(mills: u64) -> String {
     #[inline]
@@ -61,28 +62,43 @@ fn time_string_from_mills(mills: u64) -> String {
 impl Display for RawSign {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name_width = get_width_str_should_be(self.name.as_str(), 12);
-        write!(
-            f,
-            "id: {}, name: {:>width$}, status: {}, time: {}, course: {}/{}",
-            self.active_id,
-            self.name,
-            self.status_code,
-            time_string_from_mills(self.start_time_mills),
-            self.course.id(),
-            self.course.name(),
-            width = name_width,
-        )
+        if let Some(mills) = self.start_time_mills {
+            write!(
+                f,
+                "id: {}, name: {:>width$}, status: {}, time: {}, course: {}/{}",
+                self.active_id,
+                self.name,
+                self.status_code,
+                time_string_from_mills(mills),
+                self.course.id(),
+                self.course.name(),
+                width = name_width,
+            )
+        } else {
+            write!(
+                f,
+                "id: {}, name: {:>width$}, status: {}, time: no time, course: {}/{}",
+                self.active_id,
+                self.name,
+                self.status_code,
+                self.course.id(),
+                self.course.name(),
+                width = name_width,
+            )
+        }
     }
 }
 
 impl RawSign {
+    #[inline]
     pub fn new(
         active_id: String,
         course: CourseWithInfo,
         name: String,
-        other_id: String,
+        other_id: i64,
         status_code: i32,
-        start_time_mills: u64,
+        start_time_mills: Option<u64>,
+        class_ended: bool,
     ) -> Self {
         Self {
             start_time_mills,
@@ -91,18 +107,29 @@ impl RawSign {
             course,
             other_id,
             status_code,
+            class_ended,
         }
     }
     pub fn fmt_without_course_info(&self) -> String {
         let name_width = get_width_str_should_be(self.name.as_str(), 12);
-        format!(
-            "id: {}, name: {:>width$}, status: {}, time: {}",
-            self.active_id,
-            self.name,
-            self.status_code,
-            time_string_from_mills(self.start_time_mills),
-            width = name_width,
-        )
+        if let Some(mills) = self.start_time_mills {
+            format!(
+                "id: {}, name: {:>width$}, status: {}, time: {}",
+                self.active_id,
+                self.name,
+                self.status_code,
+                time_string_from_mills(mills),
+                width = name_width,
+            )
+        } else {
+            format!(
+                "id: {}, name: {:>width$}, status: {}, time: no time",
+                self.active_id,
+                self.name,
+                self.status_code,
+                width = name_width,
+            )
+        }
     }
     pub fn get_sign_detail<TypesProtocol, UserProtocol>(
         active_id: &str,

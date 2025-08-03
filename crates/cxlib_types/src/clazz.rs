@@ -23,7 +23,7 @@ impl ClassInfo {
     }
     #[inline]
     pub fn new_with_state(id: i64, state: Option<u8>) -> ClassInfo {
-        let ended = state.is_none_or(|state| state == 0);
+        let ended = state.is_none_or(|state| state == 1);
         ClassInfo { id, ended }
     }
     /// 返回 [`ClassId`].

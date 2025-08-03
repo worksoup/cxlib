@@ -65,15 +65,23 @@ pub trait SignTrait: Ord {
     /// [`RawSign`] 的各字段均为 `pub`,
     /// 故可以通过本函数获取一些签到通用的信息。
     fn as_inner(&self) -> &RawSign;
-    /// 判断签到活动是否有效（目前认定两小时内未结束的签到为有效签到）。
+    /// 判断签到活动是否有效
+    ///
+    /// 目前认定两小时内未结束的签到为有效签到。
+    /// 开始时间可能不存在，则认定为无效签到。课程已经结束则返回无效。
     fn is_valid(&self) -> bool {
-        let time = std::time::Duration::from_millis(*self.as_inner().start_time_mills());
-        let two_hours = std::time::Duration::from_secs(7200);
-        1 == *self.as_inner().status_code()
-            && std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH.add(time))
-                .log_unwrap()
-                < two_hours
+        !self.as_inner().class_ended()
+            && if let Some(time_mills) = self.as_inner().start_time_mills() {
+                let time = std::time::Duration::from_millis(*time_mills);
+                let two_hours = std::time::Duration::from_secs(7200);
+                1 == *self.as_inner().status_code()
+                    && std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH.add(time))
+                        .log_unwrap()
+                        < two_hours
+            } else {
+                false
+            }
     }
     /// 获取签到后状态。参见返回类型 [`SignState`].
     fn get_sign_state<SignProtocol, U>(&self, session: &Session<U>) -> Result<SignState, SignError>

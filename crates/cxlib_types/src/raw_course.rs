@@ -32,7 +32,7 @@ impl RawCourse {
             image_url,
             name,
         } = self;
-        CourseWithInfo::new_with_fields(id, info, name, image_url, teacher)
+        CourseWithInfo::new_with_fields(id, info, teacher, image_url, name)
     }
     #[inline]
     pub fn new(id: i64, teacher: String, image_url: Option<String>, name: String) -> RawCourse {

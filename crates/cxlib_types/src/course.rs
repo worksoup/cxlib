@@ -49,7 +49,7 @@ impl CourseWithInfo {
         RawCourse::into_course(raw, class_info)
     }
     #[inline]
-    pub fn new_with_fields(
+    pub(crate) fn new_with_fields(
         id: i64,
         class_info: ClassInfo,
         teacher: String,
@@ -173,7 +173,24 @@ struct ActivityRaw {
     other_id: Option<String>,
     status: i32,
     #[serde(rename = "startTime")]
-    start_time_mills: u64,
+    start_time_mills: StartTimeMills,
+}
+/// 对于已经结束的课程，该字段将为空字符串。
+/// 也许有可能为 null. TODO: 后续需验证。
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(untagged)]
+enum StartTimeMills {
+    Some(u64),
+    None(String),
+}
+impl StartTimeMills {
+    #[inline]
+    pub fn some(&self) -> Option<u64> {
+        match self {
+            Self::Some(mills) => Some(*mills),
+            Self::None(_) => None,
+        }
+    }
 }
 /// 内部类型，用于反序列化。
 ///
@@ -197,8 +214,27 @@ impl CourseWithInfo {
         &self,
         session: &Session<UserProtocol>,
     ) -> Result<Vec<Activity>, ActivityError> {
-        let r = TypesProtocol::active_list(session, (self.id(), self.class_id()))?;
-        let r: GetActivityR = r.into_body().read_json().log_unwrap();
+        let mut r = TypesProtocol::active_list(session, (self.id(), self.class_id()))?;
+        let r: GetActivityR = {
+            #[cfg(debug_assertions)]
+            {
+                let r = r.body_mut().read_to_string().unwrap();
+                match serde_json::from_str(&r) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        log::error!("{}/{}", session.name(), self.info().name());
+                        log::error!("{r}");
+                        log::error!("{e:?}");
+                        panic!()
+                    }
+                }
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                r.into_body().read_json().log_unwrap()
+            }
+        };
+        let class_ended = self.class_ended();
         let activities = Arc::new(Mutex::new(Vec::new()));
         if let Some(data) = r.data {
             let thread_count = 1;
@@ -217,11 +253,10 @@ impl CourseWithInfo {
                     let c = self.clone();
                     let activities = activities.clone();
                     let handle = std::thread::spawn(move || {
-                        if ar.other_id.as_ref().is_some_and(|oid| {
-                            let other_id_i64: i64 = oid.parse().unwrap();
-                            (0..=5).contains(&other_id_i64)
-                        }) {
-                            let other_id = unsafe { ar.other_id.unwrap_unchecked() };
+                        if let Some(oid) = ar.other_id.as_ref()
+                            && let Ok(other_id) = oid.parse::<i64>()
+                            && { (0..=5).contains(&other_id) }
+                        {
                             let active_id = ar.id.to_string();
                             let base_sign = RawSign::new(
                                 active_id,
@@ -229,7 +264,8 @@ impl CourseWithInfo {
                                 ar.name_one,
                                 other_id,
                                 ar.status,
-                                ar.start_time_mills,
+                                ar.start_time_mills.some(),
+                                class_ended,
                             );
                             activities
                                 .lock()
@@ -240,11 +276,12 @@ impl CourseWithInfo {
                                 .lock()
                                 .unwrap()
                                 .push(Activity::Other(OtherActivity {
+                                    other_id: ar.other_id,
                                     id: ar.id.to_string(),
                                     name: ar.name_one,
                                     course: c.clone(),
                                     status_code: ar.status,
-                                    start_time_mills: ar.start_time_mills,
+                                    start_time_mills: ar.start_time_mills.some(),
                                 }))
                         }
                     });

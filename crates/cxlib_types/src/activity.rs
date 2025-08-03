@@ -32,12 +32,13 @@ pub enum Activity {
 )]
 #[getset2(get_ref(pub))]
 pub struct OtherActivity {
+    pub other_id: Option<String>,
     pub id: String,
     pub name: String,
     pub course: CourseWithInfo,
     #[getset2(set(pub))]
     pub status_code: i32,
-    pub start_time_mills: u64,
+    pub start_time_mills: Option<u64>,
 }
 
 impl Activity {
@@ -70,7 +71,7 @@ impl Activity {
         };
         self
     }
-    pub fn start_time_mills(&self) -> u64 {
+    pub fn start_time_mills(&self) -> Option<u64> {
         match self {
             Activity::RawSign(a) => *a.start_time_mills(),
             Activity::Other(a) => a.start_time_mills,

@@ -1,4 +1,5 @@
 use bincode::{decode_from_slice, encode_to_vec};
+use cxlib_error_utils::CxlibResultUtils;
 use redb::{TypeName, Value};
 use std::{cmp::Ordering, fmt::Debug, ops::Deref};
 
@@ -51,7 +52,7 @@ where
         Self: 'a,
     {
         decode_from_slice(data, bincode::config::standard())
-            .unwrap()
+            .log_unwrap()
             .0
     }
 
@@ -60,7 +61,7 @@ where
     where
         Self: 'b,
     {
-        encode_to_vec(value, bincode::config::standard()).unwrap()
+        encode_to_vec(value, bincode::config::standard()).log_unwrap()
     }
 
     #[inline]

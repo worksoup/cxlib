@@ -114,28 +114,38 @@ pub struct DefaultCourseDataSorter;
 impl<T> CourseDataFilterAndSorterTrait<T> for DefaultCourseDataSorter {
     #[inline]
     fn filter(a: (&Course, &CourseInfo, &CourseData)) -> bool {
-        !a.1.ended()
-            && (u64::MAX == *a.2.recently_used_timestamp() || {
+        !a.1.ended() && {
+            if let Some(mills) = a.2.recently_used_timestamp() {
                 let now = (get_now_timestamp_mills() / 1000) as u64;
-                *a.2.recently_used_timestamp() > now
-                    || now - a.2.recently_used_timestamp() < 160 * 24 * 60 * 60
-            })
+                *mills > now || now - mills < 160 * 24 * 60 * 60
+            } else {
+                true
+            }
+        }
     }
     fn sorter(
         a: (&Course, &CourseInfo, &CourseData),
         b: (&Course, &CourseInfo, &CourseData),
     ) -> cmp::Ordering {
-        let a = a.2.recently_used_timestamp();
-        let b = b.2.recently_used_timestamp();
-        let now = (get_now_timestamp_mills() / 1000) as u64;
-        let da = now > *a && (now - a) / (24 * 60 * 60) == 7;
-        let db = now > *b && (now - b) / (24 * 60 * 60) == 7;
-        if da == db {
-            b.cmp(a)
-        } else if da {
-            cmp::Ordering::Greater
-        } else {
-            cmp::Ordering::Less
+        // 默认排序为升序。应该是Greater的靠后。
+        match (a.1.ended(), b.1.ended()) {
+            (true, true) => {
+                let a = a.2.recently_used_timestamp().unwrap_or(u64::MAX);
+                let b = b.2.recently_used_timestamp().unwrap_or(u64::MAX);
+                let now = (get_now_timestamp_mills() / 1000) as u64;
+                let da = now > a && (now - a) / (24 * 60 * 60) == 7;
+                let db = now > b && (now - b) / (24 * 60 * 60) == 7;
+                if da == db {
+                    b.cmp(&a)
+                } else if da {
+                    cmp::Ordering::Less
+                } else {
+                    cmp::Ordering::Greater
+                }
+            }
+            (true, false) => cmp::Ordering::Less,
+            (false, true) => cmp::Ordering::Greater,
+            (false, false) => a.0.cmp(b.0),
         }
     }
 }

@@ -4,7 +4,7 @@ use crate::{
 };
 use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
 use cxlib_internal::types::Activity;
-use log::warn;
+use log::{debug, warn};
 use redb::{ReadableTable, Table, WriteTransaction};
 use std::{
     borrow::Borrow,
@@ -93,19 +93,28 @@ impl ActivityTable {
             old_data.into_iter().collect::<Vec<_>>()
         } else {
             let course_table = CourseTable::write(w_cxt);
-            if let Ok(mut course_table) = course_table
-                && let Ok(a) = {
+            match course_table {
+                Ok(mut course_table) => {
                     let course = activity.course().course();
-                    CourseTable::update_recently_used_time(
+                    match CourseTable::update_recently_used_time(
                         &mut course_table,
                         course,
                         activity.start_time_mills(),
-                    )
+                    ) {
+                        Ok(a) => {
+                            if a {
+                            } else {
+                                debug!("当前课程最新活动时间未初始化，跳过更新。");
+                            }
+                        }
+                        Err(e) => {
+                            warn!("无法更新课程最近活动时间：{e}.");
+                        }
+                    }
                 }
-                && a
-            {
-            } else {
-                warn!("无法更新课程最近活动时间。");
+                Err(e) => {
+                    warn!("无法更新课程最近活动时间：{e}.");
+                }
             }
             value
         };

@@ -50,7 +50,7 @@ impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
                     let course_data = (
                         course.info().clone(),
                         CourseData::new(
-                            u64::MAX,
+                            None,
                             users.iter().map(|s| s.uid().to_owned()).collect(),
                             vec![],
                         ),
