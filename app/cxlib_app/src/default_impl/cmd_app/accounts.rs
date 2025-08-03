@@ -56,6 +56,7 @@ where
     OwnedData: 'static,
     UserProtocol: UserProtocolTrait + 'static,
 {
+    #[inline]
     fn read_owned_data(&self, _: &Context, matches: &[&ArgMatches]) -> AccountsParser {
         AccountsParser::from_arg_matches(matches.last().unwrap()).unwrap()
     }

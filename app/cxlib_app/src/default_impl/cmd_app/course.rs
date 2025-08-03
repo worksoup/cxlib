@@ -157,6 +157,7 @@ where
         AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
     OwnedData: 'static,
 {
+    #[inline]
     fn read_owned_data(
         &self,
         _: &Context,

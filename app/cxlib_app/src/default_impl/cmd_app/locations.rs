@@ -158,6 +158,7 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
 impl<Context: AsRef<Arc<Database>> + 'static, OwnedData: 'static>
     CmdMetaAppTrait<Context, OwnedData> for LocationsCmdApp
 {
+    #[inline]
     fn read_owned_data(&self, _: &Context, matches: &[&ArgMatches]) -> Self::OwnedData {
         let matches = matches.last().unwrap();
         LocationsParser::from_arg_matches(matches).unwrap()

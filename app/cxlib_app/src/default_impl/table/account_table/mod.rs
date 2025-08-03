@@ -38,9 +38,13 @@ impl<UserProtocol> AccountTable<UserProtocol> {
     ) -> Result<bool, StoreError> {
         Self::contains_key(table, &uid.to_owned())
     }
-    pub fn delete_account(w_cxt: &WriteTransaction, uid: &str) {
-        let mut w = <Self as NormalTableTrait>::write(w_cxt).log_unwrap();
-        w.remove(&uid.to_owned()).log_unwrap();
+    pub fn delete_account(
+        w_cxt: &WriteTransaction,
+        uid: &str,
+    ) -> Result<Option<AccountData>, StoreError> {
+        let mut w = <Self as NormalTableTrait>::write(w_cxt)?;
+        let v = w.remove(&uid.to_owned())?;
+        Ok(v.map(|v| v.value()))
     }
     pub fn add_account(
         w_cxt: &WriteTransaction,

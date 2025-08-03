@@ -106,7 +106,6 @@ impl TryFromWithContext<&str> for AccountData {
     type Err = StoreError;
     type Context<'cxt> = ();
 
-    #[inline]
     fn try_from<'cxt, P: Borrow<Self::Context<'cxt>>>(s: &str, _: P) -> Result<Self, Self::Err> {
         let s = s
             .split(',')

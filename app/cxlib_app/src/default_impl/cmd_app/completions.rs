@@ -35,6 +35,7 @@ impl<Context: AsRef<Command>> AppTrait<Context> for CompletionCmdApp {
 impl<Context: AsRef<Command> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
     for CompletionCmdApp
 {
+    #[inline]
     fn read_owned_data(
         &self,
         _: &Context,

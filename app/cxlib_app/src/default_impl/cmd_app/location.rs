@@ -148,16 +148,23 @@ pub enum Remove {
         alias: String,
     },
 }
-impl LocationParser {
-    fn confirm(msg: &str) -> bool {
-        inquire::Confirm::new(msg)
-            .with_default(false)
-            .prompt()
-            .unwrap_or_else(|e| {
-                warn!("无法识别输入：{e}.");
-                false
-            })
-    }
+
+fn confirm(msg: &str) -> bool {
+    inquire::Confirm::new(msg)
+        .with_default(false)
+        .prompt()
+        .unwrap_or_else(|e| {
+            warn!("无法识别输入：{e}.");
+            false
+        })
+}
+
+pub struct LocationCmdApp<
+    TypesProtocol = cxlib_internal::protocol::collect::TypesProtocol,
+    UserProtocol = cxlib_internal::protocol::collect::UserProtocol,
+>(PhantomData<(TypesProtocol, UserProtocol)>);
+
+impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
     /// 添加位置或别名。
     fn add(
         app_info: &AppInfo,
@@ -270,7 +277,7 @@ impl LocationParser {
     }
     fn remove(database_guard: &mut DatabaseGuard, command: Remove, yes: bool) {
         if !yes {
-            let ans = Self::confirm("警告：是否删除？");
+            let ans = confirm("警告：是否删除？");
             if !ans {
                 return;
             }
@@ -354,7 +361,7 @@ impl LocationParser {
         global: bool,
     ) {
         if !yes {
-            let ans = Self::confirm("警告：是否删除？");
+            let ans = confirm("警告：是否删除？");
             if !ans {
                 return;
             }
@@ -429,7 +436,7 @@ impl LocationParser {
             return;
         }
         if !yes {
-            let ans = Self::confirm("再次警告：是否删除？");
+            let ans = confirm("再次警告：是否删除？");
             if !ans {
                 return;
             }
@@ -457,7 +464,7 @@ impl LocationParser {
             })
             .log_unwrap();
     }
-    fn import<'cxt, TypesProtocol, UserProtocol, Cxt>(
+    fn import<'cxt, Cxt>(
         database_guard: &mut DatabaseGuard,
         cxt: Cxt,
         input: Option<PathBuf>,
@@ -524,17 +531,16 @@ impl LocationParser {
             warn!("未指定任何参数，不做任何事情。")
         }
     }
-    fn export<
-        'cxt,
-        TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-        Cxt: Borrow<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
-    >(
+    fn export<'cxt, Cxt>(
         database_guard: &mut DatabaseGuard,
         cxt: Cxt,
         output: Option<PathBuf>,
         course: Option<Course>,
-    ) {
+    ) where
+        TypesProtocol: TypesProtocolTrait,
+        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
+        Cxt: Borrow<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
+    {
         let mut contents = <LocationTable as ImportExportTrait>::export_text(database_guard);
         for content in {
             course
@@ -585,19 +591,19 @@ impl LocationParser {
             println!("{contents}")
         }
     }
-    pub fn parse<
-        'cxt,
-        TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-        Cxt: Borrow<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
-    >(
-        self,
+    #[inline]
+    pub fn parse<'cxt, Cxt>(
+        location_parser: LocationParser,
         database: &Arc<Database>,
         cxt: Cxt,
         app_info: &AppInfo,
-    ) {
+    ) where
+        TypesProtocol: TypesProtocolTrait,
+        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
+        Cxt: Borrow<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
+    {
         let mut g = DatabaseGuard::new(database);
-        match self {
+        match location_parser {
             // 添加位置。
             LocationParser::Add {
                 location_str,
@@ -619,19 +625,14 @@ impl LocationParser {
                 Self::reduce(&mut g, reduce_type, yes, all, course, global);
             }
             LocationParser::Import { input, course } => {
-                Self::import::<TypesProtocol, _, _>(&mut g, cxt, input, course);
+                Self::import(&mut g, cxt, input, course);
             }
             LocationParser::Export { output, course } => {
-                Self::export::<TypesProtocol, _, _>(&mut g, cxt, output, course);
+                Self::export(&mut g, cxt, output, course);
             }
         }
     }
 }
-
-pub struct LocationCmdApp<
-    TypesProtocol = cxlib_internal::protocol::collect::TypesProtocol,
-    UserProtocol = cxlib_internal::protocol::collect::UserProtocol,
->(PhantomData<(TypesProtocol, UserProtocol)>);
 impl<T, U> Default for LocationCmdApp<T, U> {
     #[inline]
     fn default() -> Self {
@@ -645,9 +646,10 @@ impl<
 > AppTrait<Context> for LocationCmdApp<TypesProtocol, UserProtocol>
 {
     type OwnedData = LocationParser;
+    #[inline]
     fn run(&self, cxt: &Context, command: LocationParser) {
         let map: &GlobalMultimap<_> = cxt.as_ref();
-        command.parse::<TypesProtocol, UserProtocol, <AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'_>>(cxt.as_ref(), map.clone(), cxt.as_ref())
+        Self::parse(command, cxt.as_ref(), map.clone(), cxt.as_ref())
     }
 }
 impl<
@@ -662,6 +664,7 @@ impl<
     OwnedData: 'static,
 > CmdMetaAppTrait<Context, OwnedData> for LocationCmdApp<TypesProtocol, UserProtocol>
 {
+    #[inline]
     fn read_owned_data(
         &self,
         _: &Context,

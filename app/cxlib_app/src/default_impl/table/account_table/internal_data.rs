@@ -50,24 +50,30 @@ where
     }
 }
 impl<UserProtocol> AccountDataInternal<UserProtocol> {
+    #[inline]
     pub fn uid(&self) -> &str {
         self.session.uid()
     }
+    #[inline]
     pub fn uname(&self) -> &str {
         self.session.uname()
     }
+    #[inline]
     pub fn name(&self) -> &str {
         self.session.name()
     }
+    #[inline]
     pub fn enc_pwd(&self) -> &str {
         &self.enc_pwd
     }
+    #[inline]
     pub fn login_type(&self) -> &str
     where
         UserProtocol: 'static,
     {
         self.login_solver.login_type()
     }
+    #[inline]
     pub fn login_solver(&self) -> &UntypedLoginSolver<UserProtocol>
     where
         UserProtocol: 'static,
@@ -76,6 +82,7 @@ impl<UserProtocol> AccountDataInternal<UserProtocol> {
     }
 }
 impl<UserProtocol: 'static> Display for AccountDataInternal<UserProtocol> {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         AccountData::fmt(
             &<AccountData as TryFromWithContext<_>>::try_from(self, ()).unwrap(),
@@ -117,6 +124,7 @@ where
         &'cxt WriteTransaction,
     );
 
+    #[inline]
     fn try_from<'cxt, Cxt: Borrow<Self::Context<'cxt>>>(
         s: &str,
         cxt: Cxt,

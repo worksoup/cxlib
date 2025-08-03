@@ -11,6 +11,7 @@ pub struct LocationAndAliasesPairInternal {
     pub(in super::super::location_table) aliases: Vec<String>,
 }
 impl LocationAndAliasesPairInternal {
+    #[inline]
     pub fn new(
         unhandled_geoaddr: UnhandledGeoaddr,
         courses: Vec<Course>,
