@@ -10,20 +10,49 @@ use cxlib_internal::{
 };
 use log::{info, warn};
 use std::marker::PhantomData;
-
+/// 支持的登录方式枚举。
+///
+/// 应当如下实现：
+/// ``` rust, no_run
+/// #[derive(clap::ValueEnum, Clone)]
+/// pub enum DefaultLoginTypeEnum {
+///     Default,
+///     Custom, // 将会使用其 `name`(默认为蛇形命名法形式) 属性作为 LoginType.
+///     #[value(name = "xd")] // 可以通过 clap 的属性改变其 `name` 属性。
+///     Other,
+/// }
+/// ```
+pub trait LoginTypeEnumTrait: clap::ValueEnum + Send + Sync + 'static {
+    fn login_type(&self) -> String {
+        self.to_possible_value().unwrap().get_name().to_owned()
+    }
+}
+impl<T> LoginTypeEnumTrait for T where T: clap::ValueEnum + Send + Sync + 'static {}
+#[derive(clap::ValueEnum, Clone)]
+pub enum DefaultLoginTypeEnum {
+    Default,
+    None,
+}
 // TODO: build.rs 中通过环境变量设置 alias.
 #[derive(Parser, Debug, Clone)]
 #[command(name = "account", alias = "a")]
 /// 账号相关操作（添加、删除）。
-pub enum AccountParser {
+pub enum AccountParser<LoginTypeEnum = DefaultLoginTypeEnum>
+where
+    LoginTypeEnum: LoginTypeEnumTrait,
+{
     /// 添加账号。
     #[command(alias = "+")]
     Add {
         /// 账号（手机号）。
         uname: String,
+        /// 登录方式。
+        #[arg(short, long)]
+        login_type: Option<LoginTypeEnum>,
         /// 密码（明文）。
         /// 指定后将跳过询问密码阶段。
-        passwd: Option<String>,
+        #[arg(short, long)]
+        password: Option<String>,
     },
     /// 删除账号。
     #[command(alias = "rm")]
@@ -35,35 +64,37 @@ pub enum AccountParser {
         yes: bool,
     },
 }
-pub struct AccountCmdApp<UserProtocol = cxlib_internal::protocol::collect::UserProtocol>(
-    PhantomData<UserProtocol>,
-);
+pub struct AccountCmdApp<
+    LoginTypeEnum = DefaultLoginTypeEnum,
+    UserProtocol = cxlib_internal::protocol::collect::UserProtocol,
+>(PhantomData<(UserProtocol, LoginTypeEnum)>);
 impl<U> Default for AccountCmdApp<U> {
     #[inline]
     fn default() -> Self {
         Self(Default::default())
     }
 }
-impl<UserProtocol> AccountCmdApp<UserProtocol> {
+impl<LoginTypeEnum, UserProtocol> AccountCmdApp<LoginTypeEnum, UserProtocol> {
     pub fn add<'cxt, Context>(
         db: &mut DatabaseGuard,
         context: &Context,
         uname: String,
-        passwd: Option<String>,
+        password: Option<String>,
+        login_type: Option<LoginTypeEnum>,
     ) where
+        LoginTypeEnum: LoginTypeEnumTrait,
         UserProtocol: UserProtocolTrait + Send + Sync + 'static,
         Context: AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
     {
-        let pwd = cx_interact::inquire_pwd(passwd);
-        let login_type_and_uname = uname.split_once(":");
+        let pwd = cx_interact::inquire_pwd(password);
         let session = db.write_once(|w_cxt| {
-            if let Some((login_type, uname)) = login_type_and_uname {
+            if let Some(login_type) = login_type {
                 AccountTable::<UserProtocol>::login(
                     w_cxt,
                     context,
-                    uname.into(),
+                    uname.clone(),
                     pwd,
-                    login_type.into(),
+                    login_type.login_type(),
                 )
             } else {
                 AccountTable::login(
@@ -125,20 +156,25 @@ impl<UserProtocol> AccountCmdApp<UserProtocol> {
         // TODO: 删除课程列表中的账号信息。如果账号信息为空，则删除课程。
     }
 }
-impl<'cxt, Context, UserProtocol> AppTrait<Context> for AccountCmdApp<UserProtocol>
+impl<'cxt, Context, LoginTypeEnum: LoginTypeEnumTrait, UserProtocol> AppTrait<Context>
+    for AccountCmdApp<LoginTypeEnum, UserProtocol>
 where
     Context: AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
         + AsRef<DatabaseGuard>,
     UserProtocol: Send + Sync + UserProtocolTrait + 'static,
 {
-    type OwnedData = AccountParser;
+    type OwnedData = AccountParser<LoginTypeEnum>;
     #[inline]
     fn run(&self, context: &Context, owned_data: Self::OwnedData) {
         let db_g: &DatabaseGuard = context.as_ref();
         let mut db_g = db_g.clone();
         match owned_data {
-            AccountParser::Add { uname, passwd } => {
-                Self::add(&mut db_g, context, uname, passwd);
+            AccountParser::Add {
+                uname,
+                password,
+                login_type,
+            } => {
+                Self::add(&mut db_g, context, uname, password, login_type);
             }
             AccountParser::Remove { uid, yes } => {
                 Self::remove(&mut db_g, uid, yes);
@@ -147,8 +183,8 @@ where
     }
 }
 
-impl<'cxt, Context, OwnedData, UserProtocol> CmdMetaAppTrait<Context, OwnedData>
-    for AccountCmdApp<UserProtocol>
+impl<'cxt, Context, OwnedData, LoginTypeEnum: LoginTypeEnumTrait, UserProtocol>
+    CmdMetaAppTrait<Context, OwnedData> for AccountCmdApp<LoginTypeEnum, UserProtocol>
 where
     Context: AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
         + AsRef<DatabaseGuard>

@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn test() {
-        let command = AccountParser::command();
+        let command = <AccountParser>::command();
         let matches = command.get_matches_from(["a", "+", "145"]);
         let subcommand = matches.subcommand();
         println!("{subcommand:?}");

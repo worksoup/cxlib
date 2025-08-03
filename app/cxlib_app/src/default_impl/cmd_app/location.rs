@@ -121,7 +121,7 @@ pub enum LocationParser {
     },
 }
 // TODO: 需要重新设计。
-#[derive(Subcommand, Debug, Clone)]
+#[derive(Debug, Clone, Subcommand)]
 pub enum ReduceType {
     /// 位置。
     Locations,
