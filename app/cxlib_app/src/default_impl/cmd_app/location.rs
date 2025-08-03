@@ -14,14 +14,12 @@ use cxlib_internal::{
 };
 use cxlib_store::AppInfo;
 use log::{error, warn};
-use redb::Database;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
     marker::PhantomData,
     path::PathBuf,
     str::FromStr,
-    sync::Arc,
 };
 #[derive(Debug, Clone)]
 pub enum GeolocationOrUnhandledGeoaddr {
@@ -594,7 +592,7 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
     #[inline]
     pub fn parse<'cxt, Cxt>(
         location_parser: LocationParser,
-        database: &Arc<Database>,
+        database_guard: &mut DatabaseGuard,
         cxt: Cxt,
         app_info: &AppInfo,
     ) where
@@ -602,7 +600,6 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
         Cxt: Borrow<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>,
     {
-        let mut g = DatabaseGuard::new(database);
         match location_parser {
             // 添加位置。
             LocationParser::Add {
@@ -610,10 +607,10 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
                 alias,
                 course,
             } => {
-                Self::add(app_info, &mut g, location_str, alias, course);
+                Self::add(app_info, database_guard, location_str, alias, course);
             }
             LocationParser::Remove { command, yes } => {
-                Self::remove(&mut g, command, yes);
+                Self::remove(database_guard, command, yes);
             }
             LocationParser::Reduce {
                 reduce_type,
@@ -622,13 +619,13 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
                 course,
                 global,
             } => {
-                Self::reduce(&mut g, reduce_type, yes, all, course, global);
+                Self::reduce(database_guard, reduce_type, yes, all, course, global);
             }
             LocationParser::Import { input, course } => {
-                Self::import(&mut g, cxt, input, course);
+                Self::import(database_guard, cxt, input, course);
             }
             LocationParser::Export { output, course } => {
-                Self::export(&mut g, cxt, output, course);
+                Self::export(database_guard, cxt, output, course);
             }
         }
     }
@@ -642,21 +639,23 @@ impl<T, U> Default for LocationCmdApp<T, U> {
 impl<
     TypesProtocol: TypesProtocolTrait,
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    Context: AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<AppInfo>,
+    Context: AsRef<DatabaseGuard> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<AppInfo>,
 > AppTrait<Context> for LocationCmdApp<TypesProtocol, UserProtocol>
 {
     type OwnedData = LocationParser;
     #[inline]
     fn run(&self, cxt: &Context, command: LocationParser) {
         let map: &GlobalMultimap<_> = cxt.as_ref();
-        Self::parse(command, cxt.as_ref(), map.clone(), cxt.as_ref())
+        let db_g: &DatabaseGuard = cxt.as_ref();
+        let mut db_g = db_g.clone();
+        Self::parse(command, &mut db_g, map.clone(), cxt.as_ref())
     }
 }
 impl<
     'cxt,
     TypesProtocol: TypesProtocolTrait + 'static,
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    Context: AsRef<Arc<Database>>
+    Context: AsRef<DatabaseGuard>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
         + AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
         + AsRef<AppInfo>

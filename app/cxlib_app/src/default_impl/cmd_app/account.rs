@@ -9,8 +9,7 @@ use cxlib_internal::{
     types::{DefaultLoginSolver, LoginSolverTrait},
 };
 use log::{info, warn};
-use redb::Database;
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
 
 // TODO: build.rs 中通过环境变量设置 alias.
 #[derive(Parser, Debug, Clone)]
@@ -129,19 +128,20 @@ impl<UserProtocol> AccountCmdApp<UserProtocol> {
 impl<'cxt, Context, UserProtocol> AppTrait<Context> for AccountCmdApp<UserProtocol>
 where
     Context: AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
-        + AsRef<Arc<Database>>,
+        + AsRef<DatabaseGuard>,
     UserProtocol: Send + Sync + UserProtocolTrait + 'static,
 {
     type OwnedData = AccountParser;
     #[inline]
     fn run(&self, context: &Context, owned_data: Self::OwnedData) {
-        let mut db = DatabaseGuard::new(context.as_ref());
+        let db_g: &DatabaseGuard = context.as_ref();
+        let mut db_g = db_g.clone();
         match owned_data {
             AccountParser::Add { uname, passwd } => {
-                Self::add(&mut db, context, uname, passwd);
+                Self::add(&mut db_g, context, uname, passwd);
             }
             AccountParser::Remove { uid, yes } => {
-                Self::remove(&mut db, uid, yes);
+                Self::remove(&mut db_g, uid, yes);
             }
         }
     }
@@ -151,7 +151,7 @@ impl<'cxt, Context, OwnedData, UserProtocol> CmdMetaAppTrait<Context, OwnedData>
     for AccountCmdApp<UserProtocol>
 where
     Context: AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
-        + AsRef<Arc<Database>>
+        + AsRef<DatabaseGuard>
         + 'static,
     OwnedData: 'static,
     UserProtocol: Send + Sync + UserProtocolTrait + 'static,

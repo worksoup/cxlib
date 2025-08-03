@@ -10,12 +10,10 @@ use cxlib_internal::{
     protocol::collect::UserProtocolTrait,
     types::{Course, CourseInfo, CourseWithInfo, Session, UntypedLoginSolver, ext::CourseExt},
 };
-use redb::Database;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
     marker::PhantomData,
-    sync::Arc,
 };
 
 #[derive(Parser, Debug, Clone)]
@@ -94,40 +92,36 @@ impl<U> Default for CoursesCmdApp<U> {
 impl<UserProtocol, Context> AppTrait<Context> for CoursesCmdApp<UserProtocol>
 where
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    Context: AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
+    Context: AsRef<DatabaseGuard> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
 {
     type OwnedData = CoursesParser;
 
     fn run(&self, cxt: &Context, data: CoursesParser) {
         let CoursesParser { uid, fresh } = data;
-        let mut database_guard = DatabaseGuard::new(cxt.as_ref());
+        let db_g: &DatabaseGuard = cxt.as_ref();
+        let mut db_g = db_g.clone();
         let courses = if fresh {
             || -> Result<HashMap<Course, (CourseInfo, CourseData)>, error::Error> {
                 {
                     let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
                     let sessions = if let Some(uid) = &uid {
-                        AccountTable::get_sessions_by_uid_list_str(
-                            &mut database_guard,
-                            uid,
-                            login_solvers,
-                        )?
+                        AccountTable::get_sessions_by_uid_list_str(&mut db_g, uid, login_solvers)?
                     } else {
                         // 删除旧的课程数据表。
-                        database_guard.write_once(CourseTable::delete).log_ignore();
-                        AccountTable::get_all_sessions(&mut database_guard, login_solvers)?
+                        db_g.write_once(CourseTable::delete).log_ignore();
+                        AccountTable::get_all_sessions(&mut db_g, login_solvers)?
                     };
-                    Self::update_sessions_courses(&mut database_guard, sessions.values())
+                    Self::update_sessions_courses(&mut db_g, sessions.values())
                 }
             }()
             .log_unwrap_or_default()
         } else {
-            database_guard
-                .read(|r_cxt| {
-                    let course_table = CourseTable::read(r_cxt).log_unwrap();
-                    CourseTable::get_courses(&course_table)
-                })
-                .map(ReadAccessGuard::unwrap_inner)
-                .log_unwrap_or_default()
+            db_g.read(|r_cxt| {
+                let course_table = CourseTable::read(r_cxt).log_unwrap();
+                CourseTable::get_courses(&course_table)
+            })
+            .map(ReadAccessGuard::unwrap_inner)
+            .log_unwrap_or_default()
         };
         if let Some(uid) = &uid
             && !fresh
@@ -154,7 +148,7 @@ impl<UserProtocol, Context, OwnedData> CmdMetaAppTrait<Context, OwnedData>
 where
     UserProtocol: std::marker::Send + UserProtocolTrait + 'static,
     Context:
-        AsRef<Arc<Database>> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
+        AsRef<DatabaseGuard> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
     OwnedData: 'static,
 {
     #[inline]

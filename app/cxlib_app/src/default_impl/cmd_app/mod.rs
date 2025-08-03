@@ -10,6 +10,7 @@ pub use account::*;
 pub use accounts::*;
 pub use activity::*;
 pub use course::*;
+use cxlib_error_utils::CxlibResultUtils;
 use cxlib_store::{AppInfo, ConfigDir};
 pub use location::*;
 pub use locations::*;
@@ -21,7 +22,10 @@ mod completions;
 #[cfg(feature = "completion")]
 pub use completions::*;
 
-use crate::{AliasTable, CourseData, CourseTable, GlobalMultimap, NormalTableTrait};
+use crate::{
+    AliasTable, CourseData, CourseTable, GlobalMultimap, NormalTableTrait,
+    database_guard::DatabaseGuard,
+};
 use clap::Command;
 use cxlib_internal::{
     captcha::utils::get_now_timestamp_mills,
@@ -33,12 +37,11 @@ use cxlib_internal::{
     },
 };
 use log::warn;
-use redb::Database;
 use std::{cmp, path::Path};
 
 pub struct CmdAppContext<UserProtocol = cxlib_internal::protocol::collect::UserProtocol> {
     dir: ConfigDir,
-    db: Database,
+    db: DatabaseGuard,
     command: Command,
     login_solvers: GlobalMultimap<UntypedLoginSolver<UserProtocol>>,
     app_info: AppInfo,
@@ -51,12 +54,12 @@ impl<U> CmdAppContext<U> {
         login_solvers: GlobalMultimap<UntypedLoginSolver<U>>,
         app_info: AppInfo,
     ) -> Self {
-        let db = Database::builder()
+        let db = redb::Database::builder()
             .create(config_dir.get_config_dir().join(db_file_name))
             .unwrap();
         Self {
             dir: config_dir,
-            db,
+            db: DatabaseGuard::new(db),
             command,
             app_info,
             login_solvers,
@@ -69,9 +72,9 @@ impl<U> AsRef<Command> for CmdAppContext<U> {
         &self.command
     }
 }
-impl<U> AsRef<Database> for CmdAppContext<U> {
+impl<U> AsRef<DatabaseGuard> for CmdAppContext<U> {
     #[inline]
-    fn as_ref(&self) -> &Database {
+    fn as_ref(&self) -> &DatabaseGuard {
         &self.db
     }
 }
@@ -138,16 +141,16 @@ impl<T> CourseDataFilterAndSorterTrait<T> for DefaultCourseDataSorter {
 }
 
 #[derive(Clone, Copy)]
-pub struct DefaultLocationInfoGetter<'a>(&'a Database);
+pub struct DefaultLocationInfoGetter<'a>(&'a DatabaseGuard);
 impl<'a> DefaultLocationInfoGetter<'a> {
     #[inline]
-    pub fn new(db: &'a Database) -> Self {
+    pub fn new(db: &'a DatabaseGuard) -> Self {
         Self(db)
     }
 }
-impl<'a> From<&'a Database> for DefaultLocationInfoGetter<'a> {
+impl<'a> From<&'a DatabaseGuard> for DefaultLocationInfoGetter<'a> {
     #[inline]
-    fn from(db: &'a Database) -> Self {
+    fn from(db: &'a DatabaseGuard) -> Self {
         Self::new(db)
     }
 }
@@ -159,10 +162,10 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
         preprocessor: &impl LocationPreprocessorTrait,
     ) -> Option<Geoaddr> {
         // 将字符串作为别名读取数据库，若不存在或读取出错则作为位置解析。
-        let r_cxt = self.0.begin_read().ok()?;
-        let alias_table = AliasTable::read(&r_cxt).ok()?;
-        let geolocation = AliasTable::get_location(&alias_table, trimmed_location_str);
-        drop(alias_table);
+        let geolocation = self.0.read_once(|r_cxt| {
+            let alias_table = AliasTable::read(r_cxt)?;
+            AliasTable::get_location(&alias_table, trimmed_location_str)
+        });
         match geolocation {
             Ok(addr @ Some(_)) => addr,
             r => {
@@ -186,13 +189,14 @@ impl LocationInfoGetterTrait for DefaultLocationInfoGetter<'_> {
         sign: &LocationSign,
         preprocessor: &impl LocationPreprocessorTrait,
     ) -> Option<Geoaddr> {
-        let r_cxt = self.0.begin_read().ok()?;
-        let course_table = CourseTable::read(&r_cxt).ok()?;
-        CourseTable::get_course(&course_table, sign.as_inner().course().course())
-            .ok()
-            .flatten()?
-            .1
-            .locations()
+        let r = self
+            .0
+            .read_once(|r_cxt| {
+                let course_table = CourseTable::read(r_cxt)?;
+                CourseTable::get_course(&course_table, sign.as_inner().course().course())
+            })
+            .log_ok()??;
+        r.1.locations()
             .next()
             .cloned()
             .map(|geolocation| geolocation.to_location(preprocessor))

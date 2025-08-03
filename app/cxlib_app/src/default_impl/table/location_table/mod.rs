@@ -66,8 +66,7 @@ impl LocationTable {
                 }
             }) {
                 Ok(course_data) => {
-                    CourseTable::insert_course(&mut course_table, course, course_data)
-                        .map_err(|e| e.0)?;
+                    CourseTable::insert_course(&mut course_table, course, course_data)?;
                 }
                 Err(e) => {
                     if e.is_fatal() {

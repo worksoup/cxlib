@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     AliasTable, AppTrait, CmdMetaAppTrait, CourseTable, LocationTable, NormalTableTrait,
     database_guard::DatabaseGuard,
@@ -7,7 +5,6 @@ use crate::{
 use clap::{ArgMatches, FromArgMatches, Parser, arg};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::types::Course;
-use redb::Database;
 
 #[derive(Parser, Debug, Clone)]
 // TODO: build.rs 中通过环境变量设置 alias.
@@ -30,7 +27,7 @@ pub struct LocationsParser {
 #[derive(Default)]
 pub struct LocationsCmdApp;
 
-impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
+impl<Context: AsRef<DatabaseGuard>> AppTrait<Context> for LocationsCmdApp {
     type OwnedData = LocationsParser;
 
     fn run(
@@ -43,7 +40,7 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
             short,
         }: Self::OwnedData,
     ) {
-        let g = DatabaseGuard::new(context.as_ref());
+        let db_g: &DatabaseGuard = context.as_ref();
         let course = course.or(if global {
             Some(Course::global_course())
         } else {
@@ -51,7 +48,7 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
         });
         if short {
             if let Some(course) = course {
-                let binding = g
+                let binding = db_g
                     .read(|r_cxt| {
                         let course_table = CourseTable::read(r_cxt)?;
                         CourseTable::get_course(&course_table, &course)
@@ -63,7 +60,7 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
                     println!("{location}")
                 }
             } else {
-                let geoaddrs = g
+                let geoaddrs = db_g
                     .read(|r_cxt| {
                         let location_table = LocationTable::read(r_cxt)?;
                         LocationTable::get_geoaddrs(&location_table)
@@ -77,14 +74,14 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
             };
         } else if let Some(course) = course {
             // 列出指定课程的位置。
-            let locations = g
+            let locations = db_g
                 .read(|r_cxt| {
                     let course_table = CourseTable::read(r_cxt)?;
                     CourseTable::get_course(&course_table, &course)
                 })
                 .log_unwrap()
                 .unwrap_inner();
-            let aliases = g
+            let aliases = db_g
                 .read(|r_cxt| {
                     let alias_table = AliasTable::read(r_cxt)?;
                     AliasTable::get_all_aliases(&alias_table)
@@ -112,14 +109,14 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
             }
         } else {
             // 列出所有位置。
-            let locations = g
+            let locations = db_g
                 .read(|r_cxt| {
                     let course_table = LocationTable::read(r_cxt)?;
                     LocationTable::get_geoaddrs(&course_table)
                 })
                 .log_unwrap()
                 .unwrap_inner();
-            let aliases = g
+            let aliases = db_g
                 .read(|r_cxt| {
                     let alias_table = AliasTable::read(r_cxt)?;
                     AliasTable::get_all_aliases(&alias_table)
@@ -155,7 +152,7 @@ impl<Context: AsRef<Arc<Database>>> AppTrait<Context> for LocationsCmdApp {
         }
     }
 }
-impl<Context: AsRef<Arc<Database>> + 'static, OwnedData: 'static>
+impl<Context: AsRef<DatabaseGuard> + 'static, OwnedData: 'static>
     CmdMetaAppTrait<Context, OwnedData> for LocationsCmdApp
 {
     #[inline]

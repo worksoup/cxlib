@@ -4,8 +4,7 @@ use crate::{
 use clap::{ArgMatches, FromArgMatches, Parser, arg};
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_internal::{protocol::collect::UserProtocolTrait, types::UntypedLoginSolver};
-use redb::Database;
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
 
 #[derive(Parser, Debug, Clone)]
 // TODO: build.rs 中通过环境变量设置 alias.
@@ -27,20 +26,21 @@ impl<U> Default for AccountsCmdApp<U> {
 }
 impl<Context, UserProtocol> AppTrait<Context> for AccountsCmdApp<UserProtocol>
 where
-    Context: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Arc<Database>>,
+    Context: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<DatabaseGuard>,
     UserProtocol: UserProtocolTrait + 'static,
 {
     type OwnedData = AccountsParser;
 
     fn run(&self, cxt: &Context, AccountsParser { fresh }: Self::OwnedData) {
-        let solver_cxt = cxt.as_ref();
-        let mut db = DatabaseGuard::new(cxt.as_ref());
+        let solver_cxt: &GlobalMultimap<UntypedLoginSolver<UserProtocol>> = cxt.as_ref();
+        let db_g: &DatabaseGuard = cxt.as_ref();
+        let mut db_g = db_g.clone();
         let sessions = if fresh {
-            db.write_once(|w_cxt| AccountTable::<UserProtocol>::relogin_all(w_cxt, cxt))
+            db_g.write_once(|w_cxt| AccountTable::<UserProtocol>::relogin_all(w_cxt, cxt))
                 .log_unwrap()
         } else {
             // 列出所有账号。
-            AccountTable::get_all_sessions(&mut db, solver_cxt).log_unwrap()
+            AccountTable::get_all_sessions(&mut db_g, solver_cxt).log_unwrap()
         };
         for session in sessions.into_values() {
             println!("{}, {}, {}", session.uname(), session.name(), session.uid());
@@ -52,7 +52,7 @@ impl<Context, OwnedData, UserProtocol> CmdMetaAppTrait<Context, OwnedData>
     for AccountsCmdApp<UserProtocol>
 where
     Context:
-        AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Arc<Database>> + 'static,
+        AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<DatabaseGuard> + 'static,
     OwnedData: 'static,
     UserProtocol: UserProtocolTrait + 'static,
 {

@@ -25,11 +25,10 @@ use cxlib_internal::{
 };
 use cxlib_store::AppInfo;
 use log::{debug, error, info, warn};
-use redb::{Database, WriteTransaction};
+use redb::WriteTransaction;
 use ref_wrapper::Unit;
 use std::{
-    borrow::Borrow, collections::HashMap, marker::PhantomData, path::PathBuf, sync::Arc,
-    time::Duration,
+    borrow::Borrow, collections::HashMap, marker::PhantomData, path::PathBuf, time::Duration,
 };
 
 #[derive(Clone)]
@@ -391,12 +390,13 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
         SignProtocol: std::marker::Send + SignProtocolTrait + 'static,
         TypesProtocol: TypesProtocolTrait + 'static,
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-        Cxt: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<Arc<Database>>,
+        Cxt: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<DatabaseGuard>,
         LocationGetter: LocationInfoGetterTrait + Copy,
         CaptchaSolver: CaptchaSolverTrait,
         T: CourseDataFilterAndSorterTrait<Cxt>,
     {
-        let mut db_g = DatabaseGuard::new(cxt.as_ref());
+        let db_g: &DatabaseGuard = cxt.as_ref();
+        let mut db_g = db_g.clone();
         let SignParser {
             id: active_id,
             uid: uid_list_str,
@@ -694,10 +694,10 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
         sessions: impl IntoIterator<Item = &'a Session<UserProtocol>>,
     ) -> Result<CachedActivitiesResult<'a, UserProtocol>, Error>
     where
-        Cxt: AsRef<Arc<Database>>,
+        Cxt: AsRef<DatabaseGuard>,
         UserProtocol: 'a,
     {
-        let database_guard = DatabaseGuard::new(cxt.as_ref());
+        let database_guard = cxt.as_ref();
         let sessions = sessions
             .into_iter()
             .map(|s| (s.uid().to_owned(), s))
@@ -765,7 +765,7 @@ impl<
         T,
     >
 where
-    Context: AsRef<Arc<Database>>
+    Context: AsRef<DatabaseGuard>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
@@ -791,7 +791,7 @@ where
             data,
             cxt,
             (
-                DefaultLocationInfoGetter::from(&**AsRef::<Arc<Database>>::as_ref(cxt)),
+                DefaultLocationInfoGetter::from(cxt.as_ref()),
                 AsRef::<Preprocessor>::as_ref(&cxt),
             ),
         )
@@ -840,7 +840,7 @@ impl<
         T,
     >
 where
-    Context: AsRef<Arc<Database>>
+    Context: AsRef<DatabaseGuard>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>

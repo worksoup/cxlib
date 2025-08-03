@@ -5,11 +5,15 @@ use cxlib_error_utils::CxlibResultUtils;
 use redb::{Database, ReadTransaction, WriteTransaction};
 
 use crate::StoreError;
+#[derive(Clone)]
 pub struct DatabaseGuard {
     db: Arc<Database>,
 }
 impl DatabaseGuard {
-    pub fn new(db: &Arc<Database>) -> Self {
+    pub fn new(db: Database) -> Self {
+        Self { db: Arc::new(db) }
+    }
+    pub fn from(db: &Arc<Database>) -> Self {
         Self { db: Arc::clone(db) }
     }
     pub fn read_once_map_err<

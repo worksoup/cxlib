@@ -1,11 +1,15 @@
-use crate::{AccountTable, BinCode, NormalTableTrait, StoreError, TableDefinitionTrait};
+use crate::{
+    AccountTable, BinCode, NormalTableTrait, StoreError, TableDefinitionTrait,
+    database_guard::DatabaseGuard,
+};
 use bincode::{Decode, Encode};
 use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
 use cxlib_internal::{
     protocol::collect::UserProtocolTrait,
     types::{__private::UnhandledGeoaddr, Course, CourseInfo, Session},
 };
-use redb::{Database, ReadTransaction, ReadableTable, Table};
+use log::warn;
+use redb::{ReadTransaction, ReadableTable, Table};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -75,13 +79,9 @@ impl CourseTable {
             <Self as TableDefinitionTrait>::Value,
         >,
         course: impl Borrow<Course>,
-        course_data @ (_, _): CourseStoreData,
-    ) -> Result<Option<CourseStoreData>, Box<(StoreError, CourseStoreData)>> {
-        let v = course_data;
-        match table.insert(course, &v) {
-            Ok(r) => Ok(r.map(|r| r.value())),
-            Err(e) => Err((e.into(), v))?,
-        }
+        course_data: impl Borrow<CourseStoreData>,
+    ) -> Result<Option<CourseStoreData>, StoreError> {
+        Ok(table.insert(course, course_data)?.map(|v| v.value()))
     }
     pub fn merge_course(
         table: &mut redb::Table<
@@ -110,26 +110,28 @@ impl CourseTable {
             } else {
                 course_data
             };
-        Self::insert_course(table, course, course_data.clone()).map_err(|e| (*e).0)?;
+        Self::insert_course(table, course, course_data.clone())?;
         Ok(course_data)
     }
     pub fn update_users<'s>(
-        db: &Database,
+        db: &mut DatabaseGuard,
         course: &Course,
         users: impl IntoIterator<Item = &'s (impl Borrow<str> + 's)>,
-    ) {
-        let r_cxt = db.begin_read().log_unwrap();
-        let r = Self::read(&r_cxt).log_unwrap();
-        let course_data = r.get(course).log_unwrap();
+    ) -> Result<Option<CourseStoreData>, StoreError> {
+        let course_data = db.read_once(|r_cxt| {
+            let r = Self::read(r_cxt)?;
+            Self::get_course(&r, course)
+        })?;
         if let Some(course_data) = course_data {
-            let mut course_data = course_data.value();
+            let mut course_data = course_data;
             let users = users.into_iter().map(Borrow::borrow).collect();
             course_data.1.set_users(users);
-            let w_cxt = db.begin_write().log_unwrap();
-            let mut w = Self::write(&w_cxt).log_unwrap();
-            w.insert(course, course_data).log_unwrap();
-            drop(w);
-            w_cxt.commit().log_unwrap();
+            db.write_once(|w_cxt| {
+                let mut w = Self::write(w_cxt).log_unwrap();
+                Self::insert_course(&mut w, course, course_data)
+            })
+        } else {
+            Ok(None)
         }
     }
     /// 更新最近活动时间，当入参大于原值才会更新。
@@ -163,18 +165,22 @@ impl CourseTable {
         }
     }
     #[inline]
-    pub fn insert_uid(db: &Database, course: &Course, user: &str) -> Result<(), StoreError> {
-        let r_cxt = db.begin_read()?;
-        let r = Self::read(&r_cxt).log_unwrap();
-        let course_data = r.get(course).log_unwrap();
+    pub fn insert_uid(
+        db: &mut DatabaseGuard,
+        course: &Course,
+        user: &str,
+    ) -> Result<(), StoreError> {
+        let course_data = db.read_once(|r_cxt| {
+            let r = Self::read(r_cxt)?;
+            Self::get_course(&r, course)
+        })?;
         if let Some(course_data) = course_data {
-            let mut course_data = course_data.value();
+            let mut course_data = course_data;
             course_data.1.get_users_mut().push(String::from(user));
-            let w_cxt = db.begin_write().log_unwrap();
-            let mut w = Self::write(&w_cxt).log_unwrap();
-            w.insert(course, course_data).log_unwrap();
-            drop(w);
-            w_cxt.commit().log_unwrap();
+            db.write_once(|w_cxt| {
+                let mut w = Self::write(w_cxt).log_unwrap();
+                Self::insert_course(&mut w, course, course_data)
+            })?;
         }
         Ok(())
     }
@@ -186,22 +192,22 @@ impl CourseTable {
                 <Self as TableDefinitionTrait>::Value,
             >,
             &Course,
-            CourseStoreData,
-        ) -> Result<(), StoreError>,
+            &CourseStoreData,
+        ) -> Result<Option<CourseStoreData>, StoreError>,
     >(
         table: &mut redb::Table<
             <Self as TableDefinitionTrait>::Key,
             <Self as TableDefinitionTrait>::Value,
         >,
         course: &Course,
-        course_data @ (_, _): CourseStoreData,
+        course_data: impl Borrow<CourseStoreData>,
         or: O,
-    ) -> Result<(), StoreError> {
-        match Self::insert_course(table, course, course_data) {
-            Ok(_) => Ok(()),
+    ) -> Result<Option<CourseStoreData>, StoreError> {
+        match Self::insert_course(table, course, course_data.borrow()) {
+            Ok(r) => Ok(r),
             Err(e) => {
-                let (_, course_data) = *e;
-                or(table, course, course_data)
+                warn!("插入数据失败：{e}");
+                or(table, course, course_data.borrow())
             }
         }
     }
@@ -245,8 +251,8 @@ impl CourseTable {
             <Self as TableDefinitionTrait>::Value,
         >,
         course: &Course,
-        course_data: CourseStoreData,
-    ) -> Result<Option<CourseStoreData>, Box<(StoreError, CourseStoreData)>> {
+        course_data: impl Borrow<CourseStoreData>,
+    ) -> Result<Option<CourseStoreData>, StoreError> {
         Self::insert_course(table, course, course_data)
     }
     #[inline]
@@ -263,14 +269,14 @@ impl CourseTable {
                 <Self as TableDefinitionTrait>::Value,
             >,
             &Course,
-            CourseStoreData,
-        ) -> Result<Option<CourseStoreData>, Box<(StoreError, CourseStoreData)>>,
-    ) -> Result<Option<CourseStoreData>, Box<(StoreError, CourseStoreData)>> {
-        match Self::insert_course(table, course, course_data) {
+            &CourseStoreData,
+        ) -> Result<Option<CourseStoreData>, StoreError>,
+    ) -> Result<Option<CourseStoreData>, StoreError> {
+        match Self::insert_course(table, course, course_data.borrow()) {
             ok @ Ok(_) => ok,
             Err(e) => {
-                let (_, course_data) = *e;
-                or(table, course, course_data)
+                warn!("插入数据失败：{e}");
+                or(table, course, course_data.borrow())
             }
         }
     }
