@@ -424,7 +424,15 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
         } else {
             AccountTable::get_all_sessions(&mut db_g, login_solvers)?
         };
-        if fresh {
+        let cached_activities = Self::get_cached_activities(&mut db_g, sessions.values());
+        if fresh
+            || matches!(
+                cached_activities,
+                Err(Error::StoreError(StoreError::TableError(
+                    redb::TableError::TableDoesNotExist(_)
+                )))
+            )
+        {
             let mut courses = CourseTable::courses_to_course_sessions_map_with_current_sessions(
                 CoursesCmdApp::update_sessions_courses(&mut db_g, sessions.values())?,
                 &sessions,
@@ -473,7 +481,7 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
                 Error::from,
             )?;
         } else {
-            let activities = Self::get_cached_activities(cxt, sessions.values())?;
+            let activities = cached_activities?;
             let activities = if let Some(course) = course {
                 activities
                     .into_iter()
@@ -689,15 +697,13 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
     ///
     /// # 返回
     /// 缓存的活动信息映射表
-    pub fn get_cached_activities<'a, Cxt>(
-        cxt: Cxt,
+    pub fn get_cached_activities<'a>(
+        database_guard: &mut DatabaseGuard,
         sessions: impl IntoIterator<Item = &'a Session<UserProtocol>>,
     ) -> Result<CachedActivitiesResult<'a, UserProtocol>, Error>
     where
-        Cxt: AsRef<DatabaseGuard>,
         UserProtocol: 'a,
     {
-        let database_guard = cxt.as_ref();
         let sessions = sessions
             .into_iter()
             .map(|s| (s.uid().to_owned(), s))

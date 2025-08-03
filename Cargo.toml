@@ -17,10 +17,10 @@ authors = ["worksoup"]
 [workspace.dependencies]
 bincode = "2.0"
 chrono = "0.4"
-derive-where = "1.4"
+derive-where = "1.5"
 des = "0.8"
 directories = "6.0"
-flate2 = "1.0"
+flate2 = "1.1"
 getset2 = "0.4"
 hex = "0.4"
 image = "0.25"
