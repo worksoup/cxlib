@@ -14,20 +14,26 @@ pub trait MaybeFatalError {
 }
 
 #[inline]
+#[track_caller]
 pub fn log_none<T>(e: impl std::fmt::Debug) -> Option<T> {
-    log::warn!("{e:?}, 将使用空值。",);
+    let caller = core::panic::Location::caller();
+    log::warn!("{caller}: {e:?}, 将使用空值。",);
     None
 }
 
 #[inline]
+#[track_caller]
 pub fn log_panic<T>(e: impl std::fmt::Debug) -> T {
-    log::error!("{e:?}.");
+    let caller = core::panic::Location::caller();
+    log::error!("{caller}: {e:?}.");
     panic!();
 }
 
 #[inline]
+#[track_caller]
 pub fn log_default<T: Default>(e: impl std::fmt::Debug) -> T {
-    log::warn!("{e:?}, 将使用默认值。",);
+    let caller = core::panic::Location::caller();
+    log::warn!("{caller}: {e:?}, 将使用默认值。",);
     T::default()
 }
 
@@ -42,11 +48,13 @@ pub trait CxlibResultUtils<T, E> {
 }
 impl<T, E: std::fmt::Debug> CxlibResultUtils<T, E> for Result<T, E> {
     #[inline]
+    #[track_caller]
     fn log_unwrap(self) -> T {
         self.unwrap_or_else(log_panic)
     }
 
     #[inline]
+    #[track_caller]
     fn log_unwrap_or_default(self) -> T
     where
         T: Default,
@@ -55,19 +63,24 @@ impl<T, E: std::fmt::Debug> CxlibResultUtils<T, E> for Result<T, E> {
     }
 
     #[inline]
+    #[track_caller]
     fn log_ok(self) -> Option<T> {
         self.ok_or_else(log_none)
     }
 
     #[inline]
+    #[track_caller]
     fn log_ignore(self) {
+        let caller = core::panic::Location::caller();
         match self {
-            Ok(_) => {}
-            Err(e) => log::warn!("{e:?}, 将使用空值。",),
+            Ok(_) => log::warn!("{caller}: 值将被抛弃已忽略。",),
+
+            Err(e) => log::warn!("{caller}: 忽略错误：{e:?}。",),
         }
     }
 
     #[inline]
+    #[track_caller]
     fn ok_or_else<F: FnOnce(E) -> Option<T>>(self, f: F) -> Option<T> {
         match self {
             Ok(x) => Some(x),
