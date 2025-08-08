@@ -1,14 +1,16 @@
 use crate::utils::try_secondary_verification;
 use cx_gizmo_types::OptionPair;
-use cxlib_captcha::{CaptchaId, CaptchaSolverTrait};
+use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{
-    collect::{CaptchaProtocolTrait, SignProtocolTrait},
+    collect::{
+        CaptchaId, CaptchaProtocolTrait, PreSignResult, SignProtocolTrait, SignState,
+        ValidSignState,
+    },
     utils::PPTSignHelper,
 };
-use cxlib_types::{CourseWithInfo, LocationWithRange, RawSign, Session};
+use cxlib_types::{CourseWithInfo, RawSign, Session, UnhandledGeoAddrWithRange};
 use log::info;
-use serde::Deserialize;
 use std::{collections::HashMap, ops::Add};
 
 mod error;
@@ -35,24 +37,6 @@ pub use error::*;
 pub trait SignTrait: Ord {
     type PreSignData: ?Sized;
     type Data: ?Sized;
-    /// 通过签到结果的字符串判断签到结果如何。
-    fn guess_sign_result_by_text(text: &str) -> SignResult {
-        match text {
-            "success" => SignResult::Success,
-            msg => {
-                if msg.is_empty() {
-                    SignResult::Failure {
-                        msg:
-                        "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
-                    }
-                } else if msg == "您已签到过了" {
-                    SignResult::Success
-                } else {
-                    SignResult::Failure { msg: msg.into() }
-                }
-            }
-        }
-    }
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -84,25 +68,6 @@ pub trait SignTrait: Ord {
             }
     }
     /// 获取签到后状态。参见返回类型 [`SignState`].
-    fn get_sign_state<SignProtocol, U>(&self, session: &Session<U>) -> Result<SignState, SignError>
-    where
-        SignProtocol: SignProtocolTrait,
-    {
-        let r = SignProtocol::get_attend_info(session, self.as_inner().active_id())?;
-        #[derive(Deserialize)]
-        struct Status {
-            status: i64,
-        }
-        #[derive(Deserialize)]
-        struct Data {
-            data: Status,
-        }
-        let Data {
-            data: Status { status },
-        } = r.into_body().read_json().log_unwrap();
-        Ok(status.into())
-    }
-    /// 获取签到后状态。参见返回类型 [`SignState`].
     fn guess_sign_result_by_state<SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -110,7 +75,7 @@ pub trait SignTrait: Ord {
     where
         SignProtocol: SignProtocolTrait,
     {
-        let state = self.as_inner().get_sign_state::<SignProtocol, U>(session)?;
+        let state = SignProtocol::get_sign_state(session, self.as_inner().active_id())?;
         let result = match state {
             SignState::ValidSignState(valid_sign_state) => match valid_sign_state {
                 ValidSignState::未签 => {
@@ -180,7 +145,7 @@ pub trait SignTrait: Ord {
         &self,
         session: &Session<U>,
         pre_sign_url: &str,
-        pre_sign_result_data: &OptionPair<CaptchaId, LocationWithRange>,
+        pre_sign_result_data: &OptionPair<CaptchaId, UnhandledGeoAddrWithRange>,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
     ) -> Result<SignResult, SignError>
@@ -244,6 +209,7 @@ impl SignTrait for RawSign {
     type PreSignData = ();
     type Data = ();
 
+    #[inline]
     fn sign_url<SignProtocol, UserProtocol>(
         &self,
         session: &Session<UserProtocol>,
@@ -273,31 +239,17 @@ impl SignTrait for RawSign {
     {
         let active_id = self.active_id();
         let uid = session.uid();
-        let response_of_pre_sign = SignProtocol::pre_sign(
+        let response_of_presign = SignProtocol::pre_sign(
             session,
             (self.course().id(), self.course().class_id()),
             active_id,
             uid,
         )?;
         info!("用户[{}]预签到已请求。", session.name());
-        utils::analysis_after_presign::<CaptchaProtocol, SignProtocol, _>(
-            active_id,
-            session,
-            response_of_pre_sign,
-        )
+        Ok(response_of_presign.analysis::<CaptchaProtocol, SignProtocol>(session, active_id)?)
     }
 }
 
-/// # [`PreSignResult`]
-/// 预签到结果，可能包含了一些签到时需要的信息。
-pub enum PreSignResult {
-    Susses,
-    Data {
-        url: String,
-        data: OptionPair<CaptchaId, LocationWithRange>,
-    },
-}
-impl PreSignResult {}
 /// 签到的结果。为枚举类型。
 /// ``` rust
 /// #[derive(Debug)]
@@ -318,51 +270,23 @@ pub enum SignResult {
         msg: String,
     },
 }
-impl SignResult {}
-//noinspection ALL
-/// 签到后状态。
-///
-/// 可以为任意值（签到发出端可以通过网络请求手动设置为任意值）。
-#[derive(Debug)]
-#[repr(i64)]
-pub enum ValidSignState {
-    未签 = 0,
-    签到成功 = 1,
-    教师代签 = 2,
-    请假 = 4,
-    缺勤 = 5,
-    病假 = 7,
-    事假 = 8,
-    迟到 = 9,
-    早退 = 10,
-    签到已过期 = 11,
-    公假 = 12,
-}
-/// 签到后状态。
-///
-/// 可以为任意值（签到发出端可以通过网络请求手动设置为任意值）。
-#[derive(Debug)]
-pub enum SignState {
-    ValidSignState(ValidSignState),
-    Other(i64),
-}
-impl From<i64> for SignState {
-    #[inline]
-    fn from(number: i64) -> Self {
-        match number {
-            0 | 1 | 2 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 => {
-                Self::ValidSignState(unsafe { std::mem::transmute::<i64, ValidSignState>(number) })
+impl SignResult {
+    /// 通过签到结果的字符串判断签到结果如何。
+    pub fn guess_by_text(text: &str) -> SignResult {
+        match text {
+            "success" => SignResult::Success,
+            msg => {
+                if msg.is_empty() {
+                    SignResult::Failure {
+                        msg:
+                        "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
+                    }
+                } else if msg == "您已签到过了" {
+                    SignResult::Success
+                } else {
+                    SignResult::Failure { msg: msg.into() }
+                }
             }
-            _ => Self::Other(number),
-        }
-    }
-}
-impl From<SignState> for i64 {
-    #[inline]
-    fn from(enum_value: SignState) -> Self {
-        match enum_value {
-            SignState::ValidSignState(valid_sign_state) => valid_sign_state as Self,
-            SignState::Other(value) => value,
         }
     }
 }

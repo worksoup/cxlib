@@ -53,10 +53,10 @@ impl LocationTable {
                     else {
                         unreachable!()
                     };
-                    let addr = UnhandledGeoaddr {
-                        unhandled_place_name: unhandled_addr.borrow().to_owned(),
-                        geolocation: location.borrow().clone(),
-                    };
+                    let addr = UnhandledGeoaddr::new(
+                        unhandled_addr.borrow().to_owned(),
+                        location.borrow().clone(),
+                    );
                     locations.1.get_locations_mut().push(addr);
                     Ok(locations)
                 } else {
@@ -91,10 +91,10 @@ impl LocationTable {
         Self::add_location(w_cxt, location.borrow(), unhandled_addr.borrow(), course)?;
         let mut alias_table = AliasTable::write(w_cxt)?;
         for alias in aliases {
-            let addr = UnhandledGeoaddr {
-                unhandled_place_name: unhandled_addr.borrow().to_owned(),
-                geolocation: location.borrow().clone(),
-            };
+            let addr = UnhandledGeoaddr::new(
+                unhandled_addr.borrow().to_owned(),
+                location.borrow().clone(),
+            );
             let e = AliasTable::add_alias(&mut alias_table, alias, addr);
             if let Err(e) = e
                 && e.is_fatal()
@@ -168,10 +168,7 @@ impl LocationTable {
             .map(|(k, v)| {
                 let v = v.value();
                 (
-                    UnhandledGeoaddr {
-                        geolocation: k.value(),
-                        unhandled_place_name: v.unhandled_addr,
-                    },
+                    UnhandledGeoaddr::new(v.unhandled_addr, k.value()),
                     v.courses,
                 )
             })
@@ -270,18 +267,14 @@ impl ImportExportTrait for LocationTable {
         db.write_once(|w_cxt| {
             for location_and_aliases_pair_internal in data {
                 let LocationAndAliasesPairInternal {
-                    unhandled_geoaddr:
-                        UnhandledGeoaddr {
-                            unhandled_place_name,
-                            geolocation,
-                        },
+                    unhandled_geoaddr,
                     courses,
                     aliases,
                 } = location_and_aliases_pair_internal;
                 _ = Self::insert_location(
                     w_cxt,
-                    geolocation,
-                    unhandled_place_name,
+                    unhandled_geoaddr.geolocation(),
+                    unhandled_geoaddr.unhandled_place_name(),
                     courses,
                     &aliases,
                 );
@@ -302,10 +295,7 @@ impl ImportExportTrait for LocationTable {
             {
                 match AliasTable::get_aliases(&alias_table, &location) {
                     Ok(aliases) => {
-                        let unhandled_addr = UnhandledGeoaddr {
-                            unhandled_place_name: unhandled_addr,
-                            geolocation: location,
-                        };
+                        let unhandled_addr = UnhandledGeoaddr::new(unhandled_addr, location);
                         let datum =
                             LocationAndAliasesPairInternal::new(unhandled_addr, courses, aliases);
                         data.insert(datum);

@@ -1,9 +1,8 @@
 use crate::sign::RawSign;
-use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
 use cxlib_sign::{SignError, SignResult, SignTrait};
 use cxlib_types::Session;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 /// 手势签到。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize)]
@@ -13,12 +12,14 @@ pub struct GestureOrSigncodeSign {
 }
 
 impl GestureOrSigncodeSign {
+    #[inline]
     pub fn new(is_gesture: bool, raw_sign: RawSign) -> Self {
         Self {
             is_gesture,
             raw_sign,
         }
     }
+    #[inline]
     pub fn is_gesture(&self) -> bool {
         self.is_gesture
     }
@@ -30,6 +31,7 @@ impl GestureOrSigncodeSign {
     /// 4 5 6
     /// 7 8 9
     /// ```
+    #[inline]
     pub fn check_signcode<SignProtocol, U>(
         session: &Session<U>,
         active_id: &str,
@@ -38,16 +40,8 @@ impl GestureOrSigncodeSign {
     where
         SignProtocol: SignProtocolTrait,
     {
-        #[derive(Deserialize)]
-        struct CheckR {
-            #[allow(unused)]
-            result: i64,
-        }
-        let CheckR { result } = SignProtocol::check_signcode(session, active_id, signcode)?
-            .into_body()
-            .read_json()
-            .log_unwrap();
-        if result == 1 {
+        let result_code = SignProtocol::check_signcode(session, active_id, signcode)?;
+        if result_code == 1 {
             Ok(Ok(()))
         } else {
             Ok(Err(SignResult::Failure {
@@ -64,6 +58,7 @@ impl SignTrait for GestureOrSigncodeSign {
     type PreSignData = ();
     type Data = str;
 
+    #[inline]
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -80,6 +75,7 @@ impl SignTrait for GestureOrSigncodeSign {
         )
     }
 
+    #[inline]
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }

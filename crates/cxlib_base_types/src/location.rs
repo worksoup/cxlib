@@ -1,6 +1,9 @@
 use bincode::{Decode, Encode};
-use serde::Serialize;
+use getset2::Getset2;
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
+
+use crate::__private::UnhandledGeoaddr;
 
 /// [`LocationPreprocessorTrait`]
 /// 用来对位置作预处理。该特型试图解决如下问题：
@@ -26,6 +29,9 @@ pub mod __private {
         str::FromStr,
     };
 
+    use getset2::Getset2;
+    use serde::{Deserialize, Serialize};
+
     use crate::{Geoaddr, Geolocation, LocationPreprocessorTrait};
 
     /// # [`UnhandledLocation`]
@@ -33,13 +39,38 @@ pub mod __private {
     ///
     /// 不应使用。
     #[derive(
-        Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, bincode::Decode, bincode::Encode,
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        Hash,
+        bincode::Decode,
+        bincode::Encode,
+        Serialize,
+        Deserialize,
+        Getset2,
     )]
+    #[getset2(get_ref(pub), get_mut(pub), set(pub))]
     pub struct UnhandledGeoaddr {
-        pub unhandled_place_name: String,
-        pub geolocation: Geolocation,
+        #[serde(rename = "address")]
+        pub(super) unhandled_place_name: String,
+        #[serde(flatten)]
+        pub(super) geolocation: Geolocation,
     }
     impl UnhandledGeoaddr {
+        #[inline(always)]
+        pub fn new(unhandled_place_name: String, geolocation: Geolocation) -> Self {
+            Self {
+                unhandled_place_name,
+                geolocation,
+            }
+        }
+        #[inline(always)]
+        pub fn get_geolocation(self) -> Geolocation {
+            self.geolocation
+        }
         #[inline]
         pub fn to_location(self, preprocessor: &impl LocationPreprocessorTrait) -> Geoaddr {
             let Self {
@@ -134,13 +165,33 @@ pub mod __private {
         }
     }
 }
+fn default_alt() -> String {
+    "1108".to_owned()
+}
 /// # [`GeoLocation`]
 /// 地理坐标，由经纬度、海拔高度组成。
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Decode, Encode)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Clone,
+    Hash,
+    Decode,
+    Encode,
+    Serialize,
+    Deserialize,
+    Getset2,
+)]
+#[getset2(get_ref(pub), get_mut(pub), set(pub))]
 pub struct Geolocation {
-    pub lon: String,
-    pub lat: String,
-    pub alt: String,
+    #[serde(rename = "longitude")]
+    lon: String,
+    #[serde(rename = "latitude")]
+    lat: String,
+    #[serde(skip, default = "default_alt")]
+    alt: String,
 }
 impl Geolocation {
     /// Eq to `Self::from_owned_fields([const { String::new() }; 4])`.
@@ -153,51 +204,6 @@ impl Geolocation {
             lat: String::new(),
             alt: String::new(),
         }
-    }
-    /// 经度。
-    #[inline]
-    pub fn lon(&self) -> &String {
-        &self.lon
-    }
-    /// 纬度。
-    #[inline]
-    pub fn lat(&self) -> &String {
-        &self.lat
-    }
-    /// 海拔。
-    #[inline]
-    pub fn alt(&self) -> &String {
-        &self.alt
-    }
-    /// 经度。
-    #[inline]
-    pub fn set_lon(&mut self, lon: String) {
-        self.lon = lon
-    }
-    /// 纬度。
-    #[inline]
-    pub fn set_lat(&mut self, lat: String) {
-        self.lat = lat
-    }
-    /// 海拔。
-    #[inline]
-    pub fn set_alt(&mut self, alt: String) {
-        self.alt = alt
-    }
-    /// 经度。
-    #[inline]
-    pub fn get_lon(&mut self) -> &mut String {
-        &mut self.lon
-    }
-    /// 纬度。
-    #[inline]
-    pub fn get_lat(&mut self) -> &mut String {
-        &mut self.lat
-    }
-    /// 海拔。
-    #[inline]
-    pub fn get_alt(&mut self) -> &mut String {
-        &mut self.alt
     }
 }
 impl std::str::FromStr for Geolocation {
@@ -323,3 +329,87 @@ impl Borrow<__private::UnhandledGeoaddr> for &Geoaddr {
 //     }
 //     位置id
 // }
+/// #[`LocationWithRange`]
+/// 带范围的签到位置。参见 [`Location`], 包含额外的签到范围（半径，单位为米），但不包含海拔信息。
+///
+/// 使用 [`to_shifted_location`](LocationWithRange::to_shifted_location) 转换为偏移后的 `Location`.
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize, Deserialize, Getset2)]
+pub struct UnhandledGeoAddrWithRange {
+    #[serde(flatten)]
+    #[getset2(get_ref(pub), get_mut(pub), set(pub))]
+    unhandled_geoaddr: UnhandledGeoaddr,
+    #[serde(rename = "locationrange")]
+    #[getset2(get_copy(pub), get_mut(pub), set(pub))]
+    range: u32,
+}
+
+impl UnhandledGeoAddrWithRange {
+    #[inline(always)]
+    pub fn get_unhandled_geoaddr(self) -> UnhandledGeoaddr {
+        self.unhandled_geoaddr
+    }
+    #[inline]
+    pub fn new(addr: String, lon: String, lat: String, range: u32) -> Self {
+        Self {
+            unhandled_geoaddr: UnhandledGeoaddr {
+                unhandled_place_name: addr,
+                geolocation: Geolocation {
+                    lon,
+                    lat,
+                    alt: default_alt(),
+                },
+            },
+            range,
+        }
+    }
+    pub fn find_in_html(html: &str) -> Option<UnhandledGeoAddrWithRange> {
+        let p = [
+            "id=\"locationText\"",
+            "id=\"locationLongitude\"",
+            "id=\"locationLatitude\"",
+            "id=\"locationRange\"",
+        ];
+        let mut start = [None, None, None, None];
+        let mut results1 = Vec::new();
+        for i in 0..4 {
+            let s = html.find(p[i]);
+            start[i] = s;
+            if let Some(s) = s {
+                let r = &html[s + p[i].len()..html.len()];
+                results1.push(r);
+            } else {
+                return None;
+            }
+        }
+        let mut results2 = Vec::new();
+        for r in &results1 {
+            let s = r.find("value=\"");
+            if let Some(s) = s {
+                let r = &r[s + 7..r.len()];
+                results2.push(r);
+            } else {
+                return None;
+            }
+        }
+        let mut results3 = Vec::new();
+        for r in &results2 {
+            let e = r.find('"');
+            if let Some(e) = e {
+                let r = &r[0..e];
+                results3.push(r);
+            } else {
+                return None;
+            }
+        }
+        Some(UnhandledGeoAddrWithRange::new(
+            results3[0].to_owned(),
+            results3[1].to_owned(),
+            results3[2].to_owned(),
+            if let Ok(s) = results3[3].trim_end_matches('米').parse() {
+                s
+            } else {
+                return None;
+            },
+        ))
+    }
+}

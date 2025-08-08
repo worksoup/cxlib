@@ -11,7 +11,7 @@ pub use photo::*;
 pub use qrcode::*;
 
 use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
-use cxlib_sign::{PreSignResult, SignError, SignTrait};
+use cxlib_sign::{SignError, SignTrait};
 use cxlib_types::{RawSign, Session, SignDetail};
 use log::warn;
 use std::collections::HashMap;
@@ -109,6 +109,7 @@ impl<TypesProtocol> Sign<TypesProtocol> {
             Sign::Unknown(raw)
         }
     }
+    #[inline]
     pub fn as_raw(&self) -> &RawSign {
         match self {
             Sign::Photo(a) => a.as_inner(),
@@ -119,6 +120,7 @@ impl<TypesProtocol> Sign<TypesProtocol> {
             Sign::Unknown(a) => a.as_inner(),
         }
     }
+    #[inline]
     pub fn into_raw(self) -> RawSign {
         match self {
             Sign::Photo(a) => a.into_raw(),

@@ -24,6 +24,7 @@ pub struct DefaultQrCodeSignner<'a, T: LocationInfoGetterTrait, PP: LocationPrep
 impl<'a, T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait>
     DefaultQrCodeSignner<'a, T, PP>
 {
+    #[inline]
     pub fn new(
         location_info_getter: T,
         location_str: &'a Option<String>,
@@ -141,6 +142,7 @@ where
         Ok(map)
     }
 
+    #[inline]
     fn sign_single<U>(
         sign: &QrCodeSign,
         session: &Session<U>,
@@ -166,6 +168,7 @@ where
 }
 
 impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSignner<'_, T, PP> {
+    #[inline]
     fn pic_to_enc(pic: &PathBuf) -> Result<String, SignError> {
         if std::fs::metadata(pic).expect("图片路径出错。").is_dir() {
             loop {
@@ -192,6 +195,7 @@ impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSig
         }
     }
 
+    #[inline]
     pub fn is_enc_qrcode_url(url: &str) -> bool {
         url.contains(&*cxlib_protocol::ProtocolItem::QRCODE_PAT.to_string())
             && url.contains("&enc=")
@@ -269,6 +273,7 @@ impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSig
         None
     }
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    #[inline]
     pub fn enc_gen(path: &Option<PathBuf>, enc: &Option<String>) -> Result<String, SignError> {
         let enc = if let Some(enc) = enc {
             enc.clone()
@@ -283,6 +288,7 @@ impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSig
     }
 
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+    #[inline]
     pub fn enc_gen(
         sign: &QrCodeSign,
         path: &Option<PathBuf>,
@@ -302,6 +308,7 @@ impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSig
         };
         Ok(enc)
     }
+    #[inline]
     pub fn find_qrcode_sign_enc_in_url(url: &str) -> Option<String> {
         // 在二维码图片中会有一个参数 `c`, 二维码预签到时需要。
         // 但是该参数似乎暂时可以从 `signDetail` 接口获取到。所以此处先注释掉。
@@ -317,15 +324,18 @@ impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSig
         }
         r
     }
+    #[inline]
     pub fn pic_path_to_qrcode_result(pic_path: &str) -> Option<String> {
         let r = Self::scan_file(pic_path).ok()?;
         Self::find_qrcode_sign_enc_in_url(r.first()?.getText())
     }
+    #[inline]
     pub fn detect_qrcode_in_image(
         image: image::DynamicImage,
     ) -> rxing::common::Result<Vec<rxing::RXingResult>> {
         Self::detect_qrcode_in_image_with_hints(image, &mut rxing::DecodeHints::default())
     }
+    #[inline]
     pub fn detect_qrcode_in_image_with_hints(
         image: image::DynamicImage,
         hints: &mut rxing::DecodeHints,
@@ -344,6 +354,7 @@ impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSig
         )
     }
 
+    #[inline]
     pub fn scan_file(pic_path: &str) -> rxing::common::Result<Vec<rxing::RXingResult>> {
         rxing::helpers::detect_multiple_in_file(pic_path)
     }

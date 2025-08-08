@@ -13,6 +13,7 @@ pub struct DefaultPhotoSignner {
 }
 
 impl DefaultPhotoSignner {
+    #[inline]
     pub fn new(path: &Option<PathBuf>) -> Self {
         let path = path.as_ref().and_then(|pic| {
             std::fs::metadata(pic).ok().and_then(|metadata| {
@@ -96,6 +97,7 @@ where
         Ok(map)
     }
 
+    #[inline]
     fn sign_single<U>(
         sign: &PhotoSign<TypesProtocol>,
         session: &Session<U>,

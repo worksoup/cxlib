@@ -13,6 +13,7 @@ pub struct PhotoSign<TypesProtocol> {
     _p: PhantomData<TypesProtocol>,
 }
 impl<TypesProtocol> PhotoSign<TypesProtocol> {
+    #[inline]
     pub fn new(raw_sign: RawSign) -> Self {
         Self {
             raw_sign,
@@ -20,6 +21,7 @@ impl<TypesProtocol> PhotoSign<TypesProtocol> {
         }
     }
 
+    #[inline]
     pub fn into_raw(self) -> RawSign {
         self.raw_sign
     }
@@ -27,6 +29,7 @@ impl<TypesProtocol> PhotoSign<TypesProtocol> {
 impl<TypesProtocol> SignTrait for PhotoSign<TypesProtocol> {
     type PreSignData = ();
     type Data = Photo<TypesProtocol>;
+    #[inline]
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -43,6 +46,7 @@ impl<TypesProtocol> SignTrait for PhotoSign<TypesProtocol> {
         )
     }
 
+    #[inline]
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }

@@ -9,5 +9,3 @@ pub mod utils;
 pub use error::*;
 pub use solver::*;
 pub use verification_info::*;
-
-pub type CaptchaId = String;

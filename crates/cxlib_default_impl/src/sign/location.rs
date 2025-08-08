@@ -1,17 +1,21 @@
 use crate::sign::{RawSign, SignTrait};
 use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
-use cxlib_types::{Geoaddr, LocationPreprocessorTrait, LocationWithRange, Session};
+use cxlib_types::{
+    Geoaddr, LocationPreprocessorTrait, Session, UnhandledGeoAddrWithRange,
+    UnhandledGeoAddrWithRangeExt,
+};
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Serialize)]
 pub struct LocationSign {
     pub(crate) raw_sign: RawSign,
-    pub(crate) preset_location: Option<LocationWithRange>,
+    pub(crate) preset_location: Option<UnhandledGeoAddrWithRange>,
 }
 impl LocationSign {
     /// 获取预设的位置，同时可以选择传入一个字符串，用来设置位置的名称。
     ///
     /// 注意该函数不会调用 [`set_location`](Self::set_location), 请手动调用。
+    #[inline]
     pub fn get_preset_location(
         &self,
         preprocessor: &impl LocationPreprocessorTrait,
@@ -20,6 +24,7 @@ impl LocationSign {
             .as_ref()
             .map(|l| l.to_shifted_geoaddr(preprocessor))
     }
+    #[inline]
     pub fn into_raw(self) -> RawSign {
         self.raw_sign
     }
@@ -28,6 +33,7 @@ impl SignTrait for LocationSign {
     type PreSignData = ();
     type Data = Geoaddr;
 
+    #[inline]
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -45,6 +51,7 @@ impl SignTrait for LocationSign {
         )
     }
 
+    #[inline]
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }

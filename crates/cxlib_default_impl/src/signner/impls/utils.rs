@@ -2,8 +2,8 @@
 //! 好，还有 2 行调侃。
 use crate::sign::{LocationSign, QrCodeSign};
 use cxlib_captcha::CaptchaSolverTrait;
-use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
-use cxlib_sign::{PreSignResult, SignError, SignResult, SignTrait};
+use cxlib_protocol::collect::{CaptchaProtocolTrait, PreSignResult, SignProtocolTrait};
+use cxlib_sign::{SignError, SignResult, SignTrait};
 use cxlib_types::{Geoaddr, Session};
 use log::warn;
 use std::borrow::Borrow;
@@ -11,6 +11,7 @@ use std::borrow::Borrow;
 pub(crate) trait SignRetry<I, O: Borrow<<Self as SignTrait>::Data>, SignProtocol>:
     SignTrait
 {
+    #[inline]
     fn guess_if_retry(msg: &str) -> bool {
         msg.contains("位置")
             || msg.contains("Location")
@@ -20,6 +21,7 @@ pub(crate) trait SignRetry<I, O: Borrow<<Self as SignTrait>::Data>, SignProtocol
     fn data_helper(data: I) -> O;
 }
 impl<SignProtocol> SignRetry<Geoaddr, <Self as SignTrait>::Data, SignProtocol> for QrCodeSign {
+    #[inline]
     fn data_helper(data: Geoaddr) -> <Self as SignTrait>::Data {
         Some(data)
     }
@@ -27,6 +29,7 @@ impl<SignProtocol> SignRetry<Geoaddr, <Self as SignTrait>::Data, SignProtocol> f
 impl<'a, SignProtocol> SignRetry<&'a Geoaddr, &'a <Self as SignTrait>::Data, SignProtocol>
     for LocationSign
 {
+    #[inline]
     fn data_helper(data: &'a Geoaddr) -> &'a <Self as SignTrait>::Data {
         data
     }

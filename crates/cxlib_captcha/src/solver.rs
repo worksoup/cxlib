@@ -6,13 +6,13 @@
 use crate::{
     CaptchaError, VerificationInfoTrait,
     hash::{encode, hash, uuid},
-    utils::{get_now_timestamp_mills, get_server_time, trim_response_to_json},
+    utils::get_now_timestamp_mills,
 };
 use cxlib_error::AgentError;
 use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
-use cxlib_protocol::collect::CaptchaProtocolTrait;
+use cxlib_protocol::collect::{CaptchaProtocolTrait, VerificationDataWithToken};
 use log::{debug, warn};
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::de::DeserializeOwned;
 use ureq::Agent;
 
 /// 该文档为AI生成。获取验证码的结果结构体
@@ -23,43 +23,6 @@ pub struct GetCaptchaResult {
     /// 该文档为AI生成。包含令牌和验证数据的结构
     pub data: VerificationDataWithToken,
 }
-
-/// 该文档为AI生成。包含令牌和验证数据的结构
-#[derive(Debug, Deserialize)]
-pub struct VerificationDataWithToken {
-    /// 该文档为AI生成。验证令牌
-    pub token: String,
-    /// 该文档为AI生成。验证码数据(JSON格式)
-    #[serde(rename = "imageVerificationVo")]
-    pub data: serde_json::Value,
-}
-
-/// 该文档为AI生成。验证结果结构体
-#[derive(Deserialize, Debug)]
-pub struct ValidateResult {
-    /// 该文档为AI生成。额外的验证数据
-    #[serde(rename = "extraData")]
-    extra_data: Option<String>,
-}
-
-impl ValidateResult {
-    /// 该文档为AI生成。从验证结果中提取验证信息
-    pub fn get_validate_info(&self) -> Result<String, CaptchaError> {
-        #[derive(Deserialize)]
-        struct Tmp {
-            validate: String,
-        }
-        self.extra_data
-            .as_ref()
-            .map(|s| {
-                debug!("验证结果数据: {s}");
-                let Tmp { validate } = serde_json::from_str(s).unwrap();
-                validate
-            })
-            .ok_or_else(|| CaptchaError::VerifyFailed)
-    }
-}
-
 /// 该文档为AI生成。验证码解决器特性
 ///
 /// 定义了验证码处理的通用接口，包括生成密钥、获取验证码、验证验证码等
@@ -148,7 +111,7 @@ where
     ) -> Result<GetCaptchaResult, AgentError> {
         let (captcha_key, tmp_token) = Self::generate_secrets(captcha_id, server_time_mills);
         let iv = Self::generate_iv(captcha_id);
-        let r = CaptchaProtocol::get_captcha(
+        let data = CaptchaProtocol::get_captcha(
             agent,
             Self::captcha_type(),
             captcha_id,
@@ -157,13 +120,7 @@ where
             server_time_mills + 1,
             referer,
         )?;
-        let r_data = trim_response_to_json(
-            &r.into_body()
-                .read_to_string()
-                .expect("CaptchaResponse into String failed."),
-        )
-        .expect("Failed trim_response_to_json");
-        Ok(GetCaptchaResult { iv, data: r_data })
+        Ok(GetCaptchaResult { iv, data })
     }
 
     /// 该文档为AI生成。验证验证码结果实现
@@ -173,7 +130,7 @@ where
         text_click_arr: &str,
         server_time_mills: u128,
     ) -> Result<String, CaptchaError> {
-        let r = CaptchaProtocol::check_captcha(
+        let v = CaptchaProtocol::check_captcha(
             agent,
             Self::captcha_type(),
             captcha_id,
@@ -182,10 +139,9 @@ where
             iv,
             server_time_mills + 2,
         )?;
-        let v: ValidateResult =
-            trim_response_to_json(&r.into_body().read_to_string().log_unwrap()).log_unwrap();
         debug!("验证结果：{v:?}");
         v.get_validate_info()
+            .ok_or_else(|| CaptchaError::VerifyFailed)
     }
 
     /// 该文档为AI生成。完整的验证码解决流程实现
@@ -197,7 +153,7 @@ where
         referer: &str,
     ) -> Result<String, CaptchaError> {
         let local_time = get_now_timestamp_mills();
-        let server_time = get_server_time::<CaptchaProtocol>(agent, captcha_id, local_time)?;
+        let server_time = CaptchaProtocol::get_server_time_mills(agent, captcha_id, local_time)?;
 
         // 事不过三。
         for i in 0..3 {
@@ -238,9 +194,9 @@ mod tests {
     use crate::{
         CaptchaSolverTrait, RotateImages, SlideImages, VerificationInfoTrait,
         hash::{encode, hash},
-        utils::{get_now_timestamp_mills, get_server_time},
+        utils::get_now_timestamp_mills,
     };
-    use cxlib_protocol::collect::{CAPTCHA_ID, CaptchaProtocol};
+    use cxlib_protocol::collect::{CAPTCHA_ID, CaptchaProtocol, CaptchaProtocolTrait};
     use serde::de::DeserializeOwned;
 
     const REFERER: &str = "https%3A%2F%2Fmobilelearn.chaoxing.com";
@@ -289,7 +245,7 @@ mod tests {
             let local_time = get_now_timestamp_mills();
             let captcha_id = CAPTCHA_ID;
             let server_time =
-                get_server_time::<CaptchaProtocol>(&agent, captcha_id, local_time).unwrap();
+                CaptchaProtocol::get_server_time_mills(&agent, captcha_id, local_time).unwrap();
             let validate_info =
                 T::get_captcha::<CaptchaProtocol>(&agent, captcha_id, server_time + 1, REFERER)
                     .unwrap();

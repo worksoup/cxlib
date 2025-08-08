@@ -9,6 +9,7 @@ pub struct NormalSign {
     pub(crate) raw_sign: RawSign,
 }
 impl NormalSign {
+    #[inline]
     pub fn into_raw(self) -> RawSign {
         self.raw_sign
     }
@@ -17,6 +18,7 @@ impl SignTrait for NormalSign {
     type PreSignData = ();
     type Data = ();
 
+    #[inline]
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -30,6 +32,7 @@ impl SignTrait for NormalSign {
             .sign_url::<SignProtocol, _>(session, &(), runtime_data)
     }
 
+    #[inline]
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }

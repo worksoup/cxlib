@@ -11,7 +11,6 @@ mod photo;
 mod raw_course;
 mod raw_sign;
 mod session;
-mod sign_detail;
 
 pub use activity::*;
 pub use clazz::*;
@@ -25,4 +24,3 @@ pub use photo::*;
 pub use raw_course::*;
 pub use raw_sign::*;
 pub use session::*;
-pub use sign_detail::*;

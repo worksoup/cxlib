@@ -1,7 +1,6 @@
 use crate::{CourseWithInfo, Session, SignDetail};
 use bincode::{Decode, Encode};
 use cxlib_error::AgentError;
-use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
 use getset2::Getset2;
 use serde::{Deserialize, Serialize};
@@ -139,22 +138,8 @@ impl RawSign {
         TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait,
     {
-        #[derive(Deserialize)]
-        struct GetSignDetailR {
-            #[serde(rename = "ifPhoto")]
-            is_photo_sign: i64,
-            #[serde(rename = "ifRefreshEwm")]
-            is_refresh_qrcode: i64,
-            #[serde(rename = "signCode")]
-            sign_code: Option<String>,
-        }
         let r = TypesProtocol::sign_detail(session, active_id)?;
-        let GetSignDetailR {
-            is_photo_sign,
-            is_refresh_qrcode,
-            sign_code,
-        } = r.into_body().read_json().log_unwrap();
-        Ok(SignDetail::new(is_photo_sign, is_refresh_qrcode, sign_code))
+        Ok(r.into())
     }
     #[inline]
     pub fn get_detail<TypesProtocol, UserProtocol>(

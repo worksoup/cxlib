@@ -13,12 +13,16 @@ unused = ["ureq"]
 user = ["ureq", "rand"]
 multipart = ["rand"]
 [dependencies]
+cx_gizmo_types = { path = "../../gizmos/cx_gizmo_types" }
 cxlib_base_types = { path = "../cxlib_base_types" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_error_utils = { path = "../cxlib_error_utils" }
+getset2 = { workspace = true }
 log.workspace = true
 mime_guess = { workspace = true, optional = true }
 percent-encoding = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 thiserror.workspace = true
 ureq = { workspace = true, optional = true }

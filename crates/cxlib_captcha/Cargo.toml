@@ -8,6 +8,7 @@ authors.workspace = true
 
 [dependencies]
 yapt.workspace = true
+cxlib_base_types = { path = "../cxlib_base_types" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_error_utils = { path = "../cxlib_error_utils" }
 cx_debug_utils = { path = "../../gizmos/cx_debug_utils" }

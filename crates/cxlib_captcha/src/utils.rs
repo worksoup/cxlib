@@ -41,16 +41,10 @@
 //! 3. checkVerificationResult;
 //!    请求参数有刚返回的 `token`, 其他可以在网络请求里看到。当然也包含刚刚计算的 iv.
 
-use crate::CaptchaId;
 use cx_ureq_utils::ureq_get_bytes;
 use cxlib_error::AgentError;
-use cxlib_error_utils::CxlibResultUtils;
 use cxlib_imageproc::image_from_bytes;
-use cxlib_protocol::collect::CaptchaProtocolTrait;
 use image::DynamicImage;
-use log::debug;
-use serde::Deserialize;
-use std::fmt::Display;
 use ureq::Agent;
 
 pub fn get_now_timestamp_mills() -> u128 {
@@ -58,50 +52,6 @@ pub fn get_now_timestamp_mills() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("系统时间异常。")
         .as_millis()
-}
-pub fn get_server_time<CaptchaProtocol: CaptchaProtocolTrait>(
-    agent: &Agent,
-    captcha_id: &str,
-    time_stamp_mills: impl Display + Copy,
-) -> Result<u128, AgentError> {
-    let r = CaptchaProtocol::get_server_time(agent, captcha_id, time_stamp_mills)?;
-    #[derive(Deserialize)]
-    struct Tmp {
-        t: u128,
-    }
-    let Tmp { t } =
-        trim_response_to_json(r.into_body().read_to_string().log_unwrap().as_str()).log_unwrap();
-    Ok(t)
-}
-pub fn trim_response_to_json<'a, T>(text: &'a str) -> Result<T, serde_json::Error>
-where
-    T: serde::de::Deserialize<'a>,
-{
-    let s = &text[cxlib_protocol::collect::CALLBACK_NAME.len() + 1..text.len() - 1];
-    debug!("{s}");
-    serde_json::from_str(s)
-}
-pub fn find_captcha<CaptchaProtocol: CaptchaProtocolTrait>(
-    client: &Agent,
-    presign_html: &str,
-) -> Option<CaptchaId> {
-    if let Some(start_of_captcha_id) = presign_html.find("captchaId: '") {
-        let id = &presign_html[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
-        debug!("captcha_id: {id}");
-        Some(id.to_string())
-    } else {
-        CaptchaProtocol::my_sign_captcha_utils(client)
-            .ok()
-            .and_then(|r| {
-                let js = r.into_body().read_to_string().log_unwrap();
-                js.find("captchaId: '").map(|start_of_captcha_id| {
-                    debug!("start_of_captcha_id: {start_of_captcha_id}");
-                    let id = &js[start_of_captcha_id + 12..start_of_captcha_id + 12 + 32];
-                    debug!("captcha_id: {id}");
-                    id.to_string()
-                })
-            })
-    }
 }
 pub fn download_image(
     agent: &Agent,

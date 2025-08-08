@@ -1,8 +1,7 @@
 use crate::error::ActivityError;
-use crate::{Activity, ClassInfo, LocationWithRange, OtherActivity, RawCourse, RawSign, Session};
+use crate::{Activity, ClassInfo, UnhandledGeoAddrWithRange, OtherActivity, RawCourse, RawSign, Session};
 use bincode::{Decode, Encode};
 use cxlib_error::AgentError;
-use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -113,158 +112,60 @@ impl CourseWithInfo {
 
 impl CourseWithInfo {
     // TODO: 该函数需要注意：API 可能已经失效。
+    #[inline]
     pub fn get_locations<TypesProtocol>(
         &self,
         session: &Agent,
-    ) -> Result<HashMap<String, LocationWithRange>, AgentError>
+    ) -> Result<HashMap<String, UnhandledGeoAddrWithRange>, AgentError>
     where
         TypesProtocol: TypesProtocolTrait,
     {
-        #[derive(Debug, Clone, Deserialize)]
-        struct LocationWithRangeAndActiveId {
-            #[serde(rename = "activeid")]
-            active_id: i64,
-            #[serde(rename = "address")]
-            addr: String,
-            #[serde(rename = "longitude")]
-            lon: f64,
-            #[serde(rename = "latitude")]
-            lat: f64,
-            #[serde(rename = "locationrange")]
-            range: String,
-        }
-        impl LocationWithRangeAndActiveId {
-            #[inline]
-            pub fn into_location_with_range(self) -> LocationWithRange {
-                LocationWithRange::new(
-                    self.addr,
-                    self.lon.to_string(),
-                    self.lat.to_string(),
-                    self.range.trim().parse().unwrap_or(100),
-                )
-            }
-        }
-        #[derive(Debug, Clone, Deserialize)]
-        struct Data {
-            #[serde(rename = "data")]
-            data: Vec<LocationWithRangeAndActiveId>,
-        }
         let r = TypesProtocol::get_location_log(session, (self.id(), self.class_id()))?;
-        let data: Data = r.into_body().read_json().log_unwrap();
         let mut map = HashMap::new();
-        for l in data.data {
-            map.insert(l.active_id.to_string(), l.into_location_with_range());
+        for l in r.data() {
+            map.insert(l.active_id().to_string(), l.to_location_with_range());
         }
         Ok(map)
     }
 }
-
-/// # ActivityRaw
-///
-/// 未分类的活动类型，仅用于内部反序列化。
-///
-/// 请参考 [`protocol::active_list`] 的响应数据。
-#[derive(Deserialize, Serialize, Clone)]
-struct ActivityRaw {
-    #[serde(rename = "nameOne")]
-    name_one: String,
-    id: i64,
-    #[serde(rename = "otherId")]
-    other_id: Option<String>,
-    status: i32,
-    #[serde(rename = "startTime")]
-    start_time_mills: StartTimeMills,
-}
-/// 对于已经结束的课程，该字段将为空字符串。
-/// 也许有可能为 null. TODO: 后续需验证。
-#[derive(Deserialize, Serialize, Clone)]
-#[serde(untagged)]
-enum StartTimeMills {
-    Some(u64),
-    None(String),
-}
-impl StartTimeMills {
-    #[inline]
-    pub fn some(&self) -> Option<u64> {
-        match self {
-            Self::Some(mills) => Some(*mills),
-            Self::None(_) => None,
-        }
-    }
-}
-/// 内部类型，用于反序列化。
-///
-/// 请参考 [`protocol::active_list`] 的响应数据。
-#[derive(Deserialize, Serialize)]
-struct Data {
-    #[serde(rename = "activeList")]
-    active_list: Vec<ActivityRaw>,
-}
-/// 内部类型，用于反序列化。
-///
-/// 请参考 [`protocol::active_list`] 的响应数据。
-#[derive(Deserialize, Serialize)]
-struct GetActivityR {
-    data: Option<Data>,
-}
-
 impl CourseWithInfo {
     /// 获取该课程的活动。
     pub fn get_activities<TypesProtocol: TypesProtocolTrait, UserProtocol: UserProtocolTrait>(
         &self,
         session: &Session<UserProtocol>,
     ) -> Result<Vec<Activity>, ActivityError> {
-        let mut r = TypesProtocol::active_list(session, (self.id(), self.class_id()))?;
-        let r: GetActivityR = {
-            #[cfg(debug_assertions)]
-            {
-                let r = r.body_mut().read_to_string().unwrap();
-                match serde_json::from_str(&r) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        log::error!("{}/{}", session.name(), self.info().name());
-                        log::error!("{r}");
-                        log::error!("{e:?}");
-                        panic!()
-                    }
-                }
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                r.into_body().read_json().log_unwrap()
-            }
-        };
+        let r = TypesProtocol::active_list(session, (self.id(), self.class_id()))?;
         let class_ended = self.class_ended();
         let activities = Arc::new(Mutex::new(Vec::new()));
-        if let Some(data) = r.data {
+        if let Some(data) = r.data() {
             let thread_count = 1;
-            let len = data.active_list.len();
+            let len = data.active_list().len();
             let chunk_rest = len % thread_count;
             let chunk_count = len / thread_count + if chunk_rest == 0 { 0 } else { 1 };
             for i in 0..chunk_count {
-                let ars = &data.active_list[i * thread_count..if i != chunk_count - 1 {
+                let ars = &data.active_list()[i * thread_count..if i != chunk_count - 1 {
                     (i + 1) * thread_count
                 } else {
                     len
                 }];
                 let mut handles = Vec::new();
                 for ar in ars {
-                    let ar = ar.clone();
-                    let c = self.clone();
+                    let activity_raw = ar.clone();
+                    let course_with_info = self.clone();
                     let activities = activities.clone();
                     let handle = std::thread::spawn(move || {
-                        if let Some(oid) = ar.other_id.as_ref()
+                        if let Some(oid) = activity_raw.other_id.as_ref()
                             && let Ok(other_id) = oid.parse::<i64>()
                             && { (0..=5).contains(&other_id) }
                         {
-                            let active_id = ar.id.to_string();
+                            let active_id: String = activity_raw.id.to_string();
                             let base_sign = RawSign::new(
                                 active_id,
-                                c.clone(),
-                                ar.name_one,
+                                course_with_info.clone(),
+                                activity_raw.name_one,
                                 other_id,
-                                ar.status,
-                                ar.start_time_mills.some(),
+                                activity_raw.status,
+                                activity_raw.start_time_mills.some(),
                                 class_ended,
                             );
                             activities
@@ -276,12 +177,12 @@ impl CourseWithInfo {
                                 .lock()
                                 .unwrap()
                                 .push(Activity::Other(OtherActivity {
-                                    other_id: ar.other_id,
-                                    id: ar.id.to_string(),
-                                    name: ar.name_one,
-                                    course: c.clone(),
-                                    status_code: ar.status,
-                                    start_time_mills: ar.start_time_mills.some(),
+                                    other_id: activity_raw.other_id,
+                                    id: activity_raw.id.to_string(),
+                                    name: activity_raw.name_one,
+                                    course: course_with_info.clone(),
+                                    status_code: activity_raw.status,
+                                    start_time_mills: activity_raw.start_time_mills.some(),
                                 }))
                         }
                     });
@@ -297,6 +198,7 @@ impl CourseWithInfo {
     }
 }
 impl Display for CourseWithInfo {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -317,6 +219,7 @@ pub struct Course {
 }
 impl Course {
     pub const GLOBAL: Self = Self::new(-1, -1);
+    #[inline]
     pub const fn new(id: i64, class_id: i64) -> Self {
         Self { id, class_id }
     }
@@ -345,6 +248,7 @@ impl Course {
 impl FromStr for Course {
     type Err = String;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut course = s.split(',').map(|s| s.trim());
         let id = course
@@ -361,6 +265,7 @@ impl FromStr for Course {
     }
 }
 impl Display for Course {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write(f, format_args!("{}, {}", self.id(), self.class_id()))
     }
@@ -376,15 +281,19 @@ pub struct CourseInfo {
     name: String,
 }
 impl CourseInfo {
+    #[inline]
     pub fn ended(&self) -> bool {
         self.ended
     }
+    #[inline]
     pub fn teacher(&self) -> &String {
         &self.teacher
     }
+    #[inline]
     pub fn image_url(&self) -> Option<&String> {
         self.image_url.as_ref()
     }
+    #[inline]
     pub fn name(&self) -> &String {
         &self.name
     }
@@ -392,6 +301,7 @@ impl CourseInfo {
 impl Deref for CourseWithInfo {
     type Target = Course;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.course
     }

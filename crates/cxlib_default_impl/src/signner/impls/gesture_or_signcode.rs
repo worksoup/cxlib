@@ -22,6 +22,7 @@ where
 {
     type ExtData<'e> = &'e str;
 
+    #[inline]
     fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &GestureOrSigncodeSign,
@@ -41,6 +42,7 @@ where
         Ok(map)
     }
 
+    #[inline]
     fn sign_single<U>(
         sign: &GestureOrSigncodeSign,
         session: &Session<U>,

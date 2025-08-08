@@ -119,7 +119,7 @@ impl AliasTable {
         for r in iter {
             match r {
                 Ok((k, v)) => {
-                    if v.value().geolocation.eq(location.borrow()) {
+                    if v.value().geolocation().eq(location.borrow()) {
                         results.push(and(k.value()));
                     }
                 }

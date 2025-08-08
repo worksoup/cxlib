@@ -14,6 +14,7 @@ pub struct DefaultLocationSignner<'a, T: LocationInfoGetterTrait, PP: LocationPr
 impl<'a, T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait>
     DefaultLocationSignner<'a, T, PP>
 {
+    #[inline]
     pub fn new(
         location_info_getter: T,
         location_str: &'a Option<String>,
@@ -67,6 +68,7 @@ where
         Ok(map)
     }
 
+    #[inline]
     fn sign_single<U>(
         sign: &LocationSign,
         session: &Session<U>,

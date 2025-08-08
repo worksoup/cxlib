@@ -8,8 +8,8 @@ use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
 use cxlib_internal::{
     protocol::collect::{TypesProtocolTrait, UserProtocolTrait},
     types::{
-        __private::UnhandledGeoaddr, Course, CourseWithInfo, Geolocation, UntypedLoginSolver,
-        ext::CourseExt,
+        __private::UnhandledGeoaddr, Course, CourseWithInfo, Geolocation,
+        UnhandledGeoAddrWithRangeExt, UntypedLoginSolver, ext::CourseExt,
     },
 };
 use cxlib_store::AppInfo;
@@ -31,7 +31,7 @@ impl GeolocationOrUnhandledGeoaddr {
         match self {
             GeolocationOrUnhandledGeoaddr::Geolocation(geolocation) => geolocation,
             GeolocationOrUnhandledGeoaddr::UnhandledGeoaddr(unhandled_geoaddr) => {
-                unhandled_geoaddr.geolocation
+                unhandled_geoaddr.get_geolocation()
             }
         }
     }
@@ -206,14 +206,10 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
                     courses.insert(course);
                     database_guard
                         .write_once(|w_cxt| {
-                            let UnhandledGeoaddr {
-                                unhandled_place_name,
-                                geolocation,
-                            } = location.clone();
                             LocationTable::add_location(
                                 w_cxt,
-                                geolocation,
-                                unhandled_place_name,
+                                location.geolocation(),
+                                location.unhandled_place_name(),
                                 courses.into_iter().collect::<Vec<_>>(),
                             )
                         })
@@ -224,14 +220,10 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
             } else {
                 database_guard
                     .write_once(|w_cxt| {
-                        let UnhandledGeoaddr {
-                            unhandled_place_name,
-                            geolocation,
-                        } = location.clone();
                         LocationTable::add_location(
                             w_cxt,
-                            geolocation,
-                            unhandled_place_name,
+                            location.geolocation(),
+                            location.unhandled_place_name(),
                             vec![],
                         )
                     })
@@ -291,7 +283,7 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
                                     let alias_table = AliasTable::read(r_cxt)?;
                                     Ok::<_, StoreError>(
                                         AliasTable::get_location(&alias_table, &alias)?
-                                            .map(|l| l.geolocation),
+                                            .map(UnhandledGeoaddr::get_geolocation),
                                     )
                                 })
                                 .log_unwrap()
@@ -381,7 +373,7 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
                 data.decompose()
                     .2
                     .into_iter()
-                    .map(|UnhandledGeoaddr { geolocation, .. }| geolocation)
+                    .map(UnhandledGeoaddr::get_geolocation)
                     .collect()
             } else {
                 Default::default()
@@ -501,14 +493,11 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
                             database_guard
                                 .write_once(|w_cxt| {
                                     for (_, l) in locations {
-                                        let UnhandledGeoaddr {
-                                            unhandled_place_name,
-                                            geolocation,
-                                        } = l.into_shifted_unhandled_geoaddr();
+                                        let location = l.into_shifted_unhandled_geoaddr();
                                         let _ = LocationTable::insert_location(
                                             w_cxt,
-                                            geolocation,
-                                            unhandled_place_name,
+                                            location.geolocation(),
+                                            location.unhandled_place_name(),
                                             vec![course.course().clone()],
                                             &[],
                                         );

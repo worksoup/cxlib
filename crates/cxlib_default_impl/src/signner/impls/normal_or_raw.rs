@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 pub struct DefaultNormalOrRawSignner;
 
+#[inline]
 fn sign_single_<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, SignProtocol, U>(
     sign: &RawSign,
     session: &Session<U>,
@@ -21,6 +22,7 @@ where
         &(),
     )
 }
+#[inline]
 fn sign_<
     'a,
     CaptchaSolver: CaptchaSolverTrait,
@@ -55,6 +57,7 @@ where
 {
     type ExtData<'e> = ();
 
+    #[inline]
     fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &NormalSign,
@@ -67,6 +70,7 @@ where
     }
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
+    #[inline]
     fn sign_single<U>(
         sign: &NormalSign,
         session: &Session<U>,
@@ -85,6 +89,7 @@ where
 {
     type ExtData<'e> = ();
 
+    #[inline]
     fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
         sign: &RawSign,
@@ -94,6 +99,7 @@ where
     }
 
     /// 事实上不会被 [`SignnerTrait::sign`] 调用。
+    #[inline]
     fn sign_single<U>(
         sign: &RawSign,
         session: &Session<U>,
