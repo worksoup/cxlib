@@ -9,13 +9,26 @@ pub trait SignProtocolTrait {
     fn analysis2_url() -> &'static str {
         SignProtocol::ANALYSIS2
     }
+    fn check_if_validate_url() -> &'static str {
+        SignProtocol::CHECK_IF_VALIDATE
+    }
     fn check_signcode_url() -> &'static str {
         SignProtocol::CHECK_SIGNCODE
     }
+    // 获取签到详情。
     fn get_attend_info_url() -> &'static str {
         SignProtocol::GET_ATTEND_INFO
     }
+    // 获取活动详情。
+    fn get_ppt_active_info_url() -> &'static str {
+        SignProtocol::GET_PPT_ACTIVE_INFO
+    }
+    //获取带签退的签到详情
+    fn get_sign_in_out_attend_url() -> &'static str {
+        SignProtocol::GET_SIGN_IN_OUT_ATTEND
+    }
     fn ppt_sign_url() -> &'static str {
+        // SignProtocol::SIGN_IN
         SignProtocol::PPT_SIGN
     }
     fn pre_sign_url() -> &'static str {
@@ -34,6 +47,15 @@ pub trait SignProtocolTrait {
         let url = format!("{url}?DB_STRATEGY=RANDOM&code={code}");
         Ok(client.get(&url).call()?)
     }
+    // 检查是否需要Captcha验证码。
+    fn check_if_validate(client: &Agent, active_id: &str) -> Result<Response<Body>, AgentError> {
+        let url = Self::check_if_validate_url();
+        Ok(client
+            .get(&format!(
+                "{url}?DB_STRATEGY=PRIMARY_KEY&STRATEGY_PARA=activeId&activeId={active_id}&&puid="
+            ))
+            .call()?)
+    }
     // 签到码检查
     fn check_signcode(
         client: &Agent,
@@ -48,9 +70,28 @@ pub trait SignProtocolTrait {
     // 获取签到之后的信息，例如签到时的 ip, UA, 时间等
     // 参见 "http://mobilelearn.chaoxing.com/page/sign/signIn?courseId=$&classId=$&activeId=$&fid=$"
     fn get_attend_info(client: &Agent, active_id: &str) -> Result<Response<Body>, AgentError> {
+        //泛雅课堂多班发放通过统一链接进入的有此参数: moreClassAttendEnc
         let url = Self::get_attend_info_url();
         Ok(client
-            .get(&format!("{url}?activeId={active_id}&type=1"))
+            .get(&format!(
+                "{url}?activeId={active_id}&type=1&moreClassAttendEnc="
+            ))
+            .call()?)
+    }
+    fn get_ppt_active_info(client: &Agent, active_id: &str) -> Result<Response<Body>, AgentError> {
+        let url = Self::get_ppt_active_info_url();
+        Ok(client.get(&format!("{url}?activeId={active_id}")).call()?)
+    }
+    fn get_sign_in_out_attend(
+        client: &Agent,
+        active_id: &str,
+    ) -> Result<Response<Body>, AgentError> {
+        //泛雅课堂多班发放通过统一链接进入的有此参数: moreClassAttendEnc
+        let url = Self::get_attend_info_url();
+        Ok(client
+            .get(&format!(
+                "{url}?activeId={active_id}&type=1&moreClassAttendEnc="
+            ))
             .call()?)
     }
 
@@ -203,6 +244,9 @@ impl SignProtocol {
     pub const ANALYSIS: &'static str = "https://mobilelearn.chaoxing.com/pptSign/analysis";
     /// analysis 2
     pub const ANALYSIS2: &'static str = "https://mobilelearn.chaoxing.com/pptSign/analysis2";
+    // 检查是否需要Captcha验证码。
+    pub const CHECK_IF_VALIDATE: &'static str =
+        "https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/checkIfValidate";
     /// 签到码检查
     pub const CHECK_SIGNCODE: &'static str =
         "https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/checkSignCode";
@@ -210,8 +254,13 @@ impl SignProtocol {
     /// 参见 "http://mobilelearn.chaoxing.com/page/sign/signIn?courseId=$&classId=$&activeId=$&fid=$"
     pub const GET_ATTEND_INFO: &'static str =
         "https://mobilelearn.chaoxing.com/v2/apis/sign/getAttendInfo";
+    pub const GET_PPT_ACTIVE_INFO: &'static str =
+        "https://mobilelearn.chaoxing.com/v2/apis/active/getPPTActiveInfo";
+    pub const GET_SIGN_IN_OUT_ATTEND: &'static str = "https://mobilelearn.chaoxing.com/v2/apis/sign/sign-in-out/attend-info?DB_STRATEGY=PRIMARY_KEY&STRATEGY_PARA=activeId";
     /// 签到
     pub const PPT_SIGN: &'static str = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax";
+    /// 新签到API
+    pub const SIGN_IN: &'static str = "https://mobilelearn.chaoxing.com/v2/apis/sign/signIn";
     /// 预签到
     pub const PRE_SIGN: &'static str = "https://mobilelearn.chaoxing.com/newsign/preSign";
 }

@@ -167,6 +167,7 @@ where
     fn pwd_enc(&self, pwd: String) -> Result<String, LoginError> {
         let pwd = pwd.as_bytes();
         if (8..=16).contains(&pwd.len()) {
+            // u2oh6Vu^HWe4_AES
             Ok(Self::des_enc(pwd, b"u2oh6Vu^".to_owned()))
         } else {
             Err(LoginError::CryptoError("密码长度不规范".to_string()))

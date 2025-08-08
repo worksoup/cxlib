@@ -7,3 +7,4 @@
 Cargo.lock
 node_modules
 src-tauri/
+cx_code/
