@@ -10,9 +10,9 @@ pub use normal::*;
 pub use photo::*;
 pub use qrcode::*;
 
-use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
+use cxlib_protocol::collect::{NetdiskProtocolTrait, TypesProtocolTrait, UserProtocolTrait};
 use cxlib_sign::{SignError, SignTrait};
-use cxlib_types::{RawSign, Session, SignDetail};
+use cxlib_types::{RawSign, Session, SignDetail, ext::CourseWithInfoExt};
 use log::warn;
 use std::collections::HashMap;
 
@@ -20,9 +20,9 @@ pub type CaptchaId = String;
 
 /// 总体的签到类型。是一个枚举，可以通过 [`RawSign::to_sign`] 获取。
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub enum Sign<TypesProtocol> {
+pub enum Sign<NetdiskProtocol> {
     /// 拍照签到
-    Photo(PhotoSign<TypesProtocol>),
+    Photo(PhotoSign<NetdiskProtocol>),
     /// 普通签到
     Normal(NormalSign),
     /// 二维码签到
@@ -34,23 +34,28 @@ pub enum Sign<TypesProtocol> {
     /// 未知
     Unknown(RawSign),
 }
-impl<TypesProtocol> Sign<TypesProtocol> {
-    pub fn detail<UserProtocol>(
+impl<NetdiskProtocol> Sign<NetdiskProtocol> {
+    pub fn detail<TypesProtocol, UserProtocol>(
         &self,
         session: &Session<UserProtocol>,
     ) -> Result<SignDetail, SignError>
     where
-        TypesProtocol: TypesProtocolTrait,
+        NetdiskProtocol: NetdiskProtocolTrait,
         UserProtocol: UserProtocolTrait,
+        TypesProtocol: TypesProtocolTrait,
     {
-        Ok(self.as_raw().get_detail::<TypesProtocol, _>(session)?)
+        Ok(self.as_raw().get_sign_detail::<TypesProtocol, _>(session)?)
     }
-    pub fn from_raw<UserProtocol>(raw: RawSign, session: &Session<UserProtocol>) -> Self
+    pub fn from_raw<TypesProtocol, UserProtocol>(
+        raw: RawSign,
+        session: &Session<UserProtocol>,
+    ) -> Self
     where
-        TypesProtocol: TypesProtocolTrait,
+        NetdiskProtocol: NetdiskProtocolTrait,
         UserProtocol: UserProtocolTrait,
+        TypesProtocol: TypesProtocolTrait,
     {
-        if let Ok(sign_detail) = raw.get_detail::<TypesProtocol, _>(session) {
+        if let Ok(sign_detail) = raw.get_sign_detail::<TypesProtocol, _>(session) {
             // let r#else = |e| {
             //     log::error!("{}", raw.other_id());
             //     log::error!("{}", raw.course().name());

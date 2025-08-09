@@ -1,14 +1,14 @@
 use crate::session::Session;
 use cxlib_error::AgentError;
 use cxlib_error_utils::CxlibResultUtils;
-use cxlib_protocol::collect::{CloudItem, TypesProtocolTrait};
+use cxlib_protocol::collect::{CloudItem, NetdiskProtocolTrait};
 use derive_where::derive_where;
-use std::{fs::File, marker::PhantomData, path::Path};
+use std::marker::PhantomData;
 
 #[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub struct Photo<TypesProtocol> {
+pub struct Photo<NetdiskProtocol> {
     item: CloudItem,
-    _p: PhantomData<TypesProtocol>,
+    _p: PhantomData<NetdiskProtocol>,
 }
 impl<T> Photo<T> {
     #[inline]
@@ -25,14 +25,15 @@ impl<P> From<CloudItem> for Photo<P> {
         }
     }
 }
-impl<TypesProtocol: TypesProtocolTrait> Photo<TypesProtocol> {
+impl<NetdiskProtocol: NetdiskProtocolTrait> Photo<NetdiskProtocol> {
+    #[cfg(feature = "upload-file")]
     #[inline]
-    pub fn new<U>(
+    pub fn new<U, R: std::io::Read>(
         session: &Session<U>,
-        file: &File,
-        file_name: impl AsRef<Path>,
+        file: R,
+        file_name: impl AsRef<std::path::Path>,
     ) -> Result<Self, AgentError> {
-        let item = CloudItem::upload_temporary::<TypesProtocol, _>(
+        let item = CloudItem::upload_temporary::<NetdiskProtocol, _>(
             session,
             session.uid(),
             file_name,
@@ -51,16 +52,17 @@ impl<TypesProtocol: TypesProtocolTrait> Photo<TypesProtocol> {
         session: &Session<U>,
         p: impl Fn(&str) -> bool,
     ) -> Result<Option<Self>, AgentError> {
-        let r = TypesProtocol::chaoxing_netdisk_root(session)?;
-        let mut r = r.ls::<TypesProtocol>(session)?;
+        let r = NetdiskProtocol::chaoxing_netdisk_root(session)?;
+        let mut r = r.ls::<NetdiskProtocol>(session)?;
         Ok(r.find(|item| p(item.name())).map(Into::into))
     }
+    #[cfg(feature = "upload-file")]
     #[inline]
     pub fn get_from_file<U>(
         session: &Session<U>,
-        file_path: impl AsRef<Path>,
+        file_path: impl AsRef<std::path::Path>,
     ) -> Result<Self, AgentError> {
-        let f = File::open(&file_path).log_unwrap();
+        let f = std::fs::File::open(&file_path).log_unwrap();
         let file_name = file_path
             .as_ref()
             .file_name()

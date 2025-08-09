@@ -8,10 +8,12 @@ default = []
 captcha = ["ureq", "percent-encoding"]
 default_impl = ["ureq"]
 sign = ["ureq"]
-types = ["ureq", "multipart", "mime_guess"]
+netdisk = ["ureq"]
+types = ["ureq"]
 unused = ["ureq"]
 user = ["ureq", "rand"]
 multipart = ["rand"]
+upload-file = ["multipart", "mime_guess"]
 [dependencies]
 cx_gizmo_types = { path = "../../gizmos/cx_gizmo_types" }
 cxlib_base_types = { path = "../cxlib_base_types" }

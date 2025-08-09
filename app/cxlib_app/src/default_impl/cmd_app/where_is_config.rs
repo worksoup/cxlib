@@ -29,8 +29,9 @@ impl<Context: AsRef<ConfigDir>> AppTrait<Context> for WhereIsConfigCmdApp {
         );
     }
 }
-impl<Context: 'static + AsRef<ConfigDir>, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
-    for WhereIsConfigCmdApp
+impl<Context, OwnedData> CmdMetaAppTrait<Context, OwnedData> for WhereIsConfigCmdApp
+where
+    Context: AsRef<ConfigDir>,
 {
     #[inline]
     fn read_owned_data(

@@ -1,6 +1,5 @@
 use crate::{
-    Class, ClassInfo, CourseWithInfo, DefaultLoginSolver, LoginSolverTrait, RawCourse,
-    UntypedLoginSolver,
+    Class, CourseWithInfo, DefaultLoginSolver, LoginSolverTrait, UntypedLoginSolver,
     cookies::UserCookies,
     error::{CourseError, LoginError},
 };
@@ -8,7 +7,6 @@ use cxlib_error::AgentError;
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{ProtocolItem, collect::UserProtocolTrait};
 use log::info;
-use serde::Deserialize;
 use std::{hash::Hash, marker::PhantomData, ops::Deref};
 use ureq::Agent;
 
@@ -219,103 +217,15 @@ impl<UserProtocol: UserProtocolTrait> Session<UserProtocol> {
         Ok(courses)
     }
     pub fn get_classes(&self) -> Result<Vec<Class>, CourseError> {
-        let r = UserProtocol::back_clazz_data(self.deref())?;
-        #[derive(Deserialize, Debug, Default)]
-        struct Courses {
-            data: Vec<RawCourse>,
-        }
-
-        #[derive(Deserialize, Debug)]
-        struct RawClass {
-            #[serde(rename = "clazzId")]
-            id: i64,
-            // 0 | 1, 代表班级开课或结束。
-            state: Option<u8>,
-        }
-        #[derive(Deserialize, Debug)]
-        struct CourseContent {
-            // TODO: 该字段不应为 Option.
-            //       深层原因为，Class 与 Course 并非一对多的关系。
-            //       而是多对多的关系。
-            //       同时，当前实现混淆了两者的 ID, 可能会出现一些错误。
-            course: Option<Courses>,
-            #[serde(rename = "clazz")]
-            classes: Option<Vec<RawClass>>,
-            // TODO: 需要测试 `Option` 是否可以为 `flatten`.
-            #[serde(flatten)]
-            raw_course: Option<RawCourse>,
-            // 0 | 1, 代表班级开课或结束。
-            state: Option<u8>,
-        }
-
-        #[derive(Deserialize, Debug)]
-        struct ClassRaw {
-            // 可能为 ClassId, 也可能是 CourseId.
-            #[serde(rename = "key")]
-            id: serde_json::Value,
-            content: CourseContent,
-        }
-        impl ClassRaw {
-            pub fn into_class(self) -> Vec<Class> {
-                let Self { id, content } = self;
-                if id.is_i64() {
-                    let class_id = id.as_i64().unwrap();
-                    let CourseContent { course, state, .. } = content;
-                    let courses = course.unwrap_or_default().data;
-                    vec![Class::new(
-                        courses,
-                        ClassInfo::new_with_state(class_id, state),
-                    )]
-                } else if id.is_string() {
-                    // let course_id = id.as_str()
-                    //     .unwrap()
-                    //     .strip_prefix("tea_")
-                    //     .expect(
-                    //         "CourseId 格式不正确（不以 `tea_` 开头），请检查 API 是否存在更新。",
-                    //     )
-                    //     .parse()
-                    //     .unwrap();
-                    let CourseContent {
-                        classes,
-                        raw_course,
-                        ..
-                    } = content;
-                    classes
-                        .map(|classes| {
-                            classes.into_iter().map(|clazz| {
-                                Class::new(
-                                    raw_course.clone().into_iter().collect(),
-                                    ClassInfo::new_with_state(clazz.id, clazz.state),
-                                )
-                            })
-                        })
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<_>>()
-                } else {
-                    panic!(
-                        "JSON 解析失败：存在意外类型的 ClassId 或 CourseId(json 键为 \"key\"), 请检查 API 是否存在更新。"
-                    )
-                }
-            }
-        }
-
-        #[derive(Deserialize, Debug)]
-        struct GetCoursesR {
-            #[serde(rename = "channelList")]
-            channel_list: Option<Vec<ClassRaw>>,
-        }
-        let r2: GetCoursesR = r.into_body().read_json().log_unwrap();
-        let classes = if let Some(channel_list) = r2.channel_list {
-            channel_list
-                .into_iter()
-                .flat_map(|c| c.into_class())
-                .collect()
-        } else {
-            Err(LoginError::LoginExpired(
-                "`channelList` 字段为空!".to_string(),
-            ))?
-        };
+        let raw_classes = UserProtocol::get_classes(self.deref()).map_err(|e| match e {
+            cxlib_protocol::ProtocolError::AgentError(agent_error) => agent_error.into(),
+            cxlib_protocol::ProtocolError::DataParseError(e) => LoginError::LoginExpired(e),
+            _ => unreachable!("`UserProtocol::back_clazz_data` 不会返回该类型的错误。"),
+        })?;
+        let classes = raw_classes
+            .into_iter()
+            .flat_map(|raw_clazz| raw_clazz.into_class())
+            .collect();
         info!("用户[{}]已获取班级列表。", self.name());
         Ok(classes)
     }

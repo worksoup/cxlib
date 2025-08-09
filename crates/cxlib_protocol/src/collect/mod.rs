@@ -1,5 +1,7 @@
 #[cfg(feature = "captcha")]
 mod captcha;
+#[cfg(feature = "netdisk")]
+mod netdisk;
 #[cfg(feature = "sign")]
 mod sign;
 #[cfg(feature = "types")]
@@ -10,6 +12,8 @@ mod unused;
 mod user;
 #[cfg(feature = "captcha")]
 pub use captcha::*;
+#[cfg(feature = "netdisk")]
+pub use netdisk::*;
 #[cfg(feature = "sign")]
 pub use sign::*;
 #[cfg(feature = "types")]

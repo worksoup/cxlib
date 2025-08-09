@@ -15,7 +15,8 @@ use cxlib_internal::{
         },
     },
     protocol::collect::{
-        CaptchaProtocolTrait, SignProtocolTrait, TypesProtocolTrait, UserProtocolTrait,
+        CaptchaProtocolTrait, NetdiskProtocolTrait, SignProtocolTrait, TypesProtocolTrait,
+        UserProtocolTrait,
     },
     sign::{SignError, SignResult, SignTrait, SignnerTrait},
     types::{
@@ -146,6 +147,7 @@ impl SignParser {
 pub struct SignMainApp<
     CaptchaSolver = cxlib_internal::captcha::SlideImages,
     CaptchaProtocol = cxlib_internal::protocol::collect::CaptchaProtocol,
+    NetdiskProtocol = cxlib_internal::protocol::collect::NetdiskProtocol,
     SignProtocol = cxlib_internal::protocol::collect::SignProtocol,
     TypesProtocol = cxlib_internal::protocol::collect::TypesProtocol,
     UserProtocol = cxlib_internal::protocol::collect::UserProtocol,
@@ -156,7 +158,13 @@ pub struct SignMainApp<
     /// 以下文档由 AI 生成。
     ///
     ///  泛型标记(用于类型推导)
-    _p: PhantomData<(CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol)>,
+    _p: PhantomData<(
+        CaptchaProtocol,
+        NetdiskProtocol,
+        SignProtocol,
+        TypesProtocol,
+        UserProtocol,
+    )>,
     /// 以下文档由 AI 生成。
     ///
     ///  位置处理器标记
@@ -180,10 +188,20 @@ impl<CS, C, S, Ty, U, T> Default for SignMainApp<CS, C, S, Ty, U, T> {
         }
     }
 }
-impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, Preprocessor, T>
+impl<
+    CaptchaSolver,
+    CaptchaProtocol,
+    NetdiskProtocol,
+    SignProtocol,
+    TypesProtocol,
+    UserProtocol,
+    Preprocessor,
+    T,
+>
     SignMainApp<
         CaptchaSolver,
         CaptchaProtocol,
+        NetdiskProtocol,
         SignProtocol,
         TypesProtocol,
         UserProtocol,
@@ -208,15 +226,16 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
     /// 每个会话的签到结果映射
     pub fn process_typed_sign<'s, LocationGetter>(
         sign_name: String,
-        typed_sign: &mut Sign<TypesProtocol>,
+        typed_sign: &mut Sign<NetdiskProtocol>,
         (location_getter, preprocessor): (LocationGetter, &impl LocationPreprocessorTrait),
         sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
         cli_args: &CliArgs,
     ) -> Result<HashMap<&'s Session<UserProtocol>, SignResult>, Error>
     where
         CaptchaProtocol: CaptchaProtocolTrait,
+        NetdiskProtocol: NetdiskProtocolTrait + 'static,
         SignProtocol: SignProtocolTrait + Send + 'static,
-        TypesProtocol: TypesProtocolTrait + 'static,
+        TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait + Send + 'static,
         LocationGetter: LocationInfoGetterTrait,
         CaptchaSolver: CaptchaSolverTrait,
@@ -349,8 +368,9 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
     )
     where
         CaptchaProtocol: CaptchaProtocolTrait,
+        NetdiskProtocol: NetdiskProtocolTrait + 'static,
         SignProtocol: SignProtocolTrait + Send + 'static,
-        TypesProtocol: TypesProtocolTrait + 'static,
+        TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait + Send + 'static,
         LocationGetter: LocationInfoGetterTrait,
         CaptchaSolver: CaptchaSolverTrait,
@@ -358,7 +378,8 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
         let mut sessions = sessions.into_iter().peekable();
         let sign_name = raw_sign.name().clone();
         let mut typed_sign = if let Some(session) = sessions.peek() {
-            let typed_sign = Sign::<TypesProtocol>::from_raw(raw_sign, session);
+            let typed_sign =
+                Sign::<NetdiskProtocol>::from_raw::<TypesProtocol, _>(raw_sign, session);
             info!("成功判断签到[{sign_name}]的签到类型。");
             typed_sign
         } else {
@@ -387,8 +408,9 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
     ) -> Result<(), Error>
     where
         CaptchaProtocol: CaptchaProtocolTrait,
+        NetdiskProtocol: NetdiskProtocolTrait + 'static,
         SignProtocol: std::marker::Send + SignProtocolTrait + 'static,
-        TypesProtocol: TypesProtocolTrait + 'static,
+        TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
         Cxt: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<DatabaseGuard>,
         LocationGetter: LocationInfoGetterTrait + Copy,
@@ -530,8 +552,9 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
     where
         CaptchaSolver: CaptchaSolverTrait,
         CaptchaProtocol: CaptchaProtocolTrait,
+        NetdiskProtocol: NetdiskProtocolTrait + 'static,
         SignProtocol: SignProtocolTrait + std::marker::Send + 'static,
-        TypesProtocol: TypesProtocolTrait + 'static,
+        TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
         LocationGetter: LocationInfoGetterTrait + Copy,
     {
@@ -755,6 +778,7 @@ impl<CaptchaSolver, CaptchaProtocol, SignProtocol, TypesProtocol, UserProtocol, 
 impl<
     CaptchaSolver: CaptchaSolverTrait,
     CaptchaProtocol,
+    NetdiskProtocol,
     SignProtocol,
     TypesProtocol,
     UserProtocol,
@@ -765,6 +789,7 @@ impl<
     for SignMainApp<
         CaptchaSolver,
         CaptchaProtocol,
+        NetdiskProtocol,
         SignProtocol,
         TypesProtocol,
         UserProtocol,
@@ -777,10 +802,11 @@ where
         + AsRef<Preprocessor>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
     T: CourseDataFilterAndSorterTrait<Context>,
-    UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     CaptchaProtocol: CaptchaProtocolTrait,
+    NetdiskProtocol: NetdiskProtocolTrait + 'static,
     SignProtocol: Send + SignProtocolTrait + 'static,
-    TypesProtocol: TypesProtocolTrait + 'static,
+    TypesProtocol: TypesProtocolTrait,
+    UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     Preprocessor: LocationPreprocessorTrait,
 {
     type OwnedData = SignParser;
@@ -829,6 +855,7 @@ where
 impl<
     CaptchaSolver,
     CaptchaProtocol,
+    NetdiskProtocol,
     SignProtocol,
     TypesProtocol,
     UserProtocol,
@@ -840,6 +867,7 @@ impl<
     for SignMainApp<
         CaptchaSolver,
         CaptchaProtocol,
+        NetdiskProtocol,
         SignProtocol,
         TypesProtocol,
         UserProtocol,
@@ -850,16 +878,15 @@ where
     Context: AsRef<DatabaseGuard>
         + AsRef<AppInfo>
         + AsRef<Preprocessor>
-        + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
-        + 'static,
-    OwnedData: 'static,
+        + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
     T: CourseDataFilterAndSorterTrait<Context> + 'static,
-    UserProtocol: 'static + std::marker::Send + UserProtocolTrait,
-    CaptchaProtocol: 'static + CaptchaProtocolTrait,
+    CaptchaSolver: CaptchaSolverTrait + 'static,
+    CaptchaProtocol: CaptchaProtocolTrait + 'static,
+    NetdiskProtocol: NetdiskProtocolTrait + 'static,
     SignProtocol: Send + SignProtocolTrait + 'static,
     TypesProtocol: TypesProtocolTrait + 'static,
+    UserProtocol: UserProtocolTrait + Send + 'static,
     Preprocessor: LocationPreprocessorTrait + 'static,
-    CaptchaSolver: CaptchaSolverTrait + 'static,
 {
     /// 以下文档由 AI 生成。
     ///

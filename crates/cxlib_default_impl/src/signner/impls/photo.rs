@@ -1,7 +1,6 @@
 use crate::sign::PhotoSign;
 use cxlib_captcha::CaptchaSolverTrait;
-use cxlib_error_utils::CxlibResultUtils;
-use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait, TypesProtocolTrait};
+use cxlib_protocol::collect::{CaptchaProtocolTrait, NetdiskProtocolTrait, SignProtocolTrait};
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::{Photo, Session};
 use log::warn;
@@ -27,27 +26,40 @@ impl DefaultPhotoSignner {
         Self { path }
     }
 }
-impl<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, SignProtocol, TypesProtocol>
-    SignnerTrait<PhotoSign<TypesProtocol>, CaptchaSolver, CaptchaProtocol, SignProtocol>
+impl<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, SignProtocol, NetdiskProtocol>
+    SignnerTrait<PhotoSign<NetdiskProtocol>, CaptchaSolver, CaptchaProtocol, SignProtocol>
     for DefaultPhotoSignner
 where
     CaptchaProtocol: CaptchaProtocolTrait,
     SignProtocol: SignProtocolTrait,
-    TypesProtocol: TypesProtocolTrait + 'static,
+    NetdiskProtocol: NetdiskProtocolTrait + 'static,
 {
-    type ExtData<'e> = &'e Photo<TypesProtocol>;
+    type ExtData<'e> = &'e Photo<NetdiskProtocol>;
 
     fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
         &mut self,
-        sign: &PhotoSign<TypesProtocol>,
+        sign: &PhotoSign<NetdiskProtocol>,
         sessions: Sessions,
     ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
         let mut pic_map = Vec::new();
         let mut session_to_index = HashMap::new();
         let sessions = sessions.collect::<Vec<_>>();
-        if let Some(pic) = self.path.as_ref() {
+        #[cfg(not(feature = "upload-file"))]
+        {
+            warn!("未启用上传文件支持。");
+        }
+        if cfg!(feature = "upload-file")
+            && let Some(pic) = self.path.as_ref()
+        {
+            #[cfg(not(feature = "upload-file"))]
+            {
+                let _ = pic;
+                unreachable!("未启用上传文件支持。");
+            }
             // TODO: 需要测试多个用户能否用同一个photo token签到。
+            #[cfg(feature = "upload-file")]
             for session in sessions.clone() {
+                use cxlib_error_utils::CxlibResultUtils;
                 let photo = Photo::get_from_file(session, pic).log_ok();
                 if let Some(photo) = photo {
                     pic_map.push(photo);
@@ -79,7 +91,7 @@ where
             let index = session_to_index[session.uid()];
             if let Some(photo) = pic_map.get(index).cloned() {
                 let a = <Self as SignnerTrait<
-                    PhotoSign<TypesProtocol>,
+                    PhotoSign<NetdiskProtocol>,
                     CaptchaSolver,
                     CaptchaProtocol,
                     SignProtocol,
@@ -99,9 +111,9 @@ where
 
     #[inline]
     fn sign_single<U>(
-        sign: &PhotoSign<TypesProtocol>,
+        sign: &PhotoSign<NetdiskProtocol>,
         session: &Session<U>,
-        photo: &Photo<TypesProtocol>,
+        photo: &Photo<NetdiskProtocol>,
     ) -> Result<SignResult, SignError> {
         sign.check_state_and_do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
             session,

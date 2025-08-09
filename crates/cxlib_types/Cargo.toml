@@ -5,7 +5,9 @@ authors.workspace = true
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
+[features]
+default = ["upload-file"]
+upload-file = ["cxlib_protocol/upload-file"]
 [dependencies]
 bincode.workspace = true
 chrono.workspace = true
@@ -13,7 +15,11 @@ cx_enc_utils = { path = "../../gizmos/cx_enc_utils" }
 cxlib_base_types = { path = "../cxlib_base_types" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_error_utils = { path = "../cxlib_error_utils" }
-cxlib_protocol = { path = "../cxlib_protocol", features = ["types", "user"] }
+cxlib_protocol = { path = "../cxlib_protocol", features = [
+    "types",
+    "user",
+    "netdisk",
+] }
 derive-where.workspace = true
 des.workspace = true
 getset2.workspace = true

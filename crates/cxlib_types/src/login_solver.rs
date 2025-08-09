@@ -1,12 +1,11 @@
 use crate::error::LoginError;
 use cx_enc_utils::crypto::pkcs7_pad;
-use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{ProtocolItem, collect::UserProtocolTrait};
-use log::{trace, warn};
+use log::warn;
 use std::{
     any::{Any, TypeId},
     marker::PhantomData,
-    ops::{Deref, Index},
+    ops::Deref,
 };
 use ureq::Agent;
 
@@ -26,10 +25,12 @@ impl<UserProtocol: 'static> LoginSolverTrait
 {
     type UserProtocol = UserProtocol;
 
+    #[inline]
     fn login_type(&self) -> &str {
         self.deref().login_type()
     }
 
+    #[inline]
     fn is_logged_in(&self, agent: &Agent) -> bool
     where
         Self::UserProtocol: UserProtocolTrait,
@@ -37,6 +38,7 @@ impl<UserProtocol: 'static> LoginSolverTrait
         self.deref().is_logged_in(agent)
     }
 
+    #[inline]
     fn login_s(&self, account: &str, enc_passwd: &str) -> Result<Agent, LoginError>
     where
         Self::UserProtocol: UserProtocolTrait,
@@ -44,6 +46,7 @@ impl<UserProtocol: 'static> LoginSolverTrait
         self.deref().login_s(account, enc_passwd)
     }
 
+    #[inline]
     fn pwd_enc(&self, pwd: String) -> Result<String, LoginError> {
         self.deref().pwd_enc(pwd)
     }
@@ -61,20 +64,15 @@ impl<UserProtocol> DefaultLoginSolver<UserProtocol>
 where
     UserProtocol: UserProtocolTrait,
 {
+    #[inline]
     pub fn find_stu_name_in_html(agent: &Agent) -> Result<String, LoginError> {
-        let login_expired_err = || LoginError::LoginExpired("无法获取姓名！".to_string());
-        let r = UserProtocol::account_manage(agent)?;
-        let html_content = r.into_body().read_to_string().log_unwrap();
-        trace!("{html_content}");
-        let e = html_content
-            .find("colorBlue")
-            .ok_or_else(login_expired_err)?;
-        let html_content = html_content.index(e..html_content.len()).to_owned();
-        let e = html_content.find('>').unwrap() + 1;
-        let html_content = html_content.index(e..html_content.len()).to_owned();
-        let name = html_content
-            .index(0..html_content.find('<').unwrap())
-            .trim();
+        let name = UserProtocol::find_name_in_account_manage_page(agent).map_err(|e| match e {
+            cxlib_protocol::ProtocolError::AgentError(agent_error) => {
+                LoginError::AgentError(agent_error)
+            }
+            cxlib_protocol::ProtocolError::DataParseError(e) => LoginError::LoginExpired(e),
+            _ => unreachable!(),
+        })?;
         if name.is_empty() {
             return Err(LoginError::LoginExpired("姓名为空！".to_string()));
         }
@@ -82,6 +80,7 @@ where
     }
 }
 impl<UserProtocol> DefaultLoginSolver<UserProtocol> {
+    #[inline]
     pub fn des_enc(data: &[u8], key: [u8; 8]) -> String {
         use des::{
             Des,
@@ -177,11 +176,13 @@ where
 
 pub struct UntypedLoginSolver<UserProtocol>(Box<dyn LoginSolverTrait<UserProtocol = UserProtocol>>);
 impl<UserProtocol: 'static> UntypedLoginSolver<UserProtocol> {
+    #[inline]
     pub fn from_typed<LoginSolver: LoginSolverTrait<UserProtocol = UserProtocol>>(
         t: LoginSolver,
     ) -> Self {
         UntypedLoginSolver(Box::new(t))
     }
+    #[inline]
     pub fn downcast<T: LoginSolverTrait>(self) -> Result<T, Self> {
         // Get `TypeId` of the type this function is instantiated with.
         let t = TypeId::of::<T>();

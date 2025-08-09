@@ -1,7 +1,8 @@
-use crate::ClassExt;
+use crate::ext::ClassExt;
 use cxlib_protocol::collect::UserProtocolTrait;
-use cxlib_types::{Class, CourseError, CourseWithInfo, Session};
 use std::collections::HashMap;
+
+use crate::{Class, CourseError, CourseWithInfo, Session};
 
 pub trait CourseExt {
     /// 通过用户会话获取班级列表。

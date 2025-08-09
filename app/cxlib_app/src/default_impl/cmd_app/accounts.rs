@@ -51,9 +51,7 @@ where
 impl<Context, OwnedData, UserProtocol> CmdMetaAppTrait<Context, OwnedData>
     for AccountsCmdApp<UserProtocol>
 where
-    Context:
-        AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<DatabaseGuard> + 'static,
-    OwnedData: 'static,
+    Context: AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + AsRef<DatabaseGuard>,
     UserProtocol: UserProtocolTrait + 'static,
 {
     #[inline]

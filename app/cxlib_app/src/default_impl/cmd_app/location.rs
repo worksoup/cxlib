@@ -8,8 +8,9 @@ use cxlib_error_utils::{CxlibResultUtils, MaybeFatalError};
 use cxlib_internal::{
     protocol::collect::{TypesProtocolTrait, UserProtocolTrait},
     types::{
-        __private::UnhandledGeoaddr, Course, CourseWithInfo, Geolocation,
-        UnhandledGeoAddrWithRangeExt, UntypedLoginSolver, ext::CourseExt,
+        __private::UnhandledGeoaddr,
+        Course, CourseWithInfo, Geolocation, UnhandledGeoAddrWithRangeExt, UntypedLoginSolver,
+        ext::{CourseExt, CourseWithInfoExt},
     },
 };
 use cxlib_store::AppInfo;
@@ -640,17 +641,15 @@ impl<
         Self::parse(command, &mut db_g, map.clone(), cxt.as_ref())
     }
 }
-impl<
-    'cxt,
+impl<'cxt, TypesProtocol, UserProtocol, Context, OwnedData> CmdMetaAppTrait<Context, OwnedData>
+    for LocationCmdApp<TypesProtocol, UserProtocol>
+where
     TypesProtocol: TypesProtocolTrait + 'static,
     UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
     Context: AsRef<DatabaseGuard>
         + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>
         + AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
-        + AsRef<AppInfo>
-        + 'static,
-    OwnedData: 'static,
-> CmdMetaAppTrait<Context, OwnedData> for LocationCmdApp<TypesProtocol, UserProtocol>
+        + AsRef<AppInfo>,
 {
     #[inline]
     fn read_owned_data(

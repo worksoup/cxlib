@@ -187,9 +187,7 @@ impl<'cxt, Context, OwnedData, LoginTypeEnum: LoginTypeEnumTrait, UserProtocol>
     CmdMetaAppTrait<Context, OwnedData> for AccountCmdApp<LoginTypeEnum, UserProtocol>
 where
     Context: AsRef<<AccountTable<UserProtocol> as TableDefinitionTrait>::Context<'cxt>>
-        + AsRef<DatabaseGuard>
-        + 'static,
-    OwnedData: 'static,
+        + AsRef<DatabaseGuard>,
     UserProtocol: Send + Sync + UserProtocolTrait + 'static,
 {
     #[inline]

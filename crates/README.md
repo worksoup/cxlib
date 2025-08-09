@@ -46,8 +46,6 @@
 
   一些数据类型，如网盘图片类型 `Photo`, 课程类型 `Course`, 地理位置类型 `Location` 等及相关操作。
 
-  另见 [`cxlib_types_ext`](./cxlib_types_ext), 此后不再单独列出。
-
 ## 5
 
 - ### [`cxlib_sign`](./cxlib_sign)

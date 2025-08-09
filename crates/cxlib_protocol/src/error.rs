@@ -16,11 +16,13 @@ pub enum ProtocolError {
 }
 
 impl From<ureq::Error> for ProtocolError {
+    #[inline]
     fn from(value: ureq::Error) -> Self {
         Self::AgentError(AgentError::from(value))
     }
 }
 impl From<Box<ureq::Error>> for ProtocolError {
+    #[inline]
     fn from(value: Box<ureq::Error>) -> Self {
         Self::AgentError(AgentError::from(value))
     }

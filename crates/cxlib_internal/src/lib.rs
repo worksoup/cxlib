@@ -7,8 +7,5 @@ pub mod error {
     pub use cxlib_error::*;
     pub use cxlib_error_utils::*;
 }
-pub mod types {
-    pub use cxlib_types::*;
-    pub use cxlib_types_ext as ext;
-}
+pub use cxlib_types as types;
 pub use cxlib_utils as utils;

@@ -109,6 +109,7 @@ impl RawSign {
             class_ended,
         }
     }
+    #[inline]
     pub fn fmt_without_course_info(&self) -> String {
         let name_width = get_width_str_should_be(self.name.as_str(), 12);
         if let Some(mills) = self.start_time_mills {
@@ -130,19 +131,8 @@ impl RawSign {
             )
         }
     }
-    pub fn get_sign_detail<TypesProtocol, UserProtocol>(
-        active_id: &str,
-        session: &Session<UserProtocol>,
-    ) -> Result<SignDetail, AgentError>
-    where
-        TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait,
-    {
-        let r = TypesProtocol::sign_detail(session, active_id)?;
-        Ok(r.into())
-    }
     #[inline]
-    pub fn get_detail<TypesProtocol, UserProtocol>(
+    pub fn get_sign_detail<TypesProtocol, UserProtocol>(
         &self,
         session: &Session<UserProtocol>,
     ) -> Result<SignDetail, AgentError>
@@ -150,7 +140,7 @@ impl RawSign {
         TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait,
     {
-        Self::get_sign_detail::<TypesProtocol, UserProtocol>(&self.active_id, session)
+        Ok(TypesProtocol::sign_detail(session, &self.active_id)?.into())
     }
 }
 impl RawSign {

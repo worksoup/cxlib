@@ -27,7 +27,10 @@ pub struct LocationsParser {
 #[derive(Default)]
 pub struct LocationsCmdApp;
 
-impl<Context: AsRef<DatabaseGuard>> AppTrait<Context> for LocationsCmdApp {
+impl<Context> AppTrait<Context> for LocationsCmdApp
+where
+    Context: AsRef<DatabaseGuard>,
+{
     type OwnedData = LocationsParser;
 
     fn run(
@@ -152,8 +155,9 @@ impl<Context: AsRef<DatabaseGuard>> AppTrait<Context> for LocationsCmdApp {
         }
     }
 }
-impl<Context: AsRef<DatabaseGuard> + 'static, OwnedData: 'static>
-    CmdMetaAppTrait<Context, OwnedData> for LocationsCmdApp
+impl<Context, OwnedData> CmdMetaAppTrait<Context, OwnedData> for LocationsCmdApp
+where
+    Context: AsRef<DatabaseGuard>,
 {
     #[inline]
     fn read_owned_data(&self, _: &Context, matches: &[&ArgMatches]) -> Self::OwnedData {

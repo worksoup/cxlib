@@ -16,7 +16,10 @@ pub struct CompletionParser {
 }
 #[derive(Default)]
 pub struct CompletionCmdApp;
-impl<Context: AsRef<Command>> AppTrait<Context> for CompletionCmdApp {
+impl<Context> AppTrait<Context> for CompletionCmdApp
+where
+    Context: AsRef<Command>,
+{
     type OwnedData = CompletionParser;
 
     fn run(&self, command: &Context, CompletionParser { shell, output }: Self::OwnedData) {
@@ -32,8 +35,9 @@ impl<Context: AsRef<Command>> AppTrait<Context> for CompletionCmdApp {
         }
     }
 }
-impl<Context: AsRef<Command> + 'static, OwnedData: 'static> CmdMetaAppTrait<Context, OwnedData>
-    for CompletionCmdApp
+impl<Context, OwnedData> CmdMetaAppTrait<Context, OwnedData> for CompletionCmdApp
+where
+    Context: AsRef<Command>,
 {
     #[inline]
     fn read_owned_data(

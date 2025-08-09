@@ -3,13 +3,15 @@ name = "cxlib_default_impl"
 edition = "2024"
 version.workspace = true
 authors.workspace = true
-
+[features]
+default = ["upload-file"]
+upload-file = ["cxlib_types/upload-file"]
 [dependencies]
 cx_interact = { path = "../../gizmos/cx_interact" }
 cxlib_captcha = { path = "../cxlib_captcha" }
 cxlib_error_utils = { path = "../cxlib_error_utils" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
-cxlib_protocol = { path = "../cxlib_protocol", features = ["default_impl"] }
+cxlib_protocol = { path = "../cxlib_protocol", features = [] }
 cxlib_sign = { path = "../cxlib_sign" }
 cxlib_types = { path = "../cxlib_types" }
 derive-where.workspace = true

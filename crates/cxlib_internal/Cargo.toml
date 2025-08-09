@@ -15,6 +15,5 @@ cxlib_imageproc = { path = "../cxlib_imageproc" }
 cxlib_protocol = { path = "../cxlib_protocol" }
 cxlib_sign = { path = "../cxlib_sign" }
 cxlib_types = { path = "../cxlib_types" }
-cxlib_types_ext = { path = "../cxlib_types_ext" }
 cxlib_utils = { path = "../cxlib_utils" }
 thiserror.workspace = true

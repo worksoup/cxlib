@@ -1,6 +1,5 @@
 use cxlib_error_utils::MaybeFatalError;
 use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
-use cxlib_types::{Activity, ActivityError, CourseWithInfo, Session};
 use log::{debug, error, warn};
 use std::{
     ops::DerefMut,
@@ -10,6 +9,9 @@ use std::{
         mpsc::{Receiver, RecvError},
     },
 };
+
+use crate::{Activity, ActivityError, CourseWithInfo, Session, ext::CourseWithInfoExt};
+
 /// 类型别名，代表接收端所接受数据的类型。
 pub type ActivitiesSessionsPair<UserProtocol> = (Vec<Activity>, Vec<Session<UserProtocol>>);
 /// 接收端本身的类型。

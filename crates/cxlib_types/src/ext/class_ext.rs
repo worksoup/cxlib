@@ -1,8 +1,9 @@
 use cxlib_error_utils::MaybeFatalError;
 use cxlib_protocol::collect::UserProtocolTrait;
-use cxlib_types::{Class, CourseError, Session};
 use log::warn;
 use std::collections::{HashMap, hash_map::Entry};
+
+use crate::{Class, CourseError, Session};
 
 pub trait ClassExt {
     /// 通过用户会话获取班级列表。

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 /// 该文档为AI生成。命令行元应用trait，扩展了MetaAppTrait的功能
 ///
 /// 提供从命令行参数解析自有数据的能力，用于构建复杂的命令行应用结构
-pub trait CmdMetaAppTrait<Context: 'static = (), OwnedData: 'static = (), Output: 'static = ()>
+pub trait CmdMetaAppTrait<Context = (), OwnedData = (), Output = ()>
 where
     Self: MetaAppTrait<CmdApp<Context, OwnedData, Output>, Context, Output>,
 {
@@ -28,9 +28,6 @@ type MetaAppInvoker<Context, Output> = Box<dyn Fn(&Context, &Vec<&ArgMatches>) -
 impl<Context, OwnedData, Output, T>
     MetaAppTrait<CmdApp<Context, OwnedData, Output>, Context, Output> for T
 where
-    Context: 'static,
-    OwnedData: 'static,
-    Output: 'static,
     T: CmdMetaAppTrait<Context, OwnedData, Output> + 'static,
     <Self as AppTrait<Context, Output>>::OwnedData: CommandFactory,
 {
@@ -205,9 +202,6 @@ impl<Context, OwnedData, Output> CmdApp<Context, OwnedData, Output> {
     ) -> Self
     where
         <MetaApp as AppTrait<Context, Output>>::OwnedData: CommandFactory,
-        Context: 'static,
-        OwnedData: 'static,
-        Output: 'static,
     {
         let command = <MetaApp as AppTrait<Context, Output>>::OwnedData::command();
         let name = command.get_name().to_owned();

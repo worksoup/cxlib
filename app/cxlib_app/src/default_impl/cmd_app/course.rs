@@ -147,9 +147,7 @@ impl<UserProtocol, Context, OwnedData> CmdMetaAppTrait<Context, OwnedData>
     for CoursesCmdApp<UserProtocol>
 where
     UserProtocol: std::marker::Send + UserProtocolTrait + 'static,
-    Context:
-        AsRef<DatabaseGuard> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>> + 'static,
-    OwnedData: 'static,
+    Context: AsRef<DatabaseGuard> + AsRef<GlobalMultimap<UntypedLoginSolver<UserProtocol>>>,
 {
     #[inline]
     fn read_owned_data(

@@ -7,12 +7,12 @@ use std::marker::PhantomData;
 
 #[derive_where(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 #[derive(Serialize)]
-pub struct PhotoSign<TypesProtocol> {
+pub struct PhotoSign<NetdiskProtocol> {
     raw_sign: RawSign,
     #[serde(skip)]
-    _p: PhantomData<TypesProtocol>,
+    _p: PhantomData<NetdiskProtocol>,
 }
-impl<TypesProtocol> PhotoSign<TypesProtocol> {
+impl<NetdiskProtocol> PhotoSign<NetdiskProtocol> {
     #[inline]
     pub fn new(raw_sign: RawSign) -> Self {
         Self {
@@ -26,15 +26,15 @@ impl<TypesProtocol> PhotoSign<TypesProtocol> {
         self.raw_sign
     }
 }
-impl<TypesProtocol> SignTrait for PhotoSign<TypesProtocol> {
+impl<NetdiskProtocol> SignTrait for PhotoSign<NetdiskProtocol> {
     type PreSignData = ();
-    type Data = Photo<TypesProtocol>;
+    type Data = Photo<NetdiskProtocol>;
     #[inline]
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
         _: &(),
-        runtime_data: &Photo<TypesProtocol>,
+        runtime_data: &Photo<NetdiskProtocol>,
     ) -> PPTSignHelper
     where
         SignProtocol: SignProtocolTrait,
