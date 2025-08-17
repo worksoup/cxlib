@@ -1,5 +1,9 @@
-use crate::sign::{RawSign, SignTrait};
-use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
+use crate::sign::RawSign;
+use cxlib_protocol::{
+    collect::SignProtocolTrait,
+    utils::{SignHelperTrait, SignUrlHelper},
+};
+use cxlib_sign::api2507::SignApi2507;
 use cxlib_types::{Photo, Session};
 use derive_where::derive_where;
 use serde::Serialize;
@@ -26,7 +30,7 @@ impl<NetdiskProtocol> PhotoSign<NetdiskProtocol> {
         self.raw_sign
     }
 }
-impl<NetdiskProtocol> SignTrait for PhotoSign<NetdiskProtocol> {
+impl<NetdiskProtocol> SignApi2507 for PhotoSign<NetdiskProtocol> {
     type PreSignData = ();
     type Data = Photo<NetdiskProtocol>;
     #[inline]
@@ -35,11 +39,11 @@ impl<NetdiskProtocol> SignTrait for PhotoSign<NetdiskProtocol> {
         session: &Session<U>,
         _: &(),
         runtime_data: &Photo<NetdiskProtocol>,
-    ) -> PPTSignHelper
+    ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {
-        SignProtocol::photo_sign_url(
+        SignProtocol::sign_in_url().photo_sign_url(
             (session.uid(), session.fid(), session.name()),
             self.raw_sign.active_id(),
             runtime_data.get_object_id(),

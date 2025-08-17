@@ -151,10 +151,10 @@ pub trait CaptchaProtocolTrait {
         Ok(trim_response_to_json(get.call()?.into_body().into_reader()).log_unwrap())
     }
 
-    fn get_captcha_id(client: &Agent) -> Result<CaptchaId, ProtocolError> {
+    fn get_captcha_id(agent: &Agent) -> Result<CaptchaId, ProtocolError> {
         let url = Self::my_sign_captcha_utils_url();
         debug!("{url}");
-        let r = client.get(&url.to_string()).call()?;
+        let r = agent.get(&url.to_string()).call()?;
         let js = r.into_body().read_to_string().log_unwrap();
         js.find("captchaId: '")
             .map(|start_of_captcha_id| {

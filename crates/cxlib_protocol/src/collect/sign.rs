@@ -1,9 +1,9 @@
-use cxlib_base_types::Geoaddr;
 use cxlib_error::AgentError;
 use cxlib_error_utils::CxlibResultUtils;
 use ureq::{Agent, Body, http::Response};
 
 pub use types::*;
+
 mod types {
     use cx_gizmo_types::OptionPair;
     use cxlib_base_types::UnhandledGeoAddrWithRange;
@@ -185,12 +185,16 @@ pub trait SignProtocolTrait {
     }
     #[inline]
     fn ppt_sign_url() -> &'static str {
-        // SignProtocol::SIGN_IN
         SignProtocol::PPT_SIGN
     }
     #[inline]
     fn pre_sign_url() -> &'static str {
         SignProtocol::PRE_SIGN
+    }
+    /// 新签到API 2507
+    #[inline]
+    fn sign_in_url() -> &'static str {
+        SignProtocol::SIGN_IN
     }
     // analysis
     #[inline]
@@ -221,13 +225,18 @@ pub trait SignProtocolTrait {
     }
     // 检查是否需要Captcha验证。
     #[inline]
-    fn check_if_validate(client: &Agent, active_id: &str) -> Result<Response<Body>, AgentError> {
+    fn check_if_validate(client: &Agent, active_id: &str) -> Result<bool, AgentError> {
+        #[derive(Debug, serde::Deserialize)]
+        struct Res {
+            result: u8,
+        }
         let url = Self::check_if_validate_url();
-        Ok(client
+        let r = client
             .get(&format!(
                 "{url}?DB_STRATEGY=PRIMARY_KEY&STRATEGY_PARA=activeId&activeId={active_id}&&puid="
             ))
-            .call()?)
+            .call()?;
+        Ok(r.into_body().read_json::<Res>().log_unwrap().result != 0)
     }
     /// 签到码检查
     ///
@@ -291,123 +300,6 @@ pub trait SignProtocolTrait {
             .call()?)
     }
 
-    // 签到
-    #[inline]
-    fn general_sign_url(
-        (uid, fid, stu_name): (&str, &str, &str),
-        active_id: &str,
-    ) -> crate::utils::PPTSignHelper {
-        let url = Self::ppt_sign_url();
-        format!("{url}?activeId={active_id}&uid={uid}&clientip=&latitude=-1&longitude=-1&appType=15&fid={fid}&name={stu_name}").into()
-    }
-    #[inline]
-    fn photo_sign_url(
-        (uid, fid, stu_name): (&str, &str, &str),
-        active_id: &str,
-        object_id: &str,
-    ) -> crate::utils::PPTSignHelper {
-        // NOTE 存疑。
-        let url = Self::ppt_sign_url();
-        format!("{url}?activeId={active_id}&uid={uid}&clientip=&useragent=&latitude=-1&longitude=-1&appType=15&fid={fid}&objectId={object_id}&name={}", percent_encoding::utf8_percent_encode(stu_name, percent_encoding::NON_ALPHANUMERIC)).into()
-    }
-
-    fn qrcode_sign_url(
-        (uid, fid, stu_name): (&str, &str, &str),
-        enc: &str,
-        active_id: &str,
-        location: Option<&Geoaddr>,
-    ) -> crate::utils::PPTSignHelper {
-        let url = Self::ppt_sign_url();
-        // TODO: 存疑。
-        if let Some(addr) = location {
-            let (addr,geolocation) = addr.decompose_as();
-            let (lon,lat,alt) = {let l = geolocation;(l.lon(),l.lat(),l.alt())};
-            let location_str = format!(
-                r#"{{"result":"1","address":"{addr}","latitude":{lat},"longitude":{lon},"altitude":{alt}}}"#
-            );
-            let location_str = percent_encoding::utf8_percent_encode(
-                &location_str,
-                percent_encoding::NON_ALPHANUMERIC,
-            )
-                .to_string();
-            format!(
-                r#"{url}?enc={enc}&name={stu_name}&activeId={active_id}&uid={uid}&clientip=&location={location_str}&latitude=-1&longitude=-1&fid={fid}&appType=15"#
-            )
-        } else {
-            format!(
-                r#"{url}?enc={enc}&name={stu_name}&activeId={active_id}&uid={uid}&clientip=&location=&latitude=-1&longitude=-1&fid={fid}&appType=15"#
-            )
-        }.into()
-    }
-    #[inline]
-    fn location_sign_url(
-        (uid, fid, stu_name): (&str, &str, &str),
-        (addr, lat, lon): (&str, &str, &str),
-        active_id: &str,
-        is_auto_location: bool,
-    ) -> crate::utils::PPTSignHelper {
-        let url = Self::ppt_sign_url();
-        let if_tijiao = if is_auto_location { 1 } else { 0 };
-        format!("{url}?name={stu_name}&address={addr}&activeId={active_id}&uid={uid}&clientip=&latitude={lat}&longitude={lon}&fid={fid}&appType=15&ifTiJiao={if_tijiao}").into()
-    }
-
-    #[inline]
-    fn signcode_sign_url(
-        (uid, fid, stu_name): (&str, &str, &str),
-        active_id: &str,
-        signcode: &str,
-    ) -> crate::utils::PPTSignHelper {
-        let url = Self::ppt_sign_url();
-        format!("{url}?activeId={active_id}&uid={uid}&clientip=&latitude=-1&longitude=-1&appType=15&fid={fid}&name={stu_name}&signCode={signcode}").into()
-    }
-
-    #[inline]
-    fn general_sign(
-        agent: &Agent,
-        session: (&str, &str, &str),
-        active_id: &str,
-    ) -> Result<Response<Body>, AgentError> {
-        Self::general_sign_url(session, active_id).get(agent)
-    }
-
-    #[inline]
-    fn photo_sign(
-        agent: &Agent,
-        session: (&str, &str, &str),
-        active_id: &str,
-        object_id: &str,
-    ) -> Result<Response<Body>, AgentError> {
-        Self::photo_sign_url(session, active_id, object_id).get(agent)
-    }
-    #[inline]
-    fn qrcode_sign(
-        agent: &Agent,
-        session: (&str, &str, &str),
-        enc: &str,
-        active_id: &str,
-        location: Option<&Geoaddr>,
-    ) -> Result<Response<Body>, AgentError> {
-        Self::qrcode_sign_url(session, enc, active_id, location).get(agent)
-    }
-    #[inline]
-    fn location_sign(
-        agent: &Agent,
-        session: (&str, &str, &str),
-        location: (&str, &str, &str),
-        active_id: &str,
-        is_auto_location: bool,
-    ) -> Result<Response<Body>, AgentError> {
-        Self::location_sign_url(session, location, active_id, is_auto_location).get(agent)
-    }
-    #[inline]
-    fn signcode_sign(
-        agent: &Agent,
-        session: (&str, &str, &str),
-        active_id: &str,
-        signcode: &str,
-    ) -> Result<Response<Body>, AgentError> {
-        Self::signcode_sign_url(session, active_id, signcode).get(agent)
-    }
     // 预签到
     #[inline]
     fn pre_sign(

@@ -1,6 +1,9 @@
 use crate::sign::RawSign;
-use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
-use cxlib_sign::{SignError, SignResult, SignTrait};
+use cxlib_protocol::{
+    collect::SignProtocolTrait,
+    utils::{SignHelperTrait, SignUrlHelper},
+};
+use cxlib_sign::{SignError, SignResult, api2507::SignApi2507};
 use cxlib_types::Session;
 use serde::Serialize;
 
@@ -54,7 +57,7 @@ impl GestureOrSigncodeSign {
     }
 }
 
-impl SignTrait for GestureOrSigncodeSign {
+impl SignApi2507 for GestureOrSigncodeSign {
     type PreSignData = ();
     type Data = str;
 
@@ -64,17 +67,16 @@ impl SignTrait for GestureOrSigncodeSign {
         session: &Session<U>,
         _: &Self::PreSignData,
         data: &Self::Data,
-    ) -> PPTSignHelper
+    ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {
-        SignProtocol::signcode_sign_url(
+        SignProtocol::sign_in_url().signcode_sign_url(
             (session.uid(), session.fid(), session.name()),
             self.raw_sign.active_id(),
             data,
         )
     }
-
     #[inline]
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign

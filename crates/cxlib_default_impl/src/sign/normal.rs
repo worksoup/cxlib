@@ -1,5 +1,6 @@
 use crate::sign::{RawSign, SignTrait};
-use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
+use cxlib_protocol::{collect::SignProtocolTrait, utils::SignUrlHelper};
+use cxlib_sign::api2507::SignApi2507;
 use cxlib_types::Session;
 use serde::Serialize;
 
@@ -14,7 +15,7 @@ impl NormalSign {
         self.raw_sign
     }
 }
-impl SignTrait for NormalSign {
+impl SignApi2507 for NormalSign {
     type PreSignData = ();
     type Data = ();
 
@@ -24,7 +25,7 @@ impl SignTrait for NormalSign {
         session: &Session<U>,
         _: &(),
         runtime_data: &Self::Data,
-    ) -> PPTSignHelper
+    ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {

@@ -7,13 +7,15 @@ use cxlib_protocol::{
         CaptchaId, CaptchaProtocolTrait, PreSignResult, SignProtocolTrait, SignState,
         ValidSignState,
     },
-    utils::PPTSignHelper,
+    utils::{SignHelperTrait, SignUrlHelper},
 };
 use cxlib_types::{CourseWithInfo, RawSign, Session, UnhandledGeoAddrWithRange};
 use log::info;
 use std::{collections::HashMap, ops::Add};
 
 mod error;
+
+pub mod api2507;
 pub mod utils;
 
 pub use error::*;
@@ -42,7 +44,7 @@ pub trait SignTrait: Ord {
         session: &Session<U>,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
-    ) -> PPTSignHelper
+    ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait;
     /// 获取各签到类型内部对原始签到类型的引用。
@@ -67,52 +69,8 @@ pub trait SignTrait: Ord {
                 false
             }
     }
-    /// 获取签到后状态。参见返回类型 [`SignState`].
-    fn guess_sign_result_by_state<SignProtocol, U>(
-        &self,
-        session: &Session<U>,
-    ) -> Result<Option<SignResult>, SignError>
-    where
-        SignProtocol: SignProtocolTrait,
-    {
-        let state = SignProtocol::get_sign_state(session, self.as_inner().active_id())?;
-        let result = match state {
-            SignState::ValidSignState(valid_sign_state) => match valid_sign_state {
-                ValidSignState::未签 => {
-                    return Ok(None);
-                }
-                ValidSignState::签到成功 => SignResult::Success,
-                ValidSignState::教师代签 => SignResult::PartialSuccess {
-                    msg: format!(
-                        "用户[`{}`]签到[`{}`]为教师代签。",
-                        session.name(),
-                        self.as_inner().name()
-                    ),
-                },
-                state @ (ValidSignState::请假
-                | ValidSignState::病假
-                | ValidSignState::事假
-                | ValidSignState::公假) => SignResult::PartialSuccess {
-                    msg: format!(
-                        "用户[`{}`]签到[`{}`]为请假状态[`{state:?}`]。",
-                        session.name(),
-                        self.as_inner().name()
-                    ),
-                },
-                state @ (ValidSignState::缺勤
-                | ValidSignState::迟到
-                | ValidSignState::早退
-                | ValidSignState::签到已过期) => SignResult::Failure {
-                    msg: format!("签到失败，状态为[`{state:?}`]。",),
-                },
-            },
-            SignState::Other(number) => SignResult::Failure {
-                msg: format!("签到状态未知（`{number}`），可能是服务端 bug。"),
-            },
-        };
-        Ok(Some(result))
-    }
     /// 预签到。
+    #[inline]
     fn pre_sign<CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -129,6 +87,7 @@ pub trait SignTrait: Ord {
             &(),
         )
     }
+    #[inline]
     fn pre_check_data<UserProtocol>(
         &self,
         session: &Session<UserProtocol>,
@@ -141,7 +100,7 @@ pub trait SignTrait: Ord {
     /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
     /// 调用 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 进行判断，如果真，则调用 [`sign_unchecked`](SignTrait::sign_unchecked), 否则返回
     /// [`SignResult::Fail`]{msg: "签到未准备好！".to_string()}
-    fn sign<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, SignProtocol, U>(
+    fn sign<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
         pre_sign_url: &str,
@@ -152,11 +111,12 @@ pub trait SignTrait: Ord {
     where
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait,
+        CaptchaSolver: CaptchaSolverTrait,
     {
         match self.pre_check_data(session, data)? {
             Ok(_) => {
                 let url = self.sign_url::<SignProtocol, U>(session, pre_sign_data, data);
-                try_secondary_verification::<CaptchaSolver, CaptchaProtocol, SignProtocol, Self>(
+                try_secondary_verification::<CaptchaSolver, CaptchaProtocol>(
                     session,
                     url,
                     pre_sign_result_data.first(),
@@ -182,9 +142,9 @@ pub trait SignTrait: Ord {
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait,
     {
-        let guess_result = self
-            .as_inner()
-            .guess_sign_result_by_state::<SignProtocol, U>(session)?;
+        let state = SignProtocol::get_sign_state(session, self.as_inner().active_id())?;
+        let guess_result =
+            SignResult::guess_by_state(state, session.name(), self.as_inner().name());
         if let Some(guess_result) = guess_result {
             return Ok(guess_result);
         }
@@ -215,16 +175,17 @@ impl SignTrait for RawSign {
         session: &Session<UserProtocol>,
         _: &(),
         _: &(),
-    ) -> PPTSignHelper
+    ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {
-        SignProtocol::general_sign_url(
+        SignProtocol::sign_in_url().general_sign_url(
             (session.uid(), session.fid(), session.name()),
             self.active_id(),
         )
     }
 
+    #[inline]
     fn as_inner(&self) -> &RawSign {
         self
     }
@@ -271,6 +232,40 @@ pub enum SignResult {
     },
 }
 impl SignResult {
+    /// 通过 [`SignState`] 的字符串判断签到结果如何。
+    pub fn guess_by_state(
+        state: impl std::borrow::Borrow<SignState>,
+        stu_name: &str,
+        sign_name: &str,
+    ) -> Option<SignResult> {
+        let result = match state.borrow() {
+            SignState::ValidSignState(valid_sign_state) => match valid_sign_state {
+                ValidSignState::未签 => {
+                    return None;
+                }
+                ValidSignState::签到成功 => SignResult::Success,
+                ValidSignState::教师代签 => SignResult::PartialSuccess {
+                    msg: format!("用户[`{stu_name}`]签到[`{sign_name}`]为教师代签。",),
+                },
+                state @ (ValidSignState::请假
+                | ValidSignState::病假
+                | ValidSignState::事假
+                | ValidSignState::公假) => SignResult::PartialSuccess {
+                    msg: format!("用户[`{stu_name}`]签到[`{sign_name}`]为请假状态[`{state:?}`]。",),
+                },
+                state @ (ValidSignState::缺勤
+                | ValidSignState::迟到
+                | ValidSignState::早退
+                | ValidSignState::签到已过期) => SignResult::Failure {
+                    msg: format!("签到失败，状态为[`{state:?}`]。",),
+                },
+            },
+            SignState::Other(number) => SignResult::Failure {
+                msg: format!("签到状态未知（`{number}`），可能是服务端 bug。"),
+            },
+        };
+        Some(result)
+    }
     /// 通过签到结果的字符串判断签到结果如何。
     pub fn guess_by_text(text: &str) -> SignResult {
         match text {

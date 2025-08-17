@@ -1,5 +1,8 @@
 use crate::sign::{RawSign, SignTrait};
-use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
+use cxlib_protocol::{
+    collect::SignProtocolTrait,
+    utils::{SignHelperTrait, SignUrlHelper},
+};
 use cxlib_types::{
     Geoaddr, LocationPreprocessorTrait, Session, UnhandledGeoAddrWithRange,
     ext::UnhandledGeoAddrWithRangeExt,
@@ -39,11 +42,11 @@ impl SignTrait for LocationSign {
         session: &Session<U>,
         _: &(),
         data: &Geoaddr,
-    ) -> PPTSignHelper
+    ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {
-        SignProtocol::location_sign_url(
+        SignProtocol::ppt_sign_url().location_sign_url(
             (session.uid(), session.fid(), session.name()),
             (data.addr(), data.location().lat(), data.location().lon()),
             self.raw_sign.active_id(),

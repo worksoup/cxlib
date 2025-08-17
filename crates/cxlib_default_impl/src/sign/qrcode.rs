@@ -1,7 +1,7 @@
 use crate::sign::{LocationSign, RawSign, SignTrait};
 use cxlib_protocol::{
     collect::{CaptchaProtocolTrait, PreSignResult, SignProtocolTrait},
-    utils::PPTSignHelper,
+    utils::{SignHelperTrait, SignUrlHelper},
 };
 use cxlib_sign::SignError;
 use cxlib_types::{Geoaddr, Session};
@@ -42,11 +42,11 @@ impl SignTrait for QrCodeSign {
         session: &Session<U>,
         enc: &str,
         location: &Option<Geoaddr>,
-    ) -> PPTSignHelper
+    ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {
-        SignProtocol::qrcode_sign_url(
+        SignProtocol::ppt_sign_url().qrcode_sign_url(
             (session.uid(), session.fid(), session.name()),
             enc,
             self.as_inner().active_id(),

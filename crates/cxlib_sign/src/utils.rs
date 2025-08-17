@@ -1,21 +1,22 @@
-use crate::{SignError, SignResult, SignTrait};
+use crate::{SignError, SignResult};
 use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{
     collect::{CaptchaId, CaptchaProtocolTrait},
-    utils::PPTSignHelper,
+    utils::SignUrlHelper,
 };
 use log::warn;
 use ureq::Agent;
 
-pub fn secondary_verification<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, S>(
+pub fn sign_with_verification<CaptchaSolver, CaptchaProtocol>(
     agent: &Agent,
-    url: PPTSignHelper,
+    url: SignUrlHelper,
     captcha_id: Option<&CaptchaId>,
     referer: &str,
 ) -> Result<SignResult, SignError>
 where
     CaptchaProtocol: CaptchaProtocolTrait,
+    CaptchaSolver: CaptchaSolverTrait,
 {
     let captcha_id = if let Some(captcha_id) = captcha_id {
         captcha_id
@@ -31,15 +32,15 @@ where
     };
     Ok(r)
 }
-pub fn try_secondary_verification<CaptchaSolver: CaptchaSolverTrait, CaptchaProtocol, S, Sign>(
+pub fn try_secondary_verification<CaptchaSolver, CaptchaProtocol>(
     agent: &Agent,
-    url: PPTSignHelper,
+    url: SignUrlHelper,
     captcha_id: Option<&CaptchaId>,
     referer: &str,
 ) -> Result<SignResult, SignError>
 where
     CaptchaProtocol: CaptchaProtocolTrait,
-    Sign: SignTrait + ?Sized,
+    CaptchaSolver: CaptchaSolverTrait,
 {
     let r = url.get(agent)?;
     match SignResult::guess_by_text(&r.into_body().read_to_string().log_unwrap()) {
@@ -47,7 +48,7 @@ where
             if msg.starts_with("validate") {
                 // 这里假设了二次验证只有在“签到成功”的情况下出现。
                 let url = url.patch_enc_by_pre_sign_result_msg(msg);
-                secondary_verification::<CaptchaSolver, CaptchaProtocol, S>(
+                sign_with_verification::<CaptchaSolver, CaptchaProtocol>(
                     agent, url, captcha_id, referer,
                 )
             } else {

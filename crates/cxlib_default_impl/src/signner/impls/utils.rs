@@ -56,7 +56,8 @@ where
     InputDataIter: IntoIterator<Item = InputData>,
     CaptchaProtocol: CaptchaProtocolTrait,
 {
-    let guess_result = sign.guess_sign_result_by_state::<SignProtocol, U>(session)?;
+    let state = SignProtocol::get_sign_state(session, sign.as_inner().active_id())?;
+    let guess_result = SignResult::guess_by_state(state, session.name(), sign.as_inner().name());
     if let Some(guess_result) = guess_result {
         return Ok(guess_result);
     }
