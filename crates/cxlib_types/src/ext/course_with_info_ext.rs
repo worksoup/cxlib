@@ -1,6 +1,6 @@
 use crate::error::ActivityError;
-use crate::{Activity, OtherActivity, RawSign, Session, UnhandledGeoAddrWithRange};
-use cxlib_base_types::CourseWithInfo;
+use crate::{RawSign, Session, UnhandledGeoAddrWithRange};
+use cxlib_base_types::{Activity, CourseWithInfo, OtherActivity};
 use cxlib_error::AgentError;
 use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
 use std::{

@@ -73,8 +73,7 @@ impl<T, E: std::fmt::Debug> CxlibResultUtils<T, E> for Result<T, E> {
     fn log_ignore(self) {
         let caller = core::panic::Location::caller();
         match self {
-            Ok(_) => {log::debug!("{caller}: 值已被忽略。",)},
-
+            Ok(_) => log::debug!("{caller}: 值已被忽略。",),
             Err(e) => log::warn!("{caller}: 忽略错误：{e:?}。",),
         }
     }

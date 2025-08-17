@@ -1,6 +1,8 @@
+use getset2::Getset2;
+use serde::Deserialize;
 use ureq::{Agent, Cookie};
-#[allow(non_snake_case)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Deserialize, Clone, Getset2)]
+#[getset2(get_ref(pub))]
 pub struct UserCookies {
     // JSESSIONID: String,
     // lv: String,
@@ -16,7 +18,8 @@ pub struct UserCookies {
     // route: String,
     // _d: String,
     fid: String,
-    _uid: String,
+    #[serde(rename = "_uid")]
+    uid: String,
 }
 
 impl UserCookies {
@@ -46,7 +49,7 @@ impl UserCookies {
         // route: &str,
         // _d: &str,
         fid: &str,
-        _uid: &str,
+        uid: &str,
     ) -> Self {
         UserCookies {
             // JSESSIONID: JSESSIONID.into(),
@@ -63,7 +66,7 @@ impl UserCookies {
             // route: route.into(),
             // _d: _d.into(),
             fid: fid.into(),
-            _uid: _uid.into(),
+            uid: uid.into(),
         }
     }
     #[allow(non_snake_case)]
@@ -83,7 +86,7 @@ impl UserCookies {
         // let mut route = String::new();
         // let mut _d = String::new();
         let mut fid = String::new();
-        let mut _uid = String::new();
+        let mut uid = String::new();
         for c in cookies {
             match c.name() {
                 // "JSESSIONID" => {
@@ -129,7 +132,7 @@ impl UserCookies {
                     fid = c.value().into();
                 }
                 "_uid" => {
-                    _uid = c.value().into();
+                    uid = c.value().into();
                 }
                 _ => {
                     fid = c.value().into();
@@ -151,16 +154,8 @@ impl UserCookies {
             // route,
             // _d,
             fid,
-            _uid,
+            uid,
         }
-    }
-    #[inline]
-    pub fn uid(&self) -> &str {
-        &self._uid
-    }
-    #[inline]
-    pub fn fid(&self) -> &str {
-        &self.fid
     }
 }
 

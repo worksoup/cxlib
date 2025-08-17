@@ -2,7 +2,7 @@ use crate::sign::{RawSign, SignTrait};
 use cxlib_protocol::{collect::SignProtocolTrait, utils::PPTSignHelper};
 use cxlib_types::{
     Geoaddr, LocationPreprocessorTrait, Session, UnhandledGeoAddrWithRange,
-    UnhandledGeoAddrWithRangeExt,
+    ext::UnhandledGeoAddrWithRangeExt,
 };
 use serde::Serialize;
 

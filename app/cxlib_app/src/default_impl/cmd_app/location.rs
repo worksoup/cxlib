@@ -9,8 +9,8 @@ use cxlib_internal::{
     protocol::collect::{TypesProtocolTrait, UserProtocolTrait},
     types::{
         __private::UnhandledGeoaddr,
-        Course, CourseWithInfo, Geolocation, UnhandledGeoAddrWithRangeExt, UntypedLoginSolver,
-        ext::{CourseExt, CourseWithInfoExt},
+        Course, CourseWithInfo, Geolocation, UntypedLoginSolver,
+        ext::{CourseExt, CourseWithInfoExt, UnhandledGeoAddrWithRangeExt},
     },
 };
 use cxlib_store::AppInfo;

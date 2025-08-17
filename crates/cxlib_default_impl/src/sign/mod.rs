@@ -12,7 +12,10 @@ pub use qrcode::*;
 
 use cxlib_protocol::collect::{NetdiskProtocolTrait, TypesProtocolTrait, UserProtocolTrait};
 use cxlib_sign::{SignError, SignTrait};
-use cxlib_types::{RawSign, Session, SignDetail, ext::CourseWithInfoExt};
+use cxlib_types::{
+    RawSign, Session, SignDetail,
+    ext::{CourseWithInfoExt, RawSignExt},
+};
 use log::warn;
 use std::collections::HashMap;
 

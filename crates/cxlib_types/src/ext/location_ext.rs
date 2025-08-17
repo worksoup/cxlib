@@ -68,7 +68,7 @@ impl UnhandledGeoAddrWithRangeExt for UnhandledGeoAddrWithRange {
 mod tests {
     use cxlib_base_types::LocationPreprocessorTrait;
 
-    use crate::{UnhandledGeoAddrWithRange, UnhandledGeoAddrWithRangeExt};
+    use crate::{UnhandledGeoAddrWithRange, ext::UnhandledGeoAddrWithRangeExt};
     struct DefaultLocationPreprocessor;
     impl LocationPreprocessorTrait for DefaultLocationPreprocessor {}
     #[test]

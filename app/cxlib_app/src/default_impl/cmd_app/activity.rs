@@ -21,7 +21,8 @@ use cxlib_internal::{
     sign::{SignError, SignResult, SignTrait, SignnerTrait},
     types::{
         Activity, Course, CourseWithInfo, LocationPreprocessorTrait, RawSign, Session,
-        UntypedLoginSolver, ext::ActivityExt,
+        UntypedLoginSolver,
+        ext::{ActivityExt, RawSignExt},
     },
 };
 use cxlib_store::AppInfo;
@@ -438,6 +439,7 @@ impl<
             precisely,
             signcode: code,
         };
+        let display_course_info = course.is_none();
         let has_uid_arg = uid_list_str.is_some();
         let login_solvers: &GlobalMultimap<_> = cxt.as_ref();
         // 两分支均能自动新建数据表。
@@ -494,7 +496,7 @@ impl<
                     });
 
                     if list {
-                        Self::display_activities(all, active_id, activities);
+                        Self::display_activities(all, active_id, activities, display_course_info);
                     } else {
                         Self::do_sign(all, active_id, has_uid_arg, location_cxt, &arg, activities)?;
                     }
@@ -514,7 +516,7 @@ impl<
             }
             .into_values();
             if list {
-                Self::display_activities(all, active_id, activities);
+                Self::display_activities(all, active_id, activities, display_course_info);
             } else {
                 Self::do_sign(all, active_id, has_uid_arg, location_cxt, &arg, activities)?;
             }
@@ -647,6 +649,7 @@ impl<
                 impl IntoIterator<Item = impl Borrow<Session<UserProtocol>> + 's>,
             ),
         >,
+        display_course_info: bool,
     ) where
         UserProtocol: 's,
     {
@@ -667,7 +670,13 @@ impl<
             });
         for (sign, names) in signs {
             if all || sign.is_valid() {
-                println!("{names:?}:{sign}");
+                if display_course_info {
+                    let sign = sign.display();
+                    println!("{names:?}:{sign}",);
+                } else {
+                    let sign = sign.display_without_course();
+                    println!("{names:?}:{sign}",);
+                }
             }
         }
     }

@@ -1,15 +1,14 @@
-use crate::{CourseWithInfo, Session, SignDetail};
-use bincode::{Decode, Encode};
+use crate::{Session, SignDetail};
+use cxlib_base_types::RawSign;
 use cxlib_error::AgentError;
 use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
-use getset2::Getset2;
-use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
     time::{Duration, SystemTime},
 };
 
-pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
+#[inline]
+fn get_width_str_should_be(s: &str, width: usize) -> usize {
     use unicode_width::UnicodeWidthStr;
     if UnicodeWidthStr::width(s) > width {
         width
@@ -18,36 +17,7 @@ pub fn get_width_str_should_be(s: &str, width: usize) -> usize {
     }
 }
 
-/// # RawSign
-///
-/// 未分类的课程签到。
-///
-/// 对于该类型的分类、处理等，请参考 `cxlib_default_impl::sign` 中的相关部分。
-#[derive(
-    Debug,
-    PartialEq,
-    PartialOrd,
-    Ord,
-    Eq,
-    Hash,
-    Clone,
-    Serialize,
-    Deserialize,
-    Getset2,
-    Decode,
-    Encode,
-)]
-#[getset2(get_ref(pub))]
-pub struct RawSign {
-    active_id: String,
-    course: CourseWithInfo,
-    name: String,
-    other_id: i64,
-    #[getset2(set(pub))]
-    status_code: i32,
-    start_time_mills: Option<u64>,
-    class_ended: bool,
-}
+#[inline]
 fn time_string_from_mills(mills: u64) -> String {
     #[inline]
     pub fn time_string(t: SystemTime) -> String {
@@ -57,82 +27,86 @@ fn time_string_from_mills(mills: u64) -> String {
     }
     time_string(std::time::UNIX_EPOCH + Duration::from_millis(mills))
 }
-
-impl Display for RawSign {
+pub struct RawSignDisplay<'a>(&'a RawSign);
+impl Display for RawSignDisplay<'_> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let name_width = get_width_str_should_be(self.name.as_str(), 12);
-        if let Some(mills) = self.start_time_mills {
+        let name_width = get_width_str_should_be(self.0.name(), 12);
+        if let Some(mills) = self.0.start_time_mills() {
             write!(
                 f,
                 "id: {}, name: {:>width$}, status: {}, time: {}, course: {}/{}",
-                self.active_id,
-                self.name,
-                self.status_code,
-                time_string_from_mills(mills),
-                self.course.id(),
-                self.course.name(),
+                self.0.active_id(),
+                self.0.name(),
+                self.0.status_code(),
+                time_string_from_mills(*mills),
+                self.0.course().id(),
+                self.0.course().name(),
                 width = name_width,
             )
         } else {
             write!(
                 f,
                 "id: {}, name: {:>width$}, status: {}, time: no time, course: {}/{}",
-                self.active_id,
-                self.name,
-                self.status_code,
-                self.course.id(),
-                self.course.name(),
+                self.0.active_id(),
+                self.0.name(),
+                self.0.status_code(),
+                self.0.course().id(),
+                self.0.course().name(),
                 width = name_width,
             )
         }
     }
 }
-
-impl RawSign {
+pub struct RawSignDisplayWithoutCourse<'a>(&'a RawSign);
+impl Display for RawSignDisplayWithoutCourse<'_> {
     #[inline]
-    pub fn new(
-        active_id: String,
-        course: CourseWithInfo,
-        name: String,
-        other_id: i64,
-        status_code: i32,
-        start_time_mills: Option<u64>,
-        class_ended: bool,
-    ) -> Self {
-        Self {
-            start_time_mills,
-            active_id,
-            name,
-            course,
-            other_id,
-            status_code,
-            class_ended,
-        }
-    }
-    #[inline]
-    pub fn fmt_without_course_info(&self) -> String {
-        let name_width = get_width_str_should_be(self.name.as_str(), 12);
-        if let Some(mills) = self.start_time_mills {
-            format!(
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let name_width = get_width_str_should_be(self.0.name(), 12);
+        if let Some(mills) = self.0.start_time_mills() {
+            write!(
+                f,
                 "id: {}, name: {:>width$}, status: {}, time: {}",
-                self.active_id,
-                self.name,
-                self.status_code,
-                time_string_from_mills(mills),
+                self.0.active_id(),
+                self.0.name(),
+                self.0.status_code(),
+                time_string_from_mills(*mills),
                 width = name_width,
             )
         } else {
-            format!(
+            write!(
+                f,
                 "id: {}, name: {:>width$}, status: {}, time: no time",
-                self.active_id,
-                self.name,
-                self.status_code,
+                self.0.active_id(),
+                self.0.name(),
+                self.0.status_code(),
                 width = name_width,
             )
         }
     }
+}
+pub trait RawSignExt {
+    fn display<'a>(&'a self) -> RawSignDisplay<'a>;
+    fn display_without_course<'a>(&'a self) -> RawSignDisplayWithoutCourse<'a>;
+    fn get_sign_detail<TypesProtocol, UserProtocol>(
+        &self,
+        session: &Session<UserProtocol>,
+    ) -> Result<SignDetail, AgentError>
+    where
+        TypesProtocol: TypesProtocolTrait,
+        UserProtocol: UserProtocolTrait;
+}
+impl RawSignExt for RawSign {
     #[inline]
-    pub fn get_sign_detail<TypesProtocol, UserProtocol>(
+    fn display<'a>(&'a self) -> RawSignDisplay<'a> {
+        RawSignDisplay(self)
+    }
+    #[inline]
+    fn display_without_course<'a>(&'a self) -> RawSignDisplayWithoutCourse<'a> {
+        RawSignDisplayWithoutCourse(self)
+    }
+    #[inline]
+    fn get_sign_detail<TypesProtocol, UserProtocol>(
         &self,
         session: &Session<UserProtocol>,
     ) -> Result<SignDetail, AgentError>
@@ -140,28 +114,10 @@ impl RawSign {
         TypesProtocol: TypesProtocolTrait,
         UserProtocol: UserProtocolTrait,
     {
-        Ok(TypesProtocol::sign_detail(session, &self.active_id)?.into())
+        Ok(TypesProtocol::sign_detail(session, self.active_id())?.into())
     }
 }
-impl RawSign {
-    // pub fn speculate_type_by_text(text: &str) -> Sign {
-    //     if text.contains("拍照") {
-    //         Sign::Photo
-    //     } else if text.contains("位置") {
-    //         Sign::Location
-    //     } else if text.contains("二维码") {
-    //         Sign::QrCode
-    //     } else if text.contains("手势") {
-    //         // ?
-    //         Sign::Gesture
-    //     } else if text.contains("签到码") {
-    //         // ?
-    //         Sign::SignCode
-    //     } else {
-    //         Sign::Normal
-    //     }
-    // }
-
+pub trait RawSignUnusedExt {
     // pub async fn chat_group_pre_sign(
     //     &self,
     //     chat_id: &str,
@@ -235,3 +191,4 @@ impl RawSign {
     //     Ok(())
     // }
 }
+impl RawSignUnusedExt for RawSign {}
