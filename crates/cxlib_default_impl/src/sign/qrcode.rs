@@ -1,9 +1,9 @@
 use crate::sign::{LocationSign, RawSign, SignTrait};
 use cxlib_protocol::{
-    collect::{CaptchaProtocolTrait, PreSignResult, SignProtocolTrait},
+    collect::{CaptchaProtocolTrait, AnalysisResultResult, SignProtocolTrait},
     utils::{SignHelperTrait, SignUrlHelper},
 };
-use cxlib_sign::SignError;
+use cxlib_sign::{SignError, need_pre_sign::NeedPreSign};
 use cxlib_types::{Geoaddr, Session};
 use log::info;
 use serde::Serialize;
@@ -58,11 +58,36 @@ impl SignTrait for QrCodeSign {
     fn as_inner(&self) -> &RawSign {
         self.raw_sign.as_inner()
     }
+    #[inline]
+    fn check_state_and_do_sign<
+        CaptchaSolver: cxlib_captcha::CaptchaSolverTrait,
+        CaptchaProtocol,
+        SignProtocol,
+        U,
+    >(
+        &self,
+        session: &Session<U>,
+        pre_sign_data: &Self::PreSignData,
+        data: &Self::Data,
+    ) -> Result<cxlib_sign::SignResult, SignError>
+    where
+        CaptchaProtocol: CaptchaProtocolTrait,
+        SignProtocol: SignProtocolTrait,
+    {
+        <Self as NeedPreSign>::check_state_and_do_sign::<
+            CaptchaSolver,
+            CaptchaProtocol,
+            SignProtocol,
+            U,
+        >(self, session, pre_sign_data, data)
+    }
+}
+impl NeedPreSign for QrCodeSign {
     fn pre_sign<CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
         enc: &str,
-    ) -> Result<PreSignResult, SignError>
+    ) -> Result<AnalysisResultResult, SignError>
     where
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait,

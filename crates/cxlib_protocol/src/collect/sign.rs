@@ -85,14 +85,14 @@ mod types {
     }
     /// # [`PreSignResult`]
     /// 预签到结果，可能包含了一些签到时需要的信息。
-    pub enum PreSignResult {
+    pub enum AnalysisResultResult {
         Susses,
         Data {
             url: String,
             data: OptionPair<CaptchaId, UnhandledGeoAddrWithRange>,
         },
     }
-    impl PreSignResult {}
+    impl AnalysisResultResult {}
     pub struct PreSignResultRaw {
         pub(super) html: String,
         pub(super) presign_url: String,
@@ -126,14 +126,14 @@ mod types {
             self,
             agent: &Agent,
             active_id: &str,
-        ) -> Result<PreSignResult, AgentError> {
+        ) -> Result<AnalysisResultResult, AgentError> {
             // TODO
             // 需要确定重定向后的 uri 为所需。
             // let presign_url = self.0.get_uri().to_string();
             // let html = self.0.into_body().read_to_string().log_unwrap();
             log::trace!("预签到请求结果：{}", self.html);
             if self.guess_if_susses() {
-                return Ok(PreSignResult::Susses);
+                return Ok(AnalysisResultResult::Susses);
             }
             let captcha_id_and_location = OptionPair::from((
                 self.find_captcha_id_or_get::<CaptchaProtocol>(agent),
@@ -144,7 +144,7 @@ mod types {
             debug!("analysis 结果：{_response_of_analysis2}",);
             // 防止行为检测导致失败。
             std::thread::sleep(std::time::Duration::from_millis(500));
-            Ok(PreSignResult::Data {
+            Ok(AnalysisResultResult::Data {
                 url: self.presign_url,
                 data: captcha_id_and_location,
             })

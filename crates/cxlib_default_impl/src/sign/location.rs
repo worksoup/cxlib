@@ -3,6 +3,7 @@ use cxlib_protocol::{
     collect::SignProtocolTrait,
     utils::{SignHelperTrait, SignUrlHelper},
 };
+use cxlib_sign::{need_pre_sign::NeedPreSign, AsRaw};
 use cxlib_types::{
     Geoaddr, LocationPreprocessorTrait, Session, UnhandledGeoAddrWithRange,
     ext::UnhandledGeoAddrWithRangeExt,
@@ -53,9 +54,12 @@ impl SignTrait for LocationSign {
             self.preset_location.is_some(),
         )
     }
-
+}
+impl AsRaw for LocationSign {
     #[inline]
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign
     }
 }
+
+impl NeedPreSign for LocationSign {}

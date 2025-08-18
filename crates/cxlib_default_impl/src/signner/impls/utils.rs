@@ -2,8 +2,8 @@
 //! 好，还有 2 行调侃。
 use crate::sign::{LocationSign, QrCodeSign};
 use cxlib_captcha::CaptchaSolverTrait;
-use cxlib_protocol::collect::{CaptchaProtocolTrait, PreSignResult, SignProtocolTrait};
-use cxlib_sign::{SignError, SignResult, SignTrait};
+use cxlib_protocol::collect::{CaptchaProtocolTrait, AnalysisResultResult, SignProtocolTrait};
+use cxlib_sign::{need_pre_sign::NeedPreSign, SignError, SignResult, SignTrait};
 use cxlib_types::{Geoaddr, Session};
 use log::warn;
 use std::borrow::Borrow;
@@ -51,7 +51,7 @@ pub(crate) fn sign_single_retry<
 ) -> Result<SignResult, SignError>
 where
     SignProtocol: SignProtocolTrait,
-    Sign: SignTrait + SignRetry<InputData, Data, SignProtocol>,
+    Sign: SignTrait + SignRetry<InputData, Data, SignProtocol> + NeedPreSign,
     Data: Borrow<<Sign as SignTrait>::Data>,
     InputDataIter: IntoIterator<Item = InputData>,
     CaptchaProtocol: CaptchaProtocolTrait,
@@ -63,8 +63,8 @@ where
     }
     let r = sign.pre_sign::<CaptchaProtocol, SignProtocol, U>(session, pre_sign_data)?;
     match r {
-        PreSignResult::Susses => Ok(SignResult::Success),
-        PreSignResult::Data {
+        AnalysisResultResult::Susses => Ok(SignResult::Success),
+        AnalysisResultResult::Data {
             ref url,
             data: ref pre_sign_result_data,
         } => {

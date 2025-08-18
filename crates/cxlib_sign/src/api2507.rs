@@ -5,11 +5,11 @@ use cxlib_protocol::{
     collect::{CaptchaId, CaptchaProtocolTrait, SignProtocolTrait},
     utils::SignUrlHelper,
 };
-use cxlib_types::{RawSign, Session, UnhandledGeoAddrWithRange};
+use cxlib_types::{Session, UnhandledGeoAddrWithRange};
 
-use crate::{SignError, SignResult, SignTrait};
+use crate::{AsRaw, SignError, SignResult, SignTrait};
 
-pub trait SignApi2507: Ord {
+pub trait SignApi2507: Ord + AsRaw {
     type PreSignData: ?Sized;
     type Data: ?Sized;
     fn sign_url<SignProtocol, U>(
@@ -20,10 +20,6 @@ pub trait SignApi2507: Ord {
     ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait;
-    /// 获取各签到类型内部对原始签到类型的引用。
-    /// [`RawSign`] 的各字段均为 `pub`,
-    /// 故可以通过本函数获取一些签到通用的信息。
-    fn as_inner(&self) -> &RawSign;
     /// 判断签到活动是否有效
     ///
     /// 目前认定两小时内未结束的签到为有效签到。
@@ -92,46 +88,6 @@ pub trait SignApi2507: Ord {
             Err(msg) => Ok(msg),
         }
     }
-    /// 检查签到状态，如果需要签到，则预签到并签到。
-    fn check_state_and_do_sign<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
-        &self,
-        session: &Session<U>,
-        pre_sign_data: &Self::PreSignData,
-        data: &Self::Data,
-    ) -> Result<SignResult, SignError>
-    where
-        CaptchaProtocol: CaptchaProtocolTrait,
-        SignProtocol: SignProtocolTrait,
-        CaptchaSolver: CaptchaSolverTrait,
-    {
-        let raw_sign = self.as_inner();
-        let state = SignProtocol::get_sign_state(session, raw_sign.active_id())?;
-        let guess_result = SignResult::guess_by_state(state, session.name(), raw_sign.name());
-        if let Some(guess_result) = guess_result {
-            return Ok(guess_result);
-        }
-        let captcha_id = CaptchaProtocol::get_captcha_id(session).log_ok();
-        let active_id = raw_sign.active_id();
-        let result_of_analysis = SignProtocol::analysis(session, active_id)?;
-        let _response_of_analysis2 = result_of_analysis.analysis2::<SignProtocol>(session)?;
-        log::debug!("analysis 结果：{_response_of_analysis2}",);
-
-        let referer_url = format!(
-            "https://mobilelearn.chaoxing.com/page/sign/signIn?courseId={}&classId={}&activeId={}&fid=0&timetable=0",
-            raw_sign.course().id(),
-            raw_sign.course().class_id(),
-            raw_sign.active_id()
-        );
-        // 防止行为检测导致失败。
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        self.sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
-            session,
-            &referer_url,
-            &OptionPair::from_tuple((captcha_id, None)),
-            pre_sign_data,
-            data,
-        )
-    }
 }
 
 impl<T: SignApi2507> SignTrait for T {
@@ -178,26 +134,6 @@ impl<T: SignApi2507> SignTrait for T {
     }
 
     #[inline]
-    fn check_state_and_do_sign<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
-        &self,
-        session: &Session<U>,
-        pre_sign_data: &Self::PreSignData,
-        data: &Self::Data,
-    ) -> Result<SignResult, SignError>
-    where
-        CaptchaProtocol: CaptchaProtocolTrait,
-        SignProtocol: SignProtocolTrait,
-        CaptchaSolver: CaptchaSolverTrait,
-    {
-        <Self as SignApi2507>::check_state_and_do_sign::<
-            CaptchaSolver,
-            CaptchaProtocol,
-            SignProtocol,
-            _,
-        >(self, session, pre_sign_data, data)
-    }
-
-    #[inline]
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
@@ -208,10 +144,5 @@ impl<T: SignApi2507> SignTrait for T {
         SignProtocol: SignProtocolTrait,
     {
         <Self as SignApi2507>::sign_url::<SignProtocol, _>(self, session, pre_sign_data, data)
-    }
-
-    #[inline]
-    fn as_inner(&self) -> &RawSign {
-        <Self as SignApi2507>::as_inner(self)
     }
 }
