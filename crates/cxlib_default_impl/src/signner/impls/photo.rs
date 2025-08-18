@@ -1,7 +1,7 @@
 use crate::sign::PhotoSign;
 use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, NetdiskProtocolTrait, SignProtocolTrait};
-use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
+use cxlib_sign::{AsRaw, SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::{Photo, Session};
 use log::warn;
 use std::{collections::HashMap, path::PathBuf};

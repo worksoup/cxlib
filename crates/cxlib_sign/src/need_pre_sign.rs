@@ -1,8 +1,7 @@
-use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{AnalysisResultResult, CaptchaProtocolTrait, SignProtocolTrait};
 use cxlib_types::{RawSign, Session};
 
-use crate::{SignError, SignResult, SignTrait, analysis::Analysis};
+use crate::{SignError, SignTrait, analysis::Analysis};
 
 pub trait NeedPreSign: SignTrait {
     /// 预签到。
@@ -10,7 +9,7 @@ pub trait NeedPreSign: SignTrait {
     fn pre_sign<CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
-        pre_sign_data: &Self::PreSignData,
+        pre_sign_data: &Self::AnalysisSignData,
     ) -> Result<AnalysisResultResult, SignError>
     where
         CaptchaProtocol: CaptchaProtocolTrait,
@@ -52,7 +51,7 @@ impl<T> Analysis for T
 where
     T: NeedPreSign,
 {
-    type AnalysisData = T::PreSignData;
+    type AnalysisData = T::AnalysisSignData;
     #[inline]
     fn analysis<CaptchaProtocol: CaptchaProtocolTrait, SignProtocol: SignProtocolTrait, U>(
         &self,

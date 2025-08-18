@@ -1,7 +1,7 @@
 use crate::sign::NormalSign;
 use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
-use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
+use cxlib_sign::{AsRaw, SignError, SignResult, SignTrait, SignnerTrait};
 use cxlib_types::{RawSign, Session};
 use std::collections::HashMap;
 

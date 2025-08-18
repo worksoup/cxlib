@@ -3,7 +3,7 @@ use cxlib_protocol::{
     collect::SignProtocolTrait,
     utils::{SignHelperTrait, SignUrlHelper},
 };
-use cxlib_sign::{AsRaw, SignError, SignResult, analysis::Analysis, api2507::SignApi2507};
+use cxlib_sign::{Analysis, AsRaw, SignError, SignResult, api2507::SignApi2507};
 use cxlib_types::Session;
 use serde::Serialize;
 

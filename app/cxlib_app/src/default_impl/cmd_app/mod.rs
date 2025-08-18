@@ -30,7 +30,7 @@ use clap::Command;
 use cxlib_internal::{
     captcha::utils::get_now_timestamp_mills,
     default_impl::{sign::LocationSign, signner::LocationInfoGetterTrait},
-    sign::SignTrait,
+    sign::AsRaw,
     types::{
         __private::UnhandledGeoaddr, Course, CourseInfo, Geoaddr, LocationPreprocessorTrait,
         UntypedLoginSolver,

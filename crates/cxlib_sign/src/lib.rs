@@ -1,4 +1,4 @@
-use crate::{analysis::Analysis, utils::try_secondary_verification};
+use crate::utils::try_secondary_verification;
 use cx_gizmo_types::OptionPair;
 use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_error_utils::CxlibResultUtils;
@@ -12,14 +12,15 @@ use cxlib_protocol::{
 use cxlib_types::{CourseWithInfo, RawSign, Session, UnhandledGeoAddrWithRange};
 use std::{collections::HashMap, ops::Add};
 
+mod analysis;
 mod as_raw;
 mod error;
 
 pub mod api2507;
 pub mod need_pre_sign;
 pub mod utils;
-pub mod analysis;
 
+pub use analysis::*;
 pub use as_raw::*;
 pub use error::*;
 
@@ -40,12 +41,12 @@ pub use error::*;
 ///
 /// 细节详见各签到的文档。
 pub trait SignTrait: Ord + AsRaw {
-    type PreSignData: ?Sized;
+    type AnalysisSignData: ?Sized;
     type Data: ?Sized;
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
-        pre_sign_data: &Self::PreSignData,
+        pre_sign_data: &Self::AnalysisSignData,
         data: &Self::Data,
     ) -> SignUrlHelper
     where
@@ -86,7 +87,7 @@ pub trait SignTrait: Ord + AsRaw {
         session: &Session<U>,
         pre_sign_url: &str,
         pre_sign_result_data: &OptionPair<CaptchaId, UnhandledGeoAddrWithRange>,
-        pre_sign_data: &Self::PreSignData,
+        pre_sign_data: &Self::AnalysisSignData,
         data: &Self::Data,
     ) -> Result<SignResult, SignError>
     where
@@ -111,11 +112,11 @@ pub trait SignTrait: Ord + AsRaw {
     fn check_state_and_do_sign<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
         &self,
         session: &Session<U>,
-        pre_sign_data: &Self::PreSignData,
+        pre_sign_data: &Self::AnalysisSignData,
         data: &Self::Data,
     ) -> Result<SignResult, SignError>
     where
-        Self: Analysis<AnalysisData = Self::PreSignData>,
+        Self: Analysis<AnalysisData = Self::AnalysisSignData>,
         CaptchaProtocol: CaptchaProtocolTrait,
         SignProtocol: SignProtocolTrait,
         CaptchaSolver: CaptchaSolverTrait,
@@ -144,7 +145,7 @@ pub trait SignTrait: Ord + AsRaw {
 }
 
 impl SignTrait for RawSign {
-    type PreSignData = ();
+    type AnalysisSignData = ();
     type Data = ();
 
     #[inline]

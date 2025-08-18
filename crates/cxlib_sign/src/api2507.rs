@@ -91,7 +91,7 @@ pub trait SignApi2507: Ord + AsRaw {
 }
 
 impl<T: SignApi2507> SignTrait for T {
-    type PreSignData = <T as SignApi2507>::PreSignData;
+    type AnalysisSignData = <T as SignApi2507>::PreSignData;
 
     type Data = <T as SignApi2507>::Data;
 
@@ -115,7 +115,7 @@ impl<T: SignApi2507> SignTrait for T {
         session: &Session<U>,
         pre_sign_url: &str,
         pre_sign_result_data: &OptionPair<CaptchaId, UnhandledGeoAddrWithRange>,
-        pre_sign_data: &Self::PreSignData,
+        pre_sign_data: &Self::AnalysisSignData,
         data: &Self::Data,
     ) -> Result<SignResult, SignError>
     where
@@ -137,7 +137,7 @@ impl<T: SignApi2507> SignTrait for T {
     fn sign_url<SignProtocol, U>(
         &self,
         session: &Session<U>,
-        pre_sign_data: &Self::PreSignData,
+        pre_sign_data: &Self::AnalysisSignData,
         data: &Self::Data,
     ) -> SignUrlHelper
     where

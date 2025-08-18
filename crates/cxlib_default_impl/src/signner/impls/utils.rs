@@ -2,8 +2,8 @@
 //! 好，还有 2 行调侃。
 use crate::sign::{LocationSign, QrCodeSign};
 use cxlib_captcha::CaptchaSolverTrait;
-use cxlib_protocol::collect::{CaptchaProtocolTrait, AnalysisResultResult, SignProtocolTrait};
-use cxlib_sign::{need_pre_sign::NeedPreSign, SignError, SignResult, SignTrait};
+use cxlib_protocol::collect::{AnalysisResultResult, CaptchaProtocolTrait, SignProtocolTrait};
+use cxlib_sign::{SignError, SignResult, SignTrait, need_pre_sign::NeedPreSign};
 use cxlib_types::{Geoaddr, Session};
 use log::warn;
 use std::borrow::Borrow;
@@ -47,7 +47,7 @@ pub(crate) fn sign_single_retry<
 >(
     sign: &Sign,
     session: &Session<U>,
-    (pre_sign_data, locations): (&<Sign as SignTrait>::PreSignData, InputDataIter),
+    (pre_sign_data, locations): (&<Sign as SignTrait>::AnalysisSignData, InputDataIter),
 ) -> Result<SignResult, SignError>
 where
     SignProtocol: SignProtocolTrait,

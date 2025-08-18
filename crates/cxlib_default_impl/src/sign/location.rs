@@ -3,7 +3,7 @@ use cxlib_protocol::{
     collect::SignProtocolTrait,
     utils::{SignHelperTrait, SignUrlHelper},
 };
-use cxlib_sign::{need_pre_sign::NeedPreSign, AsRaw};
+use cxlib_sign::{AsRaw, need_pre_sign::NeedPreSign};
 use cxlib_types::{
     Geoaddr, LocationPreprocessorTrait, Session, UnhandledGeoAddrWithRange,
     ext::UnhandledGeoAddrWithRangeExt,
@@ -34,7 +34,7 @@ impl LocationSign {
     }
 }
 impl SignTrait for LocationSign {
-    type PreSignData = ();
+    type AnalysisSignData = ();
     type Data = Geoaddr;
 
     #[inline]

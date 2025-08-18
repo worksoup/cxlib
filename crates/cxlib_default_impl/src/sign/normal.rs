@@ -1,6 +1,6 @@
 use crate::sign::{RawSign, SignTrait};
 use cxlib_protocol::{collect::SignProtocolTrait, utils::SignUrlHelper};
-use cxlib_sign::api2507::SignApi2507;
+use cxlib_sign::{AsRaw, api2507::SignApi2507};
 use cxlib_types::Session;
 use serde::Serialize;
 
@@ -32,7 +32,8 @@ impl SignApi2507 for NormalSign {
         self.raw_sign
             .sign_url::<SignProtocol, _>(session, &(), runtime_data)
     }
-
+}
+impl AsRaw for NormalSign {
     #[inline]
     fn as_inner(&self) -> &RawSign {
         &self.raw_sign

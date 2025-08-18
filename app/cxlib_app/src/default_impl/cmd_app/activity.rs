@@ -18,7 +18,7 @@ use cxlib_internal::{
         CaptchaProtocolTrait, NetdiskProtocolTrait, SignProtocolTrait, TypesProtocolTrait,
         UserProtocolTrait,
     },
-    sign::{SignError, SignResult, SignTrait, SignnerTrait},
+    sign::{AsRaw, SignError, SignResult, SignTrait, SignnerTrait},
     types::{
         Activity, Course, CourseWithInfo, LocationPreprocessorTrait, RawSign, Session,
         UntypedLoginSolver,
