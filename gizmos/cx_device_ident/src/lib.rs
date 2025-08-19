@@ -136,19 +136,23 @@ fn md5_enc<T: AsRef<[u8]>>(input: T) -> [u8; 16] {
     md5::compute(input).0
 }
 #[inline]
-fn flatten_bytes<const BLOCK_SIZE: usize>(mut blocks: Vec<[u8; BLOCK_SIZE]>) -> Vec<u8> {
+fn flatten_bytes<const BLOCK_SIZE: usize>(blocks: Vec<[u8; BLOCK_SIZE]>) -> Vec<u8> {
+    let mut blocks = std::mem::ManuallyDrop::new(blocks);
     let (p, l, c) = (blocks.as_mut_ptr(), blocks.len(), blocks.capacity());
     unsafe { Vec::from_raw_parts(p as *mut u8, l * BLOCK_SIZE, c * BLOCK_SIZE) }
 }
 #[inline]
 // TODO: 传入 uid 时结果与预期不符，可能是有更新，需要逆向。
+// 猜测可能为 cxlib_obfuscate? 
 pub fn chaoxing_get_identifier(seed: impl AsRef<[u8]>) -> String {
     hex::encode(md5_enc(seed.as_ref()))
 }
+// TODO: 传入 ident 时结果与预期不符，可能是有更新，需要逆向。
+// 猜测可能为 SHA512?
 #[inline]
-pub fn chaoxing_get_devicecode(ident: impl AsRef<[u8]>) -> Vec<u8> {
+pub fn chaoxing_get_devicecode(ident: impl AsRef<[u8]>) -> String {
     let ident: Vec<[u8; 16]> = cx_enc_utils::crypto::pkcs7_pad(ident.as_ref());
-    aes_ecb_enc(&flatten_bytes(ident), b"QrCbNY@MuK1X8HGw")
+    base64_enc(aes_ecb_enc(&flatten_bytes(ident), b"QrCbNY@MuK1X8HGw"))
 }
 #[inline]
 pub fn chaoxing_get_schild(part: impl std::fmt::Display) -> String {
@@ -203,7 +207,10 @@ pub fn user_agent_parse(
 #[cfg(test)]
 mod tests {
 
-    use crate::{chaoxing_get_identifier, chaoxing_get_schild, user_agent_gen, user_agent_parse};
+    use crate::{
+        aes_ecb_dec, base64_dec, chaoxing_get_devicecode, chaoxing_get_identifier,
+        chaoxing_get_schild, user_agent_gen, user_agent_parse,
+    };
 
     #[test]
     fn tmp() {
@@ -214,19 +221,18 @@ mod tests {
             "(device:V2118A) Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_3_6.6.0_android_phone_10893_283 (@Kalimdor)_eb21ec75ce62463ea067895e3340f627",
         );
         println!("{b}");
+        assert_eq!(b, "45ea260fe4027811076d21570808258c");
     }
     #[test]
     fn gen_and_parse() {
         use std::time::Instant;
-        let uid = "317347528";
-        let identifier = chaoxing_get_identifier(uid);
         let start_time = Instant::now();
         let ua = user_agent_gen(
-            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36",
+            "Mozilla/5.0 (Linux; Android 14; V2118A Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36",
             "Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_3_6.6.0_android_phone_10893_283",
             None,
             "V2118A",
-            &identifier,
+            "eb21ec75ce62463ea067895e3340f627",
         );
         let elapsed = start_time.elapsed();
         println!("Generated User Agent: {ua}");
@@ -240,5 +246,18 @@ mod tests {
         println!("Device: {device:?}");
         println!("Custom Ident: {custom_ident:?}");
         println!("Device Identifier: {device_identifier:?}");
+        if let Some(device_identifier) = device_identifier {
+            let device_code = chaoxing_get_devicecode(device_identifier);
+            println!("{device_code}");
+        }
+        let device_code = "zE9+rwe3eRV6GaU0FX5KhiCnFj/Ju8X05ywjTUWxx+MV5Sfjflk+dHuRq2Pi3T7redETzSIYMbwqqRViHAEs88o+3W2FKfGichnoLiFd2iU=";
+        let device_code = base64_dec(device_code).unwrap();
+        let ident = aes_ecb_dec(&device_code, b"QrCbNY@MuK1X8HGw").unwrap();
+        let ident = unsafe { String::from_utf8_unchecked(ident) };
+        println!("{ident}");
+        let device_code = base64_dec(ident).unwrap();
+        println!("{device_code:?}",);
+        let ident = unsafe { String::from_utf8_unchecked(device_code) };
+        println!("{ident}");
     }
 }
