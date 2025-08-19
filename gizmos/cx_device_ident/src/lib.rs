@@ -174,13 +174,13 @@ pub fn user_agent_gen(
 pub fn user_agent_parse(
     ua: &str,
 ) -> (&str, Option<&str>, Option<&str>, Option<&str>, Option<&str>) {
-    let pat = ["(schild:", "(device:", "(@Kalimdor)_"];
+    let pat = ["(schild:", "(device:", ")", "(@Kalimdor)_"];
     let mut result = [None; 5];
     let mut rest = ua;
     let mut res_index = 0;
     for (pat_index, pat) in pat.into_iter().enumerate() {
-        if let Some(end) = ua.find(pat) {
-            result[res_index] = Some(&ua[ua.len() - rest.len()..end]);
+        if let Some(end) = rest.find(pat) {
+            result[res_index] = Some(&rest[..end]);
             rest = &rest[end + pat.len()..];
             res_index = pat_index + 1;
         }
@@ -194,7 +194,7 @@ pub fn user_agent_parse(
     (
         result[0].unwrap().trim(),
         result[1].map(f),
-        result[2].map(f),
+        result[2].map(str::trim),
         result[3].map(str::trim),
         result[4].map(str::trim),
     )
@@ -202,9 +202,8 @@ pub fn user_agent_parse(
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, Instant};
 
-    use crate::{chaoxing_get_identifier, chaoxing_get_schild};
+    use crate::{chaoxing_get_identifier, chaoxing_get_schild, user_agent_gen, user_agent_parse};
 
     #[test]
     fn tmp() {
@@ -215,5 +214,31 @@ mod tests {
             "(device:V2118A) Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_3_6.6.0_android_phone_10893_283 (@Kalimdor)_eb21ec75ce62463ea067895e3340f627",
         );
         println!("{b}");
+    }
+    #[test]
+    fn gen_and_parse() {
+        use std::time::Instant;
+        let uid = "317347528";
+        let identifier = chaoxing_get_identifier(uid);
+        let start_time = Instant::now();
+        let ua = user_agent_gen(
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36",
+            "Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_3_6.6.0_android_phone_10893_283",
+            None,
+            "V2118A",
+            &identifier,
+        );
+        let elapsed = start_time.elapsed();
+        println!("Generated User Agent: {ua}");
+        println!("Generated in: {elapsed:?}");
+        let start_time = Instant::now();
+        let (base_ua, schild, device, custom_ident, device_identifier) = user_agent_parse(&ua);
+        let elapsed = start_time.elapsed();
+        println!("Parsed in: {elapsed:?}");
+        println!("Base UA: {base_ua}");
+        println!("Schild: {schild:?}");
+        println!("Device: {device:?}");
+        println!("Custom Ident: {custom_ident:?}");
+        println!("Device Identifier: {device_identifier:?}");
     }
 }
