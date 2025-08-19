@@ -1,0 +1,16 @@
+[package]
+name = "cx_device_ident"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+base64 = "0.22"
+cx_enc_utils = { path = "../cx_enc_utils" }
+getset2 = "0.4"
+hex = "0.4"
+md5 = "0.8"
+percent-encoding = "2.3"
+rand = "0.9"
+rust-crypto = "0.2"
+thiserror = "2.0"
