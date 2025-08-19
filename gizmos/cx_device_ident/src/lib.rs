@@ -141,6 +141,7 @@ fn flatten_bytes<const BLOCK_SIZE: usize>(mut blocks: Vec<[u8; BLOCK_SIZE]>) -> 
     unsafe { Vec::from_raw_parts(p as *mut u8, l * BLOCK_SIZE, c * BLOCK_SIZE) }
 }
 #[inline]
+// TODO: 传入 uid 时结果与预期不符，可能是有更新，需要逆向。
 pub fn chaoxing_get_identifier(seed: impl AsRef<[u8]>) -> String {
     hex::encode(md5_enc(seed.as_ref()))
 }
@@ -156,7 +157,48 @@ pub fn chaoxing_get_schild(part: impl std::fmt::Display) -> String {
     ))
 }
 
-pub fn user_agent_gen(base_ua: &str, device_code: &str, device_identifier: &str) {}
+pub fn user_agent_gen(
+    base_ua: &str,
+    custom_ident: &str,
+    schild: Option<&str>,
+    device: &str,
+    device_identifier: &str,
+) -> String {
+    let ua_part = format!("(device:{device}) {custom_ident} (@Kalimdor)_{device_identifier}",);
+    if let Some(schild) = schild {
+        return format!("{base_ua} (schild:{schild}) {ua_part}",);
+    }
+    let schild = chaoxing_get_schild(&ua_part);
+    format!("{base_ua} (schild:{schild}) {ua_part}",)
+}
+pub fn user_agent_parse(
+    ua: &str,
+) -> (&str, Option<&str>, Option<&str>, Option<&str>, Option<&str>) {
+    let pat = ["(schild:", "(device:", "(@Kalimdor)_"];
+    let mut result = [None; 5];
+    let mut rest = ua;
+    let mut res_index = 0;
+    for (pat_index, pat) in pat.into_iter().enumerate() {
+        if let Some(end) = ua.find(pat) {
+            result[res_index] = Some(&ua[ua.len() - rest.len()..end]);
+            rest = &rest[end + pat.len()..];
+            res_index = pat_index + 1;
+        }
+    }
+    result[res_index] = Some(rest);
+    assert!(result[0].is_some());
+    fn f(s: &str) -> &str {
+        let end = s.find(')');
+        if let Some(end) = end { &s[..end] } else { s }.trim()
+    }
+    (
+        result[0].unwrap().trim(),
+        result[1].map(f),
+        result[2].map(f),
+        result[3].map(str::trim),
+        result[4].map(str::trim),
+    )
+}
 
 #[cfg(test)]
 mod tests {
@@ -173,48 +215,5 @@ mod tests {
             "(device:V2118A) Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_3_6.6.0_android_phone_10893_283 (@Kalimdor)_eb21ec75ce62463ea067895e3340f627",
         );
         println!("{b}");
-    }
-    #[test]
-    fn md5_bench() {
-        println!("MD5 计算性能测试开始...");
-
-        // 测试参数
-        let test_duration = Duration::from_secs(60); // 1分钟测试
-        let data_size = 1024; // 每次计算的数据大小（字节）
-
-        // 创建测试数据（随机内容）
-        let test_data: Vec<u8> = (0..data_size).map(|i| (i % 256) as u8).collect();
-
-        let start_time = Instant::now();
-        let mut hash_count = 0;
-
-        println!("测试运行中（将持续 60 秒）...");
-        // 主测试循环
-        while start_time.elapsed() < test_duration {
-            // 计算 MD5 哈希
-            let mut hasher = md5::Context::new();
-            hasher.consume(&test_data);
-            hasher.finalize(); // 故意不保存结果，只计算
-
-            hash_count += 1;
-
-            // 每秒显示一次进度
-            if hash_count % 100_000 == 0 {
-                let elapsed = start_time.elapsed().as_secs_f64();
-                let hash_rate = hash_count as f64 / elapsed;
-                println!(
-                    "已计算: {hash_count} 次 | 当前速率: {hash_rate:.0} 次/秒"
-                );
-            }
-        }
-
-        let elapsed = start_time.elapsed().as_secs_f64();
-        let hash_rate = hash_count as f64 / elapsed;
-
-        println!("\n测试完成！");
-        println!("总计算次数: {hash_count}");
-        println!("总耗时: {elapsed:.2} 秒");
-        println!("平均速率: {hash_rate:.0} 次/秒");
-        println!("一分钟理论计算量: {:.0} 次", hash_rate * 60.0);
     }
 }
