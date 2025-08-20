@@ -4,4 +4,12 @@ edition = "2024"
 version.workspace = true
 authors.workspace = true
 
+[features]
+md5 = ["dep:md5"]
+aes = ["dep:cbc", "dep:ecb", "dep:aes"]
+
 [dependencies]
+md5 = { version = "0.8", optional = true }
+aes = { version = "0.8", optional = true }
+cbc = { version = "0.1", features = ["alloc"], optional = true }
+ecb = { version = "0.1", features = ["alloc"], optional = true }

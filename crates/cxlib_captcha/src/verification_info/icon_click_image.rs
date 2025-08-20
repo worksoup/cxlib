@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
-    CaptchaError, DefaultSolver, TriplePoint, VerificationInfoTrait, click_captcha_helper,
-    utils::download_image,
+    CaptchaError, SolveCaptcha, SolverProviderTrait, TriplePoint, VerificationInfoTrait,
+    click_captcha_helper, utils::download_image,
 };
+
 use getset2::Getset2;
 use image::DynamicImage;
 use serde::Deserialize;
@@ -47,4 +48,9 @@ impl<SolverProvider> VerificationInfoTrait for IconClickImage<SolverProvider> {
         click_captcha_helper::triple_point_to_string(result)
     }
 }
-impl<SolverProvider> DefaultSolver<SolverProvider> for IconClickImage<SolverProvider> {}
+impl<SolverProvider> SolveCaptcha for IconClickImage<SolverProvider>
+where
+    SolverProvider: SolverProviderTrait<I = Self::I, O = Self::O>,
+{
+    type SolverProvider = SolverProvider;
+}

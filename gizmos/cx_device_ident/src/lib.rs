@@ -1,123 +1,5 @@
 use base64::{DecodeError, Engine};
-use crypto::{
-    aes, blockmodes,
-    buffer::{BufferResult, ReadBuffer, RefReadBuffer, RefWriteBuffer, WriteBuffer},
-};
 use percent_encoding::PercentEncode;
-
-fn aes_cbc_enc(padded_data: &[u8], key: &[u8; 16], iv: &[u8]) -> Vec<u8> {
-    let mut encryptor =
-        aes::cbc_encryptor(aes::KeySize::KeySize128, key, iv, blockmodes::NoPadding);
-    let mut final_result = Vec::<u8>::new();
-    let mut read_buffer = RefReadBuffer::new(padded_data);
-    let mut buffer = [0; 4096];
-    let mut write_buffer = RefWriteBuffer::new(&mut buffer);
-
-    loop {
-        let result = encryptor
-            .encrypt(&mut read_buffer, &mut write_buffer, true)
-            .expect("Encrypt failed");
-
-        final_result.extend(
-            write_buffer
-                .take_read_buffer()
-                .take_remaining()
-                .iter()
-                .copied(),
-        );
-
-        match result {
-            BufferResult::BufferUnderflow => break,
-            BufferResult::BufferOverflow => {}
-        }
-    }
-    final_result
-}
-fn aes_cbc_dec(
-    enc_data: &[u8],
-    key: &[u8; 16],
-    iv: &[u8],
-) -> Result<Vec<u8>, crypto::symmetriccipher::SymmetricCipherError> {
-    let mut decryptor =
-        aes::cbc_decryptor(aes::KeySize::KeySize128, key, iv, blockmodes::PkcsPadding);
-
-    let mut final_result = Vec::<u8>::new();
-    let mut read_buffer = RefReadBuffer::new(enc_data);
-    let mut buffer = [0; 4096];
-    let mut write_buffer = RefWriteBuffer::new(&mut buffer);
-
-    loop {
-        let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true)?;
-        final_result.extend(
-            write_buffer
-                .take_read_buffer()
-                .take_remaining()
-                .iter()
-                .copied(),
-        );
-        match result {
-            BufferResult::BufferUnderflow => break,
-            BufferResult::BufferOverflow => {}
-        }
-    }
-
-    Ok(final_result)
-}
-fn aes_ecb_enc(padded_data: &[u8], key: &[u8; 16]) -> Vec<u8> {
-    let mut encryptor = aes::ecb_encryptor(aes::KeySize::KeySize128, key, blockmodes::NoPadding);
-    let mut final_result = Vec::<u8>::new();
-    let mut read_buffer = RefReadBuffer::new(padded_data);
-    let mut buffer = [0; 4096];
-    let mut write_buffer = RefWriteBuffer::new(&mut buffer);
-
-    loop {
-        let result = encryptor
-            .encrypt(&mut read_buffer, &mut write_buffer, true)
-            .expect("Encrypt failed");
-
-        final_result.extend(
-            write_buffer
-                .take_read_buffer()
-                .take_remaining()
-                .iter()
-                .copied(),
-        );
-
-        match result {
-            BufferResult::BufferUnderflow => break,
-            BufferResult::BufferOverflow => {}
-        }
-    }
-    final_result
-}
-fn aes_ecb_dec(
-    enc_data: &[u8],
-    key: &[u8; 16],
-) -> Result<Vec<u8>, crypto::symmetriccipher::SymmetricCipherError> {
-    let mut decryptor = aes::ecb_decryptor(aes::KeySize::KeySize128, key, blockmodes::PkcsPadding);
-
-    let mut final_result = Vec::<u8>::new();
-    let mut read_buffer = RefReadBuffer::new(enc_data);
-    let mut buffer = [0; 4096];
-    let mut write_buffer = RefWriteBuffer::new(&mut buffer);
-
-    loop {
-        let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true)?;
-        final_result.extend(
-            write_buffer
-                .take_read_buffer()
-                .take_remaining()
-                .iter()
-                .copied(),
-        );
-        match result {
-            BufferResult::BufferUnderflow => break,
-            BufferResult::BufferOverflow => {}
-        }
-    }
-
-    Ok(final_result)
-}
 
 #[inline]
 fn percent_enc(input: &str) -> PercentEncode {
@@ -132,10 +14,6 @@ fn base64_dec<T: AsRef<[u8]>>(input: T) -> Result<Vec<u8>, DecodeError> {
     base64::engine::general_purpose::STANDARD.decode(input)
 }
 #[inline]
-fn md5_enc<T: AsRef<[u8]>>(input: T) -> [u8; 16] {
-    md5::compute(input).0
-}
-#[inline]
 fn flatten_bytes<const BLOCK_SIZE: usize>(blocks: Vec<[u8; BLOCK_SIZE]>) -> Vec<u8> {
     let mut blocks = std::mem::ManuallyDrop::new(blocks);
     let (p, l, c) = (blocks.as_mut_ptr(), blocks.len(), blocks.capacity());
@@ -145,18 +23,24 @@ fn flatten_bytes<const BLOCK_SIZE: usize>(blocks: Vec<[u8; BLOCK_SIZE]>) -> Vec<
 // TODO: 传入 uid 时结果与预期不符，可能是有更新，需要逆向。
 // 猜测可能为 cx_obfuscate?
 pub fn chaoxing_get_identifier(seed: impl AsRef<[u8]>) -> String {
-    hex::encode(cx_private_hash::hash(seed.as_ref()))
+    hex::encode(cx_enc_utils::hash::md5_hash(seed.as_ref()))
 }
 // TODO: 传入 ident 时结果与预期不符，可能是有更新，需要逆向。
 // 猜测可能为 SHA512?
 #[inline]
 pub fn chaoxing_get_devicecode(ident: impl AsRef<[u8]>) -> String {
-    let ident: Vec<[u8; 16]> = cx_enc_utils::crypto::pkcs7_pad(ident.as_ref());
-    base64_enc(aes_ecb_enc(&flatten_bytes(ident), b"QrCbNY@MuK1X8HGw"))
+    let ident: Vec<[u8; 16]> = cx_enc_utils::padding::pkcs7_pad(ident.as_ref());
+    base64_enc(
+        cx_enc_utils::crypto::Aes::new(
+            cx_enc_utils::crypto::KeySize::KeySize128,
+            cx_enc_utils::crypto::Mode::ECB,
+        )
+        .enc(&flatten_bytes(ident), b"QrCbNY@MuK1X8HGw"),
+    )
 }
 #[inline]
 pub fn chaoxing_get_schild(part: impl std::fmt::Display) -> String {
-    hex::encode(md5_enc(
+    hex::encode(cx_enc_utils::hash::md5_hash(
         format!("(schild:ipL$TkeiEmfy1gTXb2XHrdLN0a@7c^vu) {part}").as_bytes(),
     ))
 }
@@ -208,8 +92,8 @@ pub fn user_agent_parse(
 mod tests {
 
     use crate::{
-        aes_ecb_dec, base64_dec, chaoxing_get_devicecode, chaoxing_get_identifier,
-        chaoxing_get_schild, user_agent_gen, user_agent_parse,
+        base64_dec, chaoxing_get_devicecode, chaoxing_get_identifier, chaoxing_get_schild,
+        user_agent_gen, user_agent_parse,
     };
 
     #[test]
@@ -252,7 +136,12 @@ mod tests {
         }
         let device_code = "zE9+rwe3eRV6GaU0FX5KhiCnFj/Ju8X05ywjTUWxx+MV5Sfjflk+dHuRq2Pi3T7redETzSIYMbwqqRViHAEs88o+3W2FKfGichnoLiFd2iU=";
         let device_code = base64_dec(device_code).unwrap();
-        let ident = aes_ecb_dec(&device_code, b"QrCbNY@MuK1X8HGw").unwrap();
+        let ident = cx_enc_utils::crypto::Aes::new(
+            cx_enc_utils::crypto::KeySize::KeySize128,
+            cx_enc_utils::crypto::Mode::ECB,
+        )
+        .dec(&device_code, b"QrCbNY@MuK1X8HGw")
+        .unwrap();
         let ident = unsafe { String::from_utf8_unchecked(ident) };
         println!("{ident}");
         let device_code = base64_dec(ident).unwrap();

@@ -4,7 +4,7 @@
 //! 支持多种验证码类型，包括滑块、文字点选、图片旋转等。
 
 use crate::{
-    CaptchaError, VerificationInfoTrait,
+    CaptchaError, SolveCaptcha,
     hash::{encode, hash, uuid},
     utils::get_now_timestamp_mills,
 };
@@ -67,7 +67,7 @@ pub trait CaptchaSolverTrait {
 /// 该文档为AI生成。为所有实现VerificationInfoTrait的类型提供默认实现
 impl<T> CaptchaSolverTrait for T
 where
-    T: VerificationInfoTrait + DeserializeOwned + 'static + DefaultSolver,
+    T: DeserializeOwned + 'static + SolveCaptcha,
 {
     /// 该文档为AI生成。解决验证码的核心方法实现
     fn solver(
@@ -192,7 +192,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        CaptchaSolverTrait, IconClickImage, RotateImages, SlideImages, VerificationInfoTrait,
+        CaptchaSolverTrait, IconClickImage, RotateImages, SlideImages, SolveCaptcha,
+        VerificationInfoTrait,
         hash::{encode, hash},
         utils::get_now_timestamp_mills,
     };
@@ -218,7 +219,7 @@ mod tests {
             captcha_id: &str,
             captcha_key: &str,
         ) where
-            T: VerificationInfoTrait + DeserializeOwned + 'static,
+            T: VerificationInfoTrait,
         {
             let tmp_token = encode(hash(
                 &(server_time.to_string() + captcha_id + T::captcha_type() + captcha_key),
@@ -239,7 +240,7 @@ mod tests {
     fn get_captcha_test() {
         fn get_captcha_<T>()
         where
-            T: VerificationInfoTrait + DeserializeOwned + 'static,
+            T: DeserializeOwned + 'static + SolveCaptcha,
         {
             let agent = ureq::Agent::new_with_defaults();
             let local_time = get_now_timestamp_mills();

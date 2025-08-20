@@ -8,13 +8,13 @@ authors.workspace = true
 
 [dependencies]
 yapt.workspace = true
+cx_debug_utils = { path = "../../gizmos/cx_debug_utils" }
+cx_enc_utils = { path = "../../gizmos/cx_enc_utils", features = ["md5"] }
+cx_ureq_utils = { path = "../../gizmos/cx_ureq_utils" }
 cxlib_base_types = { path = "../cxlib_base_types" }
 cxlib_error = { path = "../cxlib_error" }
 cxlib_error_utils = { path = "../cxlib_error_utils" }
-cx_debug_utils = { path = "../../gizmos/cx_debug_utils" }
-cx_ureq_utils = { path = "../../gizmos/cx_ureq_utils" }
 cxlib_imageproc = { path = "../cxlib_imageproc" }
-cx_private_hash = { path = "../../gizmos/cx_private_hash" }
 cxlib_protocol = { path = "../cxlib_protocol", features = ["captcha"] }
 getset2.workspace = true
 hex.workspace = true

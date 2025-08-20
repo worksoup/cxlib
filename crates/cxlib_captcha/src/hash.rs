@@ -1,6 +1,6 @@
 use rand::Rng;
 
-pub(crate) use cx_private_hash::hash;
+pub(crate) use cx_enc_utils::hash::md5_hash as hash;
 
 // let mut s = String::new();
 // for c in a {
@@ -32,13 +32,12 @@ pub(crate) fn uuid() -> String {
 
 #[cfg(test)]
 mod tests {
-    use cx_private_hash::hash;
 
     use crate::hash::{encode, uuid};
     #[test]
     fn pre_hash_test() {
         let k = "12121212";
-        let k = hash(k);
+        let k = crate::hash::hash(k);
         assert_eq!(encode(k), "8ce87b8ec346ff4c80635f667d1592ae");
         let k = k.map(|a| a as i32);
         assert_eq!(

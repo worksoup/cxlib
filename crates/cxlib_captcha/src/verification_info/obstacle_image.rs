@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::{CaptchaError, DefaultSolver, VerificationInfoTrait, utils::download_image};
+use crate::{
+    CaptchaError, SolveCaptcha, SolverProviderTrait, VerificationInfoTrait, utils::download_image,
+};
+
 use getset2::Getset2;
 use image::DynamicImage;
 use log::debug;
@@ -49,4 +52,10 @@ impl<SolverProvider> VerificationInfoTrait for ObstacleImage<SolverProvider> {
         format!("%5B{data}%5D",)
     }
 }
-impl<SolverProvider> DefaultSolver<SolverProvider> for ObstacleImage<SolverProvider> {}
+
+impl<SolverProvider> SolveCaptcha for ObstacleImage<SolverProvider>
+where
+    SolverProvider: SolverProviderTrait<I = Self::I, O = Self::O>,
+{
+    type SolverProvider = SolverProvider;
+}

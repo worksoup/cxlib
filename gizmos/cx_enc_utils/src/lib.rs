@@ -1,4 +1,4 @@
-pub mod crypto {
+pub mod padding {
     //! *本文档为 AI 生成。*
     //!
     //! PKCS#7 填充方案非标准实现
@@ -214,14 +214,14 @@ pub mod crypto {
     mod tests {
         #[test]
         fn test_convert_usize_to() {
-            use crate::crypto::convert_usize_to;
+            use crate::padding::convert_usize_to;
             let data = 0xdeadbeef_baadc0de;
             println!("{:x}", unsafe { convert_usize_to::<u32>(data) })
         }
         #[test]
         fn test_pkcs7_pad_const() {
             const PADDED: [[u32; 8]; 2] = {
-                use crate::crypto::pkcs7_pad_const;
+                use crate::padding::pkcs7_pad_const;
                 let mut padded = [[0; 8]; 2];
                 unsafe {
                     pkcs7_pad_const::<8, u32>(
@@ -233,6 +233,130 @@ pub mod crypto {
             };
             println!("{PADDED:?}");
             assert_eq!(PADDED[1], [8, 8, 8, 8, 8, 8, 8, 8]);
+        }
+    }
+}
+pub mod hash {
+    #[cfg(feature = "md5")]
+    #[inline(always)]
+    pub fn md5_hash<T: AsRef<[u8]>>(input: T) -> [u8; 16] {
+        md5::compute(input).0
+    }
+}
+pub mod coding {}
+pub mod crypto {
+    #[cfg(feature = "aes")]
+    pub use aes::*;
+    #[cfg(feature = "aes")]
+    mod aes {
+        use std::marker::PhantomData;
+
+        pub use aes::{Aes128, Aes192, Aes256};
+
+        use aes::cipher::{
+            ArrayLength, BlockCipher, BlockDecrypt, BlockDecryptMut, BlockEncrypt, BlockEncryptMut,
+            KeyInit, KeyIvInit, KeySizeUser,
+            block_padding::{self, NoPadding, Pkcs7},
+            generic_array::GenericArray,
+        };
+        #[inline]
+        fn cbc_enc<
+            KeySize: KeyInit + BlockCipher + KeySizeUser + BlockEncrypt,
+            P: block_padding::Padding<KeySize::BlockSize>,
+        >(
+            msg: &[u8],
+            key: &GenericArray<u8, KeySize::KeySize>,
+            iv: &GenericArray<u8, KeySize::BlockSize>,
+        ) -> Vec<u8> {
+            cbc::Encryptor::<KeySize>::new(key, iv).encrypt_padded_vec_mut::<P>(msg)
+        }
+        #[inline]
+        fn ecb_enc<
+            KeySize: KeyInit + BlockCipher + KeySizeUser + BlockEncrypt,
+            P: block_padding::Padding<KeySize::BlockSize>,
+        >(
+            msg: &[u8],
+            key: &GenericArray<u8, KeySize::KeySize>,
+        ) -> Vec<u8> {
+            <ecb::Encryptor<KeySize> as KeyInit>::new(key).encrypt_padded_vec_mut::<P>(msg)
+        }
+        #[inline]
+        fn cbc_dec<
+            KeySize: KeyInit + BlockCipher + KeySizeUser + BlockDecrypt,
+            P: block_padding::Padding<KeySize::BlockSize>,
+        >(
+            msg: &[u8],
+            key: &GenericArray<u8, KeySize::KeySize>,
+            iv: &GenericArray<u8, KeySize::BlockSize>,
+        ) -> Vec<u8> {
+            cbc::Decryptor::<KeySize>::new(key, iv)
+                .decrypt_padded_vec_mut::<P>(msg)
+                .unwrap()
+        }
+        #[inline]
+        fn ecb_dec<
+            KeySize: KeyInit + BlockCipher + KeySizeUser + BlockDecrypt,
+            P: block_padding::Padding<KeySize::BlockSize>,
+        >(
+            msg: &[u8],
+            key: &GenericArray<u8, KeySize::KeySize>,
+        ) -> Vec<u8> {
+            <ecb::Decryptor<KeySize> as KeyInit>::new(key)
+                .decrypt_padded_vec_mut::<P>(msg)
+                .unwrap()
+        }
+        pub enum Mode<BlockSize: ArrayLength<u8>> {
+            CBC(GenericArray<u8, BlockSize>),
+            ECB,
+        }
+        pub enum Padding {
+            Pkcs7,
+            NoPadding,
+        }
+        pub struct Aes<KeySize>
+        where
+            KeySize: KeyInit + BlockCipher + KeySizeUser,
+        {
+            mode: Mode<KeySize::BlockSize>,
+            padding: Padding,
+            _p: PhantomData<KeySize>,
+        }
+        impl<KeySize> Aes<KeySize>
+        where
+            KeySize: KeyInit + BlockCipher + KeySizeUser,
+        {
+            #[inline]
+            pub fn enc(&self, msg: &[u8], key: &GenericArray<u8, KeySize::KeySize>) -> Vec<u8>
+            where
+                KeySize: BlockEncrypt,
+            {
+                match &self.padding {
+                    Padding::Pkcs7 => match &self.mode {
+                        Mode::CBC(iv) => cbc_enc::<KeySize, Pkcs7>(msg, key, iv),
+                        Mode::ECB => ecb_enc::<KeySize, Pkcs7>(msg, key),
+                    },
+                    Padding::NoPadding => match &self.mode {
+                        Mode::CBC(iv) => cbc_enc::<KeySize, NoPadding>(msg, key, iv),
+                        Mode::ECB => ecb_enc::<KeySize, NoPadding>(msg, key),
+                    },
+                }
+            }
+            #[inline]
+            pub fn dec(&self, msg: &[u8], key: &GenericArray<u8, KeySize::KeySize>) -> Vec<u8>
+            where
+                KeySize: BlockDecrypt,
+            {
+                match &self.padding {
+                    Padding::Pkcs7 => match &self.mode {
+                        Mode::CBC(iv) => cbc_dec::<KeySize, Pkcs7>(msg, key, iv),
+                        Mode::ECB => ecb_dec::<KeySize, Pkcs7>(msg, key),
+                    },
+                    Padding::NoPadding => match &self.mode {
+                        Mode::CBC(iv) => cbc_dec::<KeySize, NoPadding>(msg, key, iv),
+                        Mode::ECB => ecb_dec::<KeySize, NoPadding>(msg, key),
+                    },
+                }
+            }
         }
     }
 }
