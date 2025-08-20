@@ -30,15 +30,24 @@ pub trait VerificationInfoTrait: Sized {
     fn prepare_data(self, agent: &Agent, referer: &str) -> Result<Self::I, CaptchaError>;
     /// 将结果转为字符串类型，用来向网站发送请求。
     fn result_to_string(result: Self::O) -> String;
+}
+pub trait DefaultSolver<SolverProvider>: VerificationInfoTrait {
     /// 过验证算法。如不实现则仅仅返回一个错误。
-    fn default_solver(input: Self::I) -> Result<Self::O, CaptchaError> {
-        let _ = input;
-        Err(CaptchaError::UnsupportedType)
-    }
-    fn solve(self, agent: &Agent, referer: &str) -> Result<String, CaptchaError> {
+    #[inline]
+    fn solve(self, agent: &Agent, referer: &str) -> Result<String, CaptchaError>
+    where
+        SolverProvider: SolverProviderTrait<I = Self::I, O = Self::O>,
+    {
         let data = self.prepare_data(agent, referer)?;
         let output = Self::default_solver(data)?;
         let r = Self::result_to_string(output);
         Ok(r)
+    }
+    #[inline]
+    fn default_solver(input: Self::I) -> Result<Self::O, CaptchaError>
+    where
+        SolverProvider: SolverProviderTrait<I = Self::I, O = Self::O>,
+    {
+        SolverProvider::solver(input)
     }
 }

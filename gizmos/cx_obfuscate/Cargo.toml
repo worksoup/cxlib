@@ -1,5 +1,5 @@
 [package]
-name = "cxlib_obfuscate"
+name = "cx_obfuscate"
 edition = "2024"
 version.workspace = true
 authors.workspace = true

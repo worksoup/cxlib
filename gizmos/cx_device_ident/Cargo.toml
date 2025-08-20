@@ -7,6 +7,7 @@ authors.workspace = true
 [dependencies]
 base64 = "0.22"
 cx_enc_utils = { path = "../cx_enc_utils" }
+cx_private_hash = { path = "../cx_private_hash" }
 getset2 = "0.4"
 hex = "0.4"
 md5 = "0.8"

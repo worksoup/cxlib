@@ -1,0 +1,8 @@
+[package]
+name = "cx_private_hash"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+cx_obfuscate = { path = "../cx_obfuscate" }

@@ -143,9 +143,9 @@ fn flatten_bytes<const BLOCK_SIZE: usize>(blocks: Vec<[u8; BLOCK_SIZE]>) -> Vec<
 }
 #[inline]
 // TODO: 传入 uid 时结果与预期不符，可能是有更新，需要逆向。
-// 猜测可能为 cxlib_obfuscate? 
+// 猜测可能为 cx_obfuscate?
 pub fn chaoxing_get_identifier(seed: impl AsRef<[u8]>) -> String {
-    hex::encode(md5_enc(seed.as_ref()))
+    hex::encode(cx_private_hash::hash(seed.as_ref()))
 }
 // TODO: 传入 ident 时结果与预期不符，可能是有更新，需要逆向。
 // 猜测可能为 SHA512?

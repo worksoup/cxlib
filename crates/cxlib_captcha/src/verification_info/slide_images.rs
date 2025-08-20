@@ -6,7 +6,9 @@ use serde::Deserialize;
 use std::marker::PhantomData;
 use ureq::Agent;
 
-use crate::{CaptchaError, SolverProviderTrait, VerificationInfoTrait, utils::download_image};
+use crate::{
+    CaptchaError, DefaultSolver, SolverProviderTrait, VerificationInfoTrait, utils::download_image,
+};
 pub struct DefaultSlideImagesSolverProvider;
 impl SolverProviderTrait for DefaultSlideImagesSolverProvider {
     type I = (image::DynamicImage, image::DynamicImage);
@@ -47,11 +49,9 @@ pub struct SlideImages<SolverProvider = DefaultSlideImagesSolverProvider> {
 }
 /// 类型别名，三个一组的 [`Point`] 类型。
 pub type TriplePoint<T> = (Point<T>, Point<T>, Point<T>);
-impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::DynamicImage), O = u32>>
-    VerificationInfoTrait for SlideImages<SolverProvider>
-{
-    type I = SolverProvider::I;
-    type O = SolverProvider::O;
+impl<SolverProvider> VerificationInfoTrait for SlideImages<SolverProvider> {
+    type I = (image::DynamicImage, image::DynamicImage);
+    type O = u32;
 
     #[inline]
     fn captcha_type() -> &'static str {
@@ -63,8 +63,8 @@ impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::Dynami
         agent: &Agent,
         referer: &str,
     ) -> Result<(DynamicImage, DynamicImage), CaptchaError> {
-        debug!("small_image_url：{}", self.small_img_url());
-        debug!("big_image_url：{}", self.big_img_url());
+        debug!("small_image_url: {}", self.small_img_url());
+        debug!("big_image_url: {}", self.big_img_url());
         let small_img = download_image(agent, self.small_img_url(), referer)?;
         let big_img = download_image(agent, self.big_img_url(), referer)?;
         Ok((big_img, small_img))
@@ -74,8 +74,5 @@ impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::Dynami
         debug!("本地滑块结果：{result}");
         format!("%5B%7B%22x%22%3A{result}%7D%5D",)
     }
-    #[inline]
-    fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
-        SolverProvider::solver(input)
-    }
 }
+impl<SolverProvider> DefaultSolver<SolverProvider> for SlideImages<SolverProvider> {}

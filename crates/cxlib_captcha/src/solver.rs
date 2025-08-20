@@ -67,7 +67,7 @@ pub trait CaptchaSolverTrait {
 /// 该文档为AI生成。为所有实现VerificationInfoTrait的类型提供默认实现
 impl<T> CaptchaSolverTrait for T
 where
-    T: VerificationInfoTrait + DeserializeOwned + 'static,
+    T: VerificationInfoTrait + DeserializeOwned + 'static + DefaultSolver,
 {
     /// 该文档为AI生成。解决验证码的核心方法实现
     fn solver(
@@ -192,7 +192,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        CaptchaSolverTrait, RotateImages, SlideImages, VerificationInfoTrait,
+        CaptchaSolverTrait, IconClickImage, RotateImages, SlideImages, VerificationInfoTrait,
         hash::{encode, hash},
         utils::get_now_timestamp_mills,
     };
@@ -226,7 +226,7 @@ mod tests {
                 + (server_time + 300000_u128).to_string().as_str();
             assert_eq!(real_value, tmp_token);
         }
-        assert_eq_with_real_value::<SlideImages>(
+        assert_eq_with_real_value::<IconClickImage<()>>(
             "21d29919dc55f9a25b25a9aec531682e%3A1733129174649",
             1733128874649,
             CAPTCHA_ID,

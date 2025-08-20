@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    CaptchaError, SolverProviderTrait, TriplePoint, VerificationInfoTrait, click_captcha_helper,
+    CaptchaError, DefaultSolver, TriplePoint, VerificationInfoTrait, click_captcha_helper,
     utils::download_image,
 };
 use getset2::Getset2;
@@ -34,9 +34,7 @@ pub struct TextClickInfo<SolverProvider> {
     #[serde(skip)]
     marker: PhantomData<SolverProvider>,
 }
-impl<SolverProvider: SolverProviderTrait<I = (String, DynamicImage), O = TriplePoint<u32>>>
-    VerificationInfoTrait for TextClickInfo<SolverProvider>
-{
+impl<SolverProvider> VerificationInfoTrait for TextClickInfo<SolverProvider> {
     type I = (String, DynamicImage);
     type O = TriplePoint<u32>;
 
@@ -61,9 +59,5 @@ impl<SolverProvider: SolverProviderTrait<I = (String, DynamicImage), O = TripleP
     fn result_to_string(result: TriplePoint<u32>) -> String {
         click_captcha_helper::triple_point_to_string(result)
     }
-
-    #[inline]
-    fn default_solver(input: (String, DynamicImage)) -> Result<TriplePoint<u32>, CaptchaError> {
-        SolverProvider::solver(input)
-    }
 }
+impl<SolverProvider> DefaultSolver<SolverProvider> for TextClickInfo<SolverProvider> {}

@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{CaptchaError, SolverProviderTrait, VerificationInfoTrait, utils::download_image};
+use crate::{CaptchaError, DefaultSolver, VerificationInfoTrait, utils::download_image};
 use getset2::Getset2;
 use image::DynamicImage;
 use log::debug;
@@ -25,11 +25,9 @@ pub struct ObstacleImage<SolverProvider> {
     marker: PhantomData<SolverProvider>,
 }
 
-impl<SolverProvider: SolverProviderTrait<I = DynamicImage, O = Point<u32>>> VerificationInfoTrait
-    for ObstacleImage<SolverProvider>
-{
-    type I = SolverProvider::I;
-    type O = SolverProvider::O;
+impl<SolverProvider> VerificationInfoTrait for ObstacleImage<SolverProvider> {
+    type I = DynamicImage;
+    type O = Point<u32>;
 
     #[inline]
     fn captcha_type() -> &'static str {
@@ -50,9 +48,5 @@ impl<SolverProvider: SolverProviderTrait<I = DynamicImage, O = Point<u32>>> Veri
         debug!("本地滑块结果：{data}");
         format!("%5B{data}%5D",)
     }
-
-    #[inline]
-    fn default_solver(input: DynamicImage) -> Result<Point<u32>, CaptchaError> {
-        SolverProvider::solver(input)
-    }
 }
+impl<SolverProvider> DefaultSolver<SolverProvider> for ObstacleImage<SolverProvider> {}

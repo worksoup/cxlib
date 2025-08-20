@@ -5,7 +5,9 @@ use serde::Deserialize;
 use std::marker::PhantomData;
 use ureq::Agent;
 
-use crate::{CaptchaError, SolverProviderTrait, VerificationInfoTrait, utils::download_image};
+use crate::{
+    CaptchaError, DefaultSolver, SolverProviderTrait, VerificationInfoTrait, utils::download_image,
+};
 pub struct DefaultRotateImagesSolverProvider;
 impl SolverProviderTrait for DefaultRotateImagesSolverProvider {
     type I = (image::DynamicImage, image::DynamicImage);
@@ -45,11 +47,9 @@ pub struct RotateImages<SolverProvider = DefaultRotateImagesSolverProvider> {
     marker: PhantomData<SolverProvider>,
 }
 
-impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::DynamicImage), O = u32>>
-    VerificationInfoTrait for RotateImages<SolverProvider>
-{
-    type I = SolverProvider::I;
-    type O = SolverProvider::O;
+impl<SolverProvider> VerificationInfoTrait for RotateImages<SolverProvider> {
+    type I = (DynamicImage, DynamicImage);
+    type O = u32;
 
     #[inline]
     fn captcha_type() -> &'static str {
@@ -78,8 +78,5 @@ impl<SolverProvider: SolverProviderTrait<I = (image::DynamicImage, image::Dynami
         debug!("本地旋转结果：{result}");
         format!("%5B%7B%22x%22%3A{result}%7D%5D")
     }
-    #[inline]
-    fn default_solver(input: (DynamicImage, DynamicImage)) -> Result<u32, CaptchaError> {
-        SolverProvider::solver(input)
-    }
 }
+impl<SolverProvider> DefaultSolver<SolverProvider> for RotateImages<SolverProvider> {}
