@@ -243,13 +243,58 @@ pub mod hash {
         md5::compute(input).0
     }
 }
-pub mod coding {}
+pub mod coding {
+    #[cfg(feature = "percent-encoding")]
+    pub mod percent_encoding {
+        use std::fmt::Display;
+        pub mod deps {
+            pub use percent_encoding::*;
+        }
+
+        #[inline(always)]
+        pub fn encode(input: &'_ str) -> impl Display + Iterator {
+            percent_encoding::utf8_percent_encode(input, percent_encoding::NON_ALPHANUMERIC)
+        }
+        #[inline(always)]
+        pub fn decode(input: impl AsRef<[u8]>) -> Result<String, std::str::Utf8Error> {
+            Ok(percent_encoding::percent_decode(input.as_ref())
+                .decode_utf8()?
+                .into_owned())
+        }
+    }
+    #[cfg(feature = "base64")]
+    pub mod base64 {
+        use base64::{DecodeError, Engine};
+
+        pub mod deps {
+            pub use base64::*;
+        }
+        #[inline(always)]
+        pub fn encode<T: AsRef<[u8]>>(input: T) -> String {
+            base64::engine::general_purpose::STANDARD.encode(input)
+        }
+        #[inline(always)]
+        pub fn decode<T: AsRef<[u8]>>(input: T) -> Result<Vec<u8>, DecodeError> {
+            base64::engine::general_purpose::STANDARD.decode(input)
+        }
+    }
+    #[cfg(feature = "hex")]
+    pub mod hex {
+        pub use hex::*;
+    }
+}
 pub mod crypto {
     #[cfg(feature = "aes")]
     pub use aes::*;
     #[cfg(feature = "aes")]
     mod aes {
         use std::marker::PhantomData;
+
+        pub mod deps {
+            pub use aes::*;
+            pub use cbc::{Decryptor as CbcDecryptor, Encryptor as CbcEncryptor};
+            pub use ecb::{Decryptor as EcbDecryptor, Encryptor as EcbEncryptor};
+        }
 
         pub use aes::{Aes128, Aes192, Aes256};
 
@@ -259,7 +304,7 @@ pub mod crypto {
             block_padding::{self, NoPadding, Pkcs7},
             generic_array::GenericArray,
         };
-        #[inline]
+        #[inline(always)]
         fn cbc_enc<
             KeySize: KeyInit + BlockCipher + KeySizeUser + BlockEncrypt,
             P: block_padding::Padding<KeySize::BlockSize>,
@@ -270,7 +315,7 @@ pub mod crypto {
         ) -> Vec<u8> {
             cbc::Encryptor::<KeySize>::new(key, iv).encrypt_padded_vec_mut::<P>(msg)
         }
-        #[inline]
+        #[inline(always)]
         fn ecb_enc<
             KeySize: KeyInit + BlockCipher + KeySizeUser + BlockEncrypt,
             P: block_padding::Padding<KeySize::BlockSize>,
@@ -280,7 +325,7 @@ pub mod crypto {
         ) -> Vec<u8> {
             <ecb::Encryptor<KeySize> as KeyInit>::new(key).encrypt_padded_vec_mut::<P>(msg)
         }
-        #[inline]
+        #[inline(always)]
         fn cbc_dec<
             KeySize: KeyInit + BlockCipher + KeySizeUser + BlockDecrypt,
             P: block_padding::Padding<KeySize::BlockSize>,
@@ -293,7 +338,7 @@ pub mod crypto {
                 .decrypt_padded_vec_mut::<P>(msg)
                 .unwrap()
         }
-        #[inline]
+        #[inline(always)]
         fn ecb_dec<
             KeySize: KeyInit + BlockCipher + KeySizeUser + BlockDecrypt,
             P: block_padding::Padding<KeySize::BlockSize>,
@@ -325,6 +370,14 @@ pub mod crypto {
         where
             KeySize: KeyInit + BlockCipher + KeySizeUser,
         {
+            #[inline]
+            pub fn new(mode: Mode<KeySize::BlockSize>, padding: Padding) -> Self {
+                Self {
+                    mode,
+                    padding,
+                    _p: PhantomData,
+                }
+            }
             #[inline]
             pub fn enc(&self, msg: &[u8], key: &GenericArray<u8, KeySize::KeySize>) -> Vec<u8>
             where
@@ -358,5 +411,13 @@ pub mod crypto {
                 }
             }
         }
+    }
+}
+pub mod utils {
+    #[inline]
+    pub fn flatten_bytes<const BLOCK_SIZE: usize>(blocks: Vec<[u8; BLOCK_SIZE]>) -> Vec<u8> {
+        let mut blocks = std::mem::ManuallyDrop::new(blocks);
+        let (p, l, c) = (blocks.as_mut_ptr(), blocks.len(), blocks.capacity());
+        unsafe { Vec::from_raw_parts(p as *mut u8, l * BLOCK_SIZE, c * BLOCK_SIZE) }
     }
 }

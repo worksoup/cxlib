@@ -1,24 +1,7 @@
-use base64::{DecodeError, Engine};
-use percent_encoding::PercentEncode;
-
-#[inline]
-fn percent_enc(input: &str) -> PercentEncode {
-    percent_encoding::utf8_percent_encode(input, percent_encoding::NON_ALPHANUMERIC)
-}
-#[inline]
-fn base64_enc<T: AsRef<[u8]>>(input: T) -> String {
-    base64::engine::general_purpose::STANDARD.encode(input)
-}
-#[inline]
-fn base64_dec<T: AsRef<[u8]>>(input: T) -> Result<Vec<u8>, DecodeError> {
-    base64::engine::general_purpose::STANDARD.decode(input)
-}
-#[inline]
-fn flatten_bytes<const BLOCK_SIZE: usize>(blocks: Vec<[u8; BLOCK_SIZE]>) -> Vec<u8> {
-    let mut blocks = std::mem::ManuallyDrop::new(blocks);
-    let (p, l, c) = (blocks.as_mut_ptr(), blocks.len(), blocks.capacity());
-    unsafe { Vec::from_raw_parts(p as *mut u8, l * BLOCK_SIZE, c * BLOCK_SIZE) }
-}
+use cx_enc_utils::{
+    coding::{base64, hex},
+    crypto::{Aes128, Mode},
+};
 #[inline]
 // TODO: 传入 uid 时结果与预期不符，可能是有更新，需要逆向。
 // 猜测可能为 cx_obfuscate?
@@ -29,13 +12,9 @@ pub fn chaoxing_get_identifier(seed: impl AsRef<[u8]>) -> String {
 // 猜测可能为 SHA512?
 #[inline]
 pub fn chaoxing_get_devicecode(ident: impl AsRef<[u8]>) -> String {
-    let ident: Vec<[u8; 16]> = cx_enc_utils::padding::pkcs7_pad(ident.as_ref());
-    base64_enc(
-        cx_enc_utils::crypto::Aes::new(
-            cx_enc_utils::crypto::KeySize::KeySize128,
-            cx_enc_utils::crypto::Mode::ECB,
-        )
-        .enc(&flatten_bytes(ident), b"QrCbNY@MuK1X8HGw"),
+    base64::encode(
+        cx_enc_utils::crypto::Aes::<Aes128>::new(Mode::ECB, cx_enc_utils::crypto::Padding::Pkcs7)
+            .enc(ident.as_ref(), b"QrCbNY@MuK1X8HGw".into()),
     )
 }
 #[inline]
@@ -91,9 +70,14 @@ pub fn user_agent_parse(
 #[cfg(test)]
 mod tests {
 
+    use cx_enc_utils::{
+        coding::base64,
+        crypto::{Aes128, Mode, Padding},
+    };
+
     use crate::{
-        base64_dec, chaoxing_get_devicecode, chaoxing_get_identifier, chaoxing_get_schild,
-        user_agent_gen, user_agent_parse,
+        chaoxing_get_devicecode, chaoxing_get_identifier, chaoxing_get_schild, user_agent_gen,
+        user_agent_parse,
     };
 
     #[test]
@@ -135,16 +119,12 @@ mod tests {
             println!("{device_code}");
         }
         let device_code = "zE9+rwe3eRV6GaU0FX5KhiCnFj/Ju8X05ywjTUWxx+MV5Sfjflk+dHuRq2Pi3T7redETzSIYMbwqqRViHAEs88o+3W2FKfGichnoLiFd2iU=";
-        let device_code = base64_dec(device_code).unwrap();
-        let ident = cx_enc_utils::crypto::Aes::new(
-            cx_enc_utils::crypto::KeySize::KeySize128,
-            cx_enc_utils::crypto::Mode::ECB,
-        )
-        .dec(&device_code, b"QrCbNY@MuK1X8HGw")
-        .unwrap();
+        let device_code = base64::decode(device_code).unwrap();
+        let ident = cx_enc_utils::crypto::Aes::<Aes128>::new(Mode::ECB, Padding::Pkcs7)
+            .dec(&device_code, b"QrCbNY@MuK1X8HGw".into());
         let ident = unsafe { String::from_utf8_unchecked(ident) };
         println!("{ident}");
-        let device_code = base64_dec(ident).unwrap();
+        let device_code = base64::decode(ident).unwrap();
         println!("{device_code:?}",);
         let ident = unsafe { String::from_utf8_unchecked(device_code) };
         println!("{ident}");

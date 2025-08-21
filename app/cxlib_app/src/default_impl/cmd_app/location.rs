@@ -172,14 +172,14 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
         alias: Option<String>,
         course: Option<Course>,
     ) {
-        if let Some(course) = course.as_ref() {
-            if course.invalid() {
-                if course.is_global_course() {
-                    warn!("警告：为课程号与班级号均为 -1 的课程设置的位置将被视为全局位置！");
-                } else {
-                    error!("错误：课程号小于 0! 请检查是否正确！");
-                    panic!()
-                }
+        if let Some(course) = course.as_ref()
+            && course.invalid()
+        {
+            if course.is_global_course() {
+                warn!("警告：为课程号与班级号均为 -1 的课程设置的位置将被视为全局位置！");
+            } else {
+                error!("错误：课程号小于 0! 请检查是否正确！");
+                panic!()
             }
         }
         let location = location_str.parse::<UnhandledGeoaddr>();
@@ -436,19 +436,19 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
             .write_once(|w_cxt| {
                 if delete_locations {
                     for location in locations {
-                        if let Err(e) = LocationTable::delete_location(w_cxt, &location) {
-                            if e.is_fatal() {
-                                return Err(e);
-                            }
+                        if let Err(e) = LocationTable::delete_location(w_cxt, &location)
+                            && e.is_fatal()
+                        {
+                            return Err(e);
                         }
                     }
                 }
                 let mut alias_table = AliasTable::write(w_cxt)?;
                 for alias in aliases {
-                    if let Err(e) = AliasTable::delete_alias(&mut alias_table, &alias) {
-                        if e.is_fatal() {
-                            return Err(e);
-                        }
+                    if let Err(e) = AliasTable::delete_alias(&mut alias_table, &alias)
+                        && e.is_fatal()
+                    {
+                        return Err(e);
                     }
                 }
                 Ok(())

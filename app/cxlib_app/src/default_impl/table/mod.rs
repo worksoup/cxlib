@@ -69,8 +69,8 @@ where
         Ok(table.remove(key, value)?)
     }
     fn write(
-        w_cxt: &WriteTransaction,
-    ) -> Result<MultimapTable<Self::Key, Self::Value>, StoreError> {
+        w_cxt: &'_ WriteTransaction,
+    ) -> Result<MultimapTable<'_, Self::Key, Self::Value>, StoreError> {
         Ok(w_cxt.open_multimap_table(Self::DEFINITION)?)
     }
     fn list(
@@ -102,7 +102,7 @@ where
     ) -> Result<bool, StoreError> {
         Ok(table.get(key).map(|k| k.is_some())?)
     }
-    fn write(w_cxt: &WriteTransaction) -> Result<Table<Self::Key, Self::Value>, StoreError> {
+    fn write(w_cxt: &'_ WriteTransaction) -> Result<Table<'_, Self::Key, Self::Value>, StoreError> {
         Ok(w_cxt.open_table(Self::DEFINITION)?)
     }
     fn list(

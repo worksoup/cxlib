@@ -7,9 +7,14 @@ authors.workspace = true
 [features]
 md5 = ["dep:md5"]
 aes = ["dep:cbc", "dep:ecb", "dep:aes"]
-
+percent-encoding = ["dep:percent-encoding"]
+base64 = ["dep:base64"]
+hex = ["dep:hex"]
 [dependencies]
-md5 = { version = "0.8", optional = true }
 aes = { version = "0.8", optional = true }
+base64 = { version = "0.22", optional = true }
 cbc = { version = "0.1", features = ["alloc"], optional = true }
 ecb = { version = "0.1", features = ["alloc"], optional = true }
+hex = { version = "0.4", optional = true }
+md5 = { version = "0.8", optional = true }
+percent-encoding = { version = "2.3", optional = true }

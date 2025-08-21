@@ -189,9 +189,9 @@ impl<T: LocationInfoGetterTrait, PP: LocationPreprocessorTrait> DefaultQrCodeSig
         } else if let Some(enc) = Self::pic_path_to_qrcode_result(pic.to_str().unwrap()) {
             Ok(enc)
         } else {
-            return Err(SignError::SignDataNotFound(
+            Err(SignError::SignDataNotFound(
                 "二维码中没有 `enc` 参数！".to_owned(),
-            ));
+            ))
         }
     }
 

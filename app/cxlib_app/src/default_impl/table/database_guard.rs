@@ -2,7 +2,7 @@
 use std::{ops::Deref, sync::Arc};
 
 use cxlib_error_utils::CxlibResultUtils;
-use redb::{Database, ReadTransaction, WriteTransaction};
+use redb::{Database, ReadTransaction, ReadableDatabase, WriteTransaction};
 
 use crate::StoreError;
 #[derive(Clone)]
