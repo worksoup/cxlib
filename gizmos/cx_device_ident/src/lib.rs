@@ -4,12 +4,10 @@ use cx_enc_utils::{
 };
 #[inline]
 // TODO: 传入 uid 时结果与预期不符，可能是有更新，需要逆向。
-// 猜测可能为 cx_obfuscate?
 pub fn chaoxing_get_identifier(seed: impl AsRef<[u8]>) -> String {
     hex::encode(cx_enc_utils::hash::md5_hash(seed.as_ref()))
 }
 // TODO: 传入 ident 时结果与预期不符，可能是有更新，需要逆向。
-// 猜测可能为 SHA512?
 #[inline]
 pub fn chaoxing_get_devicecode(ident: impl AsRef<[u8]>) -> String {
     base64::encode(
