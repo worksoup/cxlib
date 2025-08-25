@@ -23,6 +23,7 @@ use std::marker::PhantomData;
 /// }
 /// ```
 pub trait LoginTypeEnumTrait: clap::ValueEnum + Send + Sync + 'static {
+    #[inline(always)]
     fn login_type(&self) -> String {
         self.to_possible_value().unwrap().get_name().to_owned()
     }
