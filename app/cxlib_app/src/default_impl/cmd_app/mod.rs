@@ -1,6 +1,7 @@
 mod account;
 mod accounts;
 mod activity;
+mod config;
 mod course;
 mod location;
 mod locations;
@@ -9,13 +10,15 @@ mod where_is_config;
 pub use account::*;
 pub use accounts::*;
 pub use activity::*;
+pub use config::*;
 pub use course::*;
-use cxlib_error_utils::CxlibResultUtils;
-use cxlib_store::{AppInfo, ConfigDir};
 pub use location::*;
 pub use locations::*;
-use ref_wrapper::{UNIT, Unit};
 pub use where_is_config::*;
+
+use cxlib_error_utils::CxlibResultUtils;
+use cxlib_store::{AppInfo, ConfigDir};
+use ref_wrapper::{UNIT, Unit};
 
 #[cfg(feature = "completion")]
 mod completions;

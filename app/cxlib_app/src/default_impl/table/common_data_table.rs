@@ -100,3 +100,68 @@ impl TableDefinitionTrait for CommonDataTable {
     type Context<'cxt> = ();
     const NAME: &'static str = "common_data";
 }
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub struct ConfigKey {
+    identifier: String,
+    key: String,
+}
+pub trait ConfigTrait: Sized + Eq + std::hash::Hash {
+    const BLOCK: &'static str;
+    fn into_identifier_key(self) -> (String, String);
+    fn from_identifier_key(identifier_key: (String, String)) -> Self;
+    #[inline]
+    fn get(self, r_cxt: &ReadTransaction) -> Result<Option<String>, StoreError> {
+        let (identifier, key) = self.into_identifier_key();
+        let key = KeyType {
+            block: Self::BLOCK.to_owned(),
+            identifier,
+            key,
+        };
+        CommonDataTable::get(r_cxt, key)
+    }
+    #[inline]
+    fn remove(self, w_cxt: &WriteTransaction) -> Result<Option<String>, StoreError> {
+        let (identifier, key) = self.into_identifier_key();
+        let key = KeyType {
+            block: Self::BLOCK.to_owned(),
+            identifier,
+            key,
+        };
+        CommonDataTable::remove(w_cxt, key)
+    }
+    #[inline]
+    fn insert(self, w_cxt: &WriteTransaction, value: String) -> Result<Option<String>, StoreError> {
+        let (identifier, key) = self.into_identifier_key();
+        let key = KeyType {
+            block: Self::BLOCK.to_owned(),
+            identifier,
+            key,
+        };
+        CommonDataTable::insert(w_cxt, key, value)
+    }
+    #[inline]
+    fn iter(r_cxt: &ReadTransaction) -> Result<HashMap<Self, String>, StoreError> {
+        let r = CommonDataTable::read(r_cxt)?;
+        let mut result = HashMap::new();
+        for data in r.iter()? {
+            let (k, v) = data?;
+            let k = k.value();
+            result.insert(Self::from_identifier_key((k.identifier, k.key)), v.value());
+        }
+        Ok(result)
+    }
+}
+impl ConfigTrait for ConfigKey {
+    const BLOCK: &'static str = "config";
+
+    #[inline]
+    fn into_identifier_key(self) -> (String, String) {
+        let Self { identifier, key } = self;
+        (identifier, key)
+    }
+
+    #[inline]
+    fn from_identifier_key((identifier, key): (String, String)) -> Self {
+        Self { identifier, key }
+    }
+}

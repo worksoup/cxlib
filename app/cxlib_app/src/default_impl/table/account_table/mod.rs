@@ -244,8 +244,8 @@ impl<U> AccountTable<U> {
         let cookies = common_data_table
             .get(&KeyType {
                 block: "cookies".to_owned(),
-                key: uid.to_owned(),
                 identifier: account_data.login_type().to_owned(),
+                key: uid.to_owned(),
             })?
             .ok_or_else(Self::none2result(format_args!(
                 "没有该账号的 cookies 数据：`{uid}`。"
@@ -284,8 +284,8 @@ impl<U> AccountTable<U> {
         common_data_table.insert(
             KeyType {
                 block: "cookies".to_owned(),
-                key: uid.to_owned(),
                 identifier: login_type.to_owned(),
+                key: uid.to_owned(),
             },
             cookies,
         )?;
