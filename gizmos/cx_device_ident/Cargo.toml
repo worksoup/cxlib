@@ -12,6 +12,7 @@ cx_enc_utils = { path = "../cx_enc_utils", features = [
     "hex",
     "percent-encoding",
 ] }
-getset2 = "0.4"
-rand = "0.9"
-thiserror = "2.0"
+getset2.workspace = true
+rand.workspace = true
+serde.workspace = true
+thiserror.workspace = true

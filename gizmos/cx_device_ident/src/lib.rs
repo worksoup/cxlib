@@ -33,6 +33,7 @@ impl DeviceCodeGen for DefaultDeviceCodeGen {
     }
 }
 
+#[derive(Debug)]
 pub struct SimpleDeviceCodeGen {
     pub user_agent: String,
     pub device_code: String,

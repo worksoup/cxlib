@@ -15,6 +15,6 @@ aes = { version = "0.8", optional = true }
 base64 = { version = "0.22", optional = true }
 cbc = { version = "0.1", features = ["alloc"], optional = true }
 ecb = { version = "0.1", features = ["alloc"], optional = true }
-hex = { version = "0.4", optional = true }
+hex = { workspace = true, optional = true }
 md5 = { version = "0.8", optional = true }
-percent-encoding = { version = "2.3", optional = true }
+percent-encoding = { workspace = true, optional = true }
