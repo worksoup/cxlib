@@ -1,27 +1,27 @@
 use cxlib_error_utils::MaybeFatalError;
-use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
+use cxlib_protocol::collect::TypesProtocolTrait;
 use log::{debug, error, warn};
 use std::{
     ops::DerefMut,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
-        mpsc::{Receiver, RecvError},
+        mpsc::{Receiver, RecvError, SendError},
     },
 };
 
 use crate::{Activity, ActivityError, CourseWithInfo, Session, ext::CourseWithInfoExt};
 
 /// 类型别名，代表接收端所接受数据的类型。
-pub type ActivitiesSessionsPair<UserProtocol> = (Vec<Activity>, Vec<Session<UserProtocol>>);
+pub type ActivitiesSessionsPair = (Vec<Activity>, Vec<Session>);
 /// 接收端本身的类型。
-pub type ActivitiesReceiverInner<UserProtocol> = Receiver<ActivitiesSessionsPair<UserProtocol>>;
+pub type ActivitiesReceiverInner = Receiver<ActivitiesSessionsPair>;
 #[derive(thiserror::Error, Debug)]
-pub enum ActivitiesReceiverError<UserProtocol> {
+pub enum ActivitiesReceiverError {
     #[error(transparent)]
     RecvError(#[from] RecvError),
     #[error(transparent)]
-    SendError(#[from] ActivitiesSessionsPair<UserProtocol>),
+    SendError(#[from] SendError<ActivitiesSessionsPair>),
     #[error(transparent)]
     ActivityError(#[from] ActivityError),
 }
@@ -30,23 +30,23 @@ pub enum ActivitiesReceiverError<UserProtocol> {
 /// 不推荐使用 for 循环迭代元素。
 ///
 /// 请使用 while 循环与 [`ActivitiesReceiver::recv`], 以获取错误信息。
-pub struct ActivitiesReceiver<UserProtocol> {
-    receiver: ActivitiesReceiverInner<UserProtocol>,
+pub struct ActivitiesReceiver {
+    receiver: ActivitiesReceiverInner,
     fatal_error_occurred: Arc<AtomicBool>,
-    fatal_error: Arc<Mutex<Option<ActivitiesReceiverError<UserProtocol>>>>,
+    fatal_error: Arc<Mutex<Option<ActivitiesReceiverError>>>,
 }
-impl<T> MaybeFatalError for ActivitiesReceiverError<T> {
+impl MaybeFatalError for ActivitiesReceiverError {
     /// 当前语境下均为不可恢复错误。
     #[inline]
     fn is_fatal(&self) -> bool {
         true
     }
 }
-impl<T> ActivitiesReceiver<T> {
+impl ActivitiesReceiver {
     /// # Errors
     /// 返回的错误均为当前语境下不可恢复错误。
     #[inline]
-    pub fn recv(&self) -> Result<ActivitiesSessionsPair<T>, ActivitiesReceiverError<T>> {
+    pub fn recv(&self) -> Result<ActivitiesSessionsPair, ActivitiesReceiverError> {
         if self.fatal_error_occurred.load(Ordering::Relaxed) {
             let mut error = self.fatal_error.lock().unwrap();
             Err(error.deref_mut().take().unwrap())?
@@ -54,18 +54,18 @@ impl<T> ActivitiesReceiver<T> {
         Ok(self.receiver.recv()?)
     }
 }
-impl<T> IntoIterator for ActivitiesReceiver<T> {
-    type Item = (Vec<Activity>, Vec<Session<T>>);
-    type IntoIter = <Receiver<(Vec<Activity>, Vec<Session<T>>)> as IntoIterator>::IntoIter;
+impl IntoIterator for ActivitiesReceiver {
+    type Item = (Vec<Activity>, Vec<Session>);
+    type IntoIter = <Receiver<(Vec<Activity>, Vec<Session>)> as IntoIterator>::IntoIter;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.receiver.into_iter()
     }
 }
-impl<'a, T> IntoIterator for &'a ActivitiesReceiver<T> {
-    type Item = (Vec<Activity>, Vec<Session<T>>);
-    type IntoIter = <&'a Receiver<(Vec<Activity>, Vec<Session<T>>)> as IntoIterator>::IntoIter;
+impl<'a> IntoIterator for &'a ActivitiesReceiver {
+    type Item = (Vec<Activity>, Vec<Session>);
+    type IntoIter = <&'a Receiver<(Vec<Activity>, Vec<Session>)> as IntoIterator>::IntoIter;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -91,17 +91,9 @@ pub trait ActivityExt {
     }
     /// 异步获取指定课程集合的活动。
     /// 通过 [`mpsc::channel`] 实现：多线程获取活动，获取的活动进入 Sender 中，返回值为 Receiver, 可以通过迭代器 API 处理。
-    fn get_from_courses<
-        TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
-    >(
-        sorted_courses: impl Iterator<
-            Item = (
-                CourseWithInfo,
-                impl IntoIterator<Item = Session<UserProtocol>>,
-            ),
-        >,
-    ) -> ActivitiesReceiver<UserProtocol> {
+    fn get_from_courses<TypesProtocol: TypesProtocolTrait>(
+        sorted_courses: impl Iterator<Item = (CourseWithInfo, impl IntoIterator<Item = Session>)>,
+    ) -> ActivitiesReceiver {
         let (sender, receiver) = std::sync::mpsc::channel();
         let fatal_error_occurred = Arc::new(AtomicBool::new(false));
         let fatal_error = Arc::new(Mutex::new(None));
@@ -115,7 +107,7 @@ pub trait ActivityExt {
             if fatal_error_occurred.load(Ordering::Relaxed) {
                 break;
             }
-            let courses: Vec<(CourseWithInfo, Vec<Session<UserProtocol>>)> = courses
+            let courses: Vec<(CourseWithInfo, Vec<Session>)> = courses
                 .into_iter()
                 .map(|(course, sessions)| (course, sessions.into_iter().collect::<Vec<_>>()))
                 .collect::<Vec<_>>();
@@ -127,7 +119,7 @@ pub trait ActivityExt {
                     let sessions = sessions.into_iter().collect::<Vec<_>>();
                     debug!("加载课程 [{course}] 的签到。");
                     if let Some(session) = sessions.first() {
-                        let activities = course.get_activities::<TypesProtocol, _>(session);
+                        let activities = course.get_activities::<TypesProtocol>(session);
                         match activities {
                             Ok(activities) => {
                                 // 有活动才发送。
@@ -140,7 +132,7 @@ pub trait ActivityExt {
                                             fatal_error
                                                 .lock()
                                                 .unwrap()
-                                                .replace(ActivitiesReceiverError::from(e.0));
+                                                .replace(ActivitiesReceiverError::from(e));
                                             return;
                                         }
                                     }

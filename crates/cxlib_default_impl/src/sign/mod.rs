@@ -10,7 +10,7 @@ pub use normal::*;
 pub use photo::*;
 pub use qrcode::*;
 
-use cxlib_protocol::collect::{NetdiskProtocolTrait, TypesProtocolTrait, UserProtocolTrait};
+use cxlib_protocol::collect::{NetdiskProtocolTrait, TypesProtocolTrait};
 use cxlib_sign::{AsRaw, SignError, SignTrait};
 use cxlib_types::{
     RawSign, Session, SignDetail,
@@ -38,27 +38,19 @@ pub enum Sign<NetdiskProtocol> {
     Unknown(RawSign),
 }
 impl<NetdiskProtocol> Sign<NetdiskProtocol> {
-    pub fn detail<TypesProtocol, UserProtocol>(
-        &self,
-        session: &Session<UserProtocol>,
-    ) -> Result<SignDetail, SignError>
+    pub fn detail<TypesProtocol>(&self, session: &Session) -> Result<SignDetail, SignError>
     where
         NetdiskProtocol: NetdiskProtocolTrait,
-        UserProtocol: UserProtocolTrait,
         TypesProtocol: TypesProtocolTrait,
     {
-        Ok(self.as_raw().get_sign_detail::<TypesProtocol, _>(session)?)
+        Ok(self.as_raw().get_sign_detail::<TypesProtocol>(session)?)
     }
-    pub fn from_raw<TypesProtocol, UserProtocol>(
-        raw: RawSign,
-        session: &Session<UserProtocol>,
-    ) -> Self
+    pub fn from_raw<TypesProtocol>(raw: RawSign, session: &Session) -> Self
     where
         NetdiskProtocol: NetdiskProtocolTrait,
-        UserProtocol: UserProtocolTrait,
         TypesProtocol: TypesProtocolTrait,
     {
-        if let Ok(sign_detail) = raw.get_sign_detail::<TypesProtocol, _>(session) {
+        if let Ok(sign_detail) = raw.get_sign_detail::<TypesProtocol>(session) {
             // let r#else = |e| {
             //     log::error!("{}", raw.other_id());
             //     log::error!("{}", raw.course().name());

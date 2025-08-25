@@ -6,86 +6,68 @@ use crate::{
 use cxlib_error::AgentError;
 use cxlib_error_utils::CxlibResultUtils;
 use cxlib_protocol::{ProtocolItem, collect::UserProtocolTrait};
+use getset2::Getset2;
 use log::info;
-use std::{hash::Hash, marker::PhantomData, ops::Deref};
+use std::{hash::Hash, ops::Deref};
 use ureq::Agent;
 
-#[derive(Debug)]
-pub struct Session<UserProtocol> {
-    agent: Agent,
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Getset2)]
+#[getset2(get_ref(pub))]
+pub struct SessionUserInfo {
     uname: String,
-    stu_name: String,
+    name: String,
     cookies: UserCookies,
-    _p: PhantomData<UserProtocol>,
 }
-impl<U> Session<U> {
-    pub fn into<Other>(self) -> Session<Other> {
-        let Session {
-            agent,
-            uname,
-            stu_name,
-            cookies,
-            _p,
-        } = self;
-        Session {
-            agent,
-            uname,
-            stu_name,
-            cookies,
-            _p: Default::default(),
-        }
-    }
-}
-impl<T> Clone for Session<T> {
+impl SessionUserInfo {
     #[inline]
-    fn clone(&self) -> Session<T> {
-        Session {
-            agent: Clone::clone(&self.agent),
-            uname: Clone::clone(&self.uname),
-            stu_name: Clone::clone(&self.stu_name),
-            cookies: Clone::clone(&self.cookies),
-            _p: Clone::clone(&self._p),
+    pub fn new(uname: String, name: String, cookies: UserCookies) -> Self {
+        Self {
+            uname,
+            name,
+            cookies,
         }
     }
 }
 
-impl<U> PartialEq for Session<U> {
-    fn eq(&self, other: &Self) -> bool {
-        self.uid() == other.uid()
-    }
+#[derive(Debug, Clone)]
+pub struct Session {
+    user_info: SessionUserInfo,
+    agent: Agent,
 }
-
-impl<U> Eq for Session<U> {}
-
-impl<U> Hash for Session<U> {
+impl Session {
     #[inline]
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.uid().hash(state);
-        self.fid().hash(state);
-        self.name().hash(state);
-    }
-}
-
-impl<UserProtocol> Session<UserProtocol>
-where
-    UserProtocol: UserProtocolTrait,
-{
-    #[inline]
-    pub fn from_raw(
-        uname: String,
-        stu_name: String,
-        agent: Agent,
-        cookies: UserCookies,
-    ) -> Result<Self, LoginError> {
-        let session = Self {
-            agent,
-            uname,
-            stu_name,
-            cookies,
-            _p: Default::default(),
-        };
+    pub fn from_raw(user_info: SessionUserInfo, agent: Agent) -> Result<Self, LoginError> {
+        let session = Self { agent, user_info };
         Ok(session)
     }
+}
+impl Session {
+    #[inline]
+    pub fn user_info(&self) -> &SessionUserInfo {
+        &self.user_info
+    }
+    #[inline]
+    pub fn uid(&self) -> &String {
+        self.user_info().cookies().uid()
+    }
+    #[inline]
+    pub fn fid(&self) -> &String {
+        self.user_info().cookies().fid()
+    }
+    #[inline]
+    pub fn name(&self) -> &String {
+        self.user_info().name()
+    }
+    #[inline]
+    pub fn uname(&self) -> &String {
+        self.user_info().uname()
+    }
+    #[inline]
+    pub fn avatar_url(&self, size: usize) -> String {
+        format!("https://photo.chaoxing.com/p/{}_{}", self.uid(), size)
+    }
+}
+impl Session {
     /// 加载本地 Cookies 并返回 [`Session`].
     #[inline]
     pub fn load_cookies<R: std::io::BufRead>(
@@ -95,55 +77,10 @@ where
     ) -> Result<Self, LoginError> {
         let agent = Self::load_cookies_raw(r)?;
         let cookies = UserCookies::new(&agent);
-        let session = Self::from_raw(uname, stu_name, agent, cookies)?;
+        let session = Self::from_raw(SessionUserInfo::new(uname, stu_name, cookies), agent)?;
         info!("用户[{}]加载 Cookies 成功！", session.name());
         Ok(session)
     }
-}
-impl<UserProtocol> Session<UserProtocol>
-where
-    UserProtocol: UserProtocolTrait + 'static,
-{
-    /// 先尝试 [`Session::load_cookies`], 如果发生错误且错误为登录过期或 Cookies 不存在，则 [`Session::relogin`]。
-    pub fn load_cookies_or_relogin<R: std::io::BufRead, W: std::io::Write>(
-        enc_passwd: &str,
-        uname: &str,
-        stu_name: String,
-        r: R,
-        w: &mut W,
-        login_solver: &UntypedLoginSolver<UserProtocol>,
-    ) -> Result<Self, LoginError> {
-        match Self::load_cookies(uname.to_owned(), stu_name, r) {
-            Ok(s) => Ok(s),
-            Err(e) => match e {
-                LoginError::LoginExpired(_) => Self::relogin(uname, enc_passwd, w, login_solver),
-                LoginError::IoError(e) => match e.kind() {
-                    std::io::ErrorKind::NotFound => {
-                        Self::relogin(uname, enc_passwd, w, login_solver)
-                    }
-                    _ => Err(LoginError::IoError(e)),
-                },
-                _ => Err(e),
-            },
-        }
-    }
-    /// 相当于 [`Session::relogin_raw`] 后 [`Session::from_raw`].
-    #[inline]
-    pub fn relogin<W: std::io::Write>(
-        uname: &str,
-        enc_pwd: &str,
-        writer: &mut W,
-        login_solver: &UntypedLoginSolver<UserProtocol>,
-    ) -> Result<Self, LoginError> {
-        let (agent, cookies) = Self::relogin_raw(uname, enc_pwd, login_solver)?;
-        Self::store_cookies(&agent, writer)?;
-        let stu_name = DefaultLoginSolver::<UserProtocol>::find_stu_name_in_html(&agent)?;
-        let session = Self::from_raw(uname.to_string(), stu_name, agent, cookies)?;
-        info!("用户[{}]登录成功！", session.name());
-        Ok(session)
-    }
-}
-impl<U> Session<U> {
     #[inline]
     pub fn load_cookies_raw<R: std::io::BufRead>(r: R) -> Result<Agent, std::io::Error> {
         let config = Agent::config_builder()
@@ -165,49 +102,13 @@ impl<U> Session<U> {
             .map_err(|e| LoginError::CookiesStoreError(AgentError::from(e)))
     }
 }
-impl<UserProtocol> Session<UserProtocol>
-where
-    UserProtocol: UserProtocolTrait + 'static,
-{
-    /// 类似于 [`Session::load_cookies`], 不过须传入加密后的密码以重新登录。重新登录后将 [`Session::store_cookies`] 以持久化 Cookies.
+impl Session {
     #[inline]
-    pub fn relogin_raw(
-        uname: &str,
-        enc_pwd: &str,
-        login_solver: &UntypedLoginSolver<UserProtocol>,
-    ) -> Result<(Agent, UserCookies), LoginError> {
-        let agent = login_solver.login_s(uname, enc_pwd)?;
-        let cookies = UserCookies::new(&agent);
-        Ok((agent, cookies))
-    }
-}
-
-impl<UserProtocol> Session<UserProtocol> {
-    #[inline]
-    pub fn uid(&self) -> &str {
-        self.cookies.uid()
-    }
-    #[inline]
-    pub fn fid(&self) -> &str {
-        self.cookies.fid()
-    }
-    #[inline]
-    pub fn name(&self) -> &str {
-        &self.stu_name
-    }
-    #[inline]
-    pub fn uname(&self) -> &str {
-        &self.uname
-    }
-    #[inline]
-    pub fn avatar_url(&self, size: usize) -> String {
-        format!("https://photo.chaoxing.com/p/{}_{}", self.uid(), size)
-    }
-}
-impl<UserProtocol: UserProtocolTrait> Session<UserProtocol> {
-    #[inline]
-    pub fn get_courses(&self) -> Result<Vec<CourseWithInfo>, CourseError> {
-        let classes = self.get_classes()?;
+    pub fn get_courses<UserProtocol>(&self) -> Result<Vec<CourseWithInfo>, CourseError>
+    where
+        UserProtocol: UserProtocolTrait,
+    {
+        let classes = self.get_classes::<UserProtocol>()?;
         let mut courses = Vec::new();
 
         for class in classes {
@@ -216,7 +117,10 @@ impl<UserProtocol: UserProtocolTrait> Session<UserProtocol> {
         info!("用户[{}]已获取课程列表。", self.name());
         Ok(courses)
     }
-    pub fn get_classes(&self) -> Result<Vec<Class>, CourseError> {
+    pub fn get_classes<UserProtocol>(&self) -> Result<Vec<Class>, CourseError>
+    where
+        UserProtocol: UserProtocolTrait,
+    {
         let raw_classes = UserProtocol::get_classes(self.deref()).map_err(|e| match e {
             cxlib_protocol::ProtocolError::AgentError(agent_error) => agent_error.into(),
             cxlib_protocol::ProtocolError::DataParseError(e) => LoginError::LoginExpired(e),
@@ -230,8 +134,71 @@ impl<UserProtocol: UserProtocolTrait> Session<UserProtocol> {
         Ok(classes)
     }
 }
-
-impl<T> Deref for Session<T> {
+impl Session {
+    /// 先尝试 [`Session::load_cookies`], 如果发生错误且错误为登录过期或 Cookies 不存在，则 [`Session::relogin`]。
+    pub fn load_cookies_or_relogin<R: std::io::BufRead, W: std::io::Write, UserProtocol>(
+        enc_passwd: &str,
+        uname: &str,
+        stu_name: String,
+        r: R,
+        w: &mut W,
+        login_solver: &UntypedLoginSolver<UserProtocol>,
+    ) -> Result<Self, LoginError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
+        match Self::load_cookies(uname.to_owned(), stu_name, r) {
+            Ok(s) => Ok(s),
+            Err(e) => match e {
+                LoginError::LoginExpired(_) => Self::relogin(uname, enc_passwd, w, login_solver),
+                LoginError::IoError(e) => match e.kind() {
+                    std::io::ErrorKind::NotFound => {
+                        Self::relogin(uname, enc_passwd, w, login_solver)
+                    }
+                    _ => Err(LoginError::IoError(e)),
+                },
+                _ => Err(e),
+            },
+        }
+    }
+    /// 相当于 [`Session::relogin_raw`] 后 [`Session::from_raw`].
+    #[inline]
+    pub fn relogin<W, UserProtocol>(
+        uname: &str,
+        enc_pwd: &str,
+        writer: &mut W,
+        login_solver: &UntypedLoginSolver<UserProtocol>,
+    ) -> Result<Self, LoginError>
+    where
+        W: std::io::Write,
+        UserProtocol: UserProtocolTrait + 'static,
+    {
+        let (agent, cookies) = Self::relogin_raw(uname, enc_pwd, login_solver)?;
+        Self::store_cookies(&agent, writer)?;
+        let stu_name = DefaultLoginSolver::<UserProtocol>::find_stu_name_in_html(&agent)?;
+        let session = Self::from_raw(
+            SessionUserInfo::new(uname.to_string(), stu_name, cookies),
+            agent,
+        )?;
+        info!("用户[{}]登录成功！", session.name());
+        Ok(session)
+    }
+    /// 类似于 [`Session::load_cookies`], 不过须传入加密后的密码以重新登录。重新登录后将 [`Session::store_cookies`] 以持久化 Cookies.
+    #[inline]
+    pub fn relogin_raw<UserProtocol>(
+        uname: &str,
+        enc_pwd: &str,
+        login_solver: &UntypedLoginSolver<UserProtocol>,
+    ) -> Result<(Agent, UserCookies), LoginError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
+        let agent = login_solver.login_s(uname, enc_pwd)?;
+        let cookies = UserCookies::new(&agent);
+        Ok((agent, cookies))
+    }
+}
+impl Deref for Session {
     type Target = Agent;
     #[inline]
     fn deref(&self) -> &Agent {

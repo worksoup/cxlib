@@ -37,9 +37,9 @@ impl SignTrait for QrCodeSign {
     type Data = Option<Geoaddr>;
 
     #[inline]
-    fn sign_url<SignProtocol, U>(
+    fn sign_url<SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         enc: &str,
         location: &Option<Geoaddr>,
     ) -> SignUrlHelper
@@ -61,9 +61,9 @@ impl AsRaw for QrCodeSign {
     }
 }
 impl NeedPreSign for QrCodeSign {
-    fn pre_sign<CaptchaProtocol, SignProtocol, U>(
+    fn pre_sign<CaptchaProtocol, SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         enc: &str,
     ) -> Result<AnalysisResultResult, SignError>
     where

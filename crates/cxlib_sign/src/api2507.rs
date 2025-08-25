@@ -12,9 +12,9 @@ use crate::{AsRaw, SignError, SignResult, SignTrait};
 pub trait SignApi2507: Ord + AsRaw {
     type PreSignData: ?Sized;
     type Data: ?Sized;
-    fn sign_url<SignProtocol, U>(
+    fn sign_url<SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_data: &Self::PreSignData,
         data: &Self::Data,
     ) -> SignUrlHelper
@@ -40,9 +40,9 @@ pub trait SignApi2507: Ord + AsRaw {
             }
     }
     #[inline]
-    fn pre_check_data<UserProtocol>(
+    fn pre_check_data(
         &self,
-        session: &Session<UserProtocol>,
+        session: &Session,
         data: &Self::Data,
     ) -> Result<Result<(), SignResult>, SignError> {
         let _ = session;
@@ -52,9 +52,9 @@ pub trait SignApi2507: Ord + AsRaw {
     /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
     /// 调用 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 进行判断，如果真，则调用 [`sign_unchecked`](SignTrait::sign_unchecked), 否则返回
     /// [`SignResult::Fail`]{msg: "签到未准备好！".to_string()}
-    fn sign<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
+    fn sign<CaptchaSolver, CaptchaProtocol, SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_url: &str,
         pre_sign_result_data: &OptionPair<CaptchaId, UnhandledGeoAddrWithRange>,
         pre_sign_data: &<Self as SignApi2507>::PreSignData,
@@ -67,7 +67,7 @@ pub trait SignApi2507: Ord + AsRaw {
     {
         match self.pre_check_data(session, data)? {
             Ok(_) => {
-                let url = self.sign_url::<SignProtocol, U>(session, pre_sign_data, data);
+                let url = self.sign_url::<SignProtocol>(session, pre_sign_data, data);
                 let need_captcha =
                     SignProtocol::check_if_validate(session, self.as_inner().active_id())?;
                 if need_captcha {
@@ -101,18 +101,18 @@ impl<T: SignApi2507> SignTrait for T {
     }
 
     #[inline]
-    fn pre_check_data<UserProtocol>(
+    fn pre_check_data(
         &self,
-        session: &Session<UserProtocol>,
+        session: &Session,
         data: &Self::Data,
     ) -> Result<Result<(), SignResult>, SignError> {
         <Self as SignApi2507>::pre_check_data(self, session, data)
     }
 
     #[inline]
-    fn sign<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
+    fn sign<CaptchaSolver, CaptchaProtocol, SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_url: &str,
         pre_sign_result_data: &OptionPair<CaptchaId, UnhandledGeoAddrWithRange>,
         pre_sign_data: &Self::AnalysisSignData,
@@ -123,7 +123,7 @@ impl<T: SignApi2507> SignTrait for T {
         SignProtocol: SignProtocolTrait,
         CaptchaSolver: CaptchaSolverTrait,
     {
-        <Self as SignApi2507>::sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, _>(
+        <Self as SignApi2507>::sign::<CaptchaSolver, CaptchaProtocol, SignProtocol>(
             self,
             session,
             pre_sign_url,
@@ -134,15 +134,15 @@ impl<T: SignApi2507> SignTrait for T {
     }
 
     #[inline]
-    fn sign_url<SignProtocol, U>(
+    fn sign_url<SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_data: &Self::AnalysisSignData,
         data: &Self::Data,
     ) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {
-        <Self as SignApi2507>::sign_url::<SignProtocol, _>(self, session, pre_sign_data, data)
+        <Self as SignApi2507>::sign_url::<SignProtocol>(self, session, pre_sign_data, data)
     }
 }

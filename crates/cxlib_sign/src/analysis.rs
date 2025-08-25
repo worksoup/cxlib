@@ -7,9 +7,9 @@ use crate::AsRaw;
 
 pub trait Analysis: AsRaw {
     type AnalysisData: ?Sized;
-    fn analysis<CaptchaProtocol: CaptchaProtocolTrait, SignProtocol: SignProtocolTrait, U>(
+    fn analysis<CaptchaProtocol: CaptchaProtocolTrait, SignProtocol: SignProtocolTrait>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         analysis_data: &Self::AnalysisData,
     ) -> Result<AnalysisResultResult, crate::SignError> {
         let _ = analysis_data;

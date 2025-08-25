@@ -9,7 +9,7 @@ use cxlib_protocol::{
     },
     utils::{SignHelperTrait, SignUrlHelper},
 };
-use cxlib_types::{CourseWithInfo, RawSign, Session, UnhandledGeoAddrWithRange};
+use cxlib_types::{CourseWithInfo, RawSign, Session, SessionUserInfo, UnhandledGeoAddrWithRange};
 use std::{collections::HashMap, ops::Add};
 
 mod analysis;
@@ -43,9 +43,9 @@ pub use error::*;
 pub trait SignTrait: Ord + AsRaw {
     type AnalysisSignData: ?Sized;
     type Data: ?Sized;
-    fn sign_url<SignProtocol, U>(
+    fn sign_url<SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_data: &Self::AnalysisSignData,
         data: &Self::Data,
     ) -> SignUrlHelper
@@ -70,9 +70,9 @@ pub trait SignTrait: Ord + AsRaw {
             }
     }
     #[inline]
-    fn pre_check_data<UserProtocol>(
+    fn pre_check_data(
         &self,
-        session: &Session<UserProtocol>,
+        session: &Session,
         data: &Self::Data,
     ) -> Result<Result<(), SignResult>, SignError> {
         let _ = session;
@@ -82,9 +82,9 @@ pub trait SignTrait: Ord + AsRaw {
     /// 本函数是否会发生未定义行为取决于 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 的实现，
     /// 调用 [`is_ready_for_sign`](SignTrait::is_ready_for_sign) 进行判断，如果真，则调用 [`sign_unchecked`](SignTrait::sign_unchecked), 否则返回
     /// [`SignResult::Fail`]{msg: "签到未准备好！".to_string()}
-    fn sign<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
+    fn sign<CaptchaSolver, CaptchaProtocol, SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_url: &str,
         pre_sign_result_data: &OptionPair<CaptchaId, UnhandledGeoAddrWithRange>,
         pre_sign_data: &Self::AnalysisSignData,
@@ -97,7 +97,7 @@ pub trait SignTrait: Ord + AsRaw {
     {
         match self.pre_check_data(session, data)? {
             Ok(_) => {
-                let url = self.sign_url::<SignProtocol, U>(session, pre_sign_data, data);
+                let url = self.sign_url::<SignProtocol>(session, pre_sign_data, data);
                 try_secondary_verification::<CaptchaSolver, CaptchaProtocol>(
                     session,
                     url,
@@ -109,9 +109,9 @@ pub trait SignTrait: Ord + AsRaw {
         }
     }
     /// 检查签到状态，如果需要签到，则预签到并签到。
-    fn check_state_and_do_sign<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
+    fn check_state_and_do_sign<CaptchaSolver, CaptchaProtocol, SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_data: &Self::AnalysisSignData,
         data: &Self::Data,
     ) -> Result<SignResult, SignError>
@@ -127,13 +127,13 @@ pub trait SignTrait: Ord + AsRaw {
         if let Some(guess_result) = guess_result {
             return Ok(guess_result);
         }
-        let r = self.analysis::<CaptchaProtocol, SignProtocol, U>(session, pre_sign_data)?;
+        let r = self.analysis::<CaptchaProtocol, SignProtocol>(session, pre_sign_data)?;
         match r {
             AnalysisResultResult::Susses => Ok(SignResult::Success),
             AnalysisResultResult::Data {
                 url,
                 data: pre_sign_result_data,
-            } => self.sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
+            } => self.sign::<CaptchaSolver, CaptchaProtocol, SignProtocol>(
                 session,
                 &url,
                 &pre_sign_result_data,
@@ -149,12 +149,7 @@ impl SignTrait for RawSign {
     type Data = ();
 
     #[inline]
-    fn sign_url<SignProtocol, UserProtocol>(
-        &self,
-        session: &Session<UserProtocol>,
-        _: &(),
-        _: &(),
-    ) -> SignUrlHelper
+    fn sign_url<SignProtocol>(&self, session: &Session, _: &(), _: &()) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {
@@ -176,12 +171,15 @@ impl SignTrait for RawSign {
 pub enum SignResult {
     /// 签到成功。
     Success,
+    // 部分成功，如教师代签、请假。
     PartialSuccess {
+        state_enum: ValidSignState,
         msg: String,
     },
     /// 签到失败以及失败原因。
     Failure {
         msg: String,
+        state_enum: Option<SignState>,
     },
 }
 impl SignResult {
@@ -198,22 +196,26 @@ impl SignResult {
                 }
                 ValidSignState::签到成功 => SignResult::Success,
                 ValidSignState::教师代签 => SignResult::PartialSuccess {
+                    state_enum: ValidSignState::教师代签,
                     msg: format!("用户[`{stu_name}`]签到[`{sign_name}`]为教师代签。",),
                 },
                 state @ (ValidSignState::请假
                 | ValidSignState::病假
                 | ValidSignState::事假
                 | ValidSignState::公假) => SignResult::PartialSuccess {
+                    state_enum: *state,
                     msg: format!("用户[`{stu_name}`]签到[`{sign_name}`]为请假状态[`{state:?}`]。",),
                 },
                 state @ (ValidSignState::缺勤
                 | ValidSignState::迟到
                 | ValidSignState::早退
                 | ValidSignState::签到已过期) => SignResult::Failure {
+                    state_enum: Some(SignState::ValidSignState(*state)),
                     msg: format!("签到失败，状态为[`{state:?}`]。",),
                 },
             },
             SignState::Other(number) => SignResult::Failure {
+                state_enum: Some(SignState::Other(*number)),
                 msg: format!("签到状态未知（`{number}`），可能是服务端 bug。"),
             },
         };
@@ -226,13 +228,16 @@ impl SignResult {
             msg => {
                 if msg.is_empty() {
                     SignResult::Failure {
-                        msg:
-                        "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into()
+                        msg: "错误信息为空，根据有限的经验，这通常意味着二维码签到的 `enc` 字段已经过期。".into(),
+                        state_enum: None,
                     }
                 } else if msg == "您已签到过了" {
                     SignResult::Success
                 } else {
-                    SignResult::Failure { msg: msg.into() }
+                    SignResult::Failure {
+                        msg: msg.into(),
+                        state_enum: None,
+                    }
                 }
             }
         }
@@ -257,15 +262,15 @@ where
     CaptchaSolver: CaptchaSolverTrait,
 {
     type ExtData<'e>;
-    fn sign<'a, U: Send + 'static, Sessions: Iterator<Item = &'a Session<U>>>(
+    fn sign<'a, Sessions: Iterator<Item = &'a Session>>(
         &mut self,
         sign: &T,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError>;
+    ) -> Result<HashMap<&'a SessionUserInfo, SignResult>, SignError>;
     /// 此处不使用 self, 方便多线程实现。
-    fn sign_single<U>(
+    fn sign_single(
         sign: &T,
-        session: &Session<U>,
+        session: &Session,
         extra_data: Self::ExtData<'_>,
     ) -> Result<SignResult, SignError>;
 }

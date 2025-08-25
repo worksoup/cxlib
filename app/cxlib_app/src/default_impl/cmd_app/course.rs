@@ -35,13 +35,13 @@ pub struct CoursesCmdApp<UserProtocol = cxlib_internal::protocol::collect::UserP
 impl<'cxt, UserProtocol> CoursesCmdApp<UserProtocol> {
     pub fn update_sessions_courses<'a>(
         db: &mut DatabaseGuard,
-        sessions: impl Iterator<Item = &'a Session<UserProtocol>>,
+        sessions: impl Iterator<Item = &'a Session>,
     ) -> Result<HashMap<Course, (CourseInfo, CourseData)>, error::Error>
     where
         UserProtocol: UserProtocolTrait + Send + 'static,
     {
         // 获取课程信息。
-        let courses = CourseWithInfo::get_from_sessions(sessions)?;
+        let courses = CourseWithInfo::get_from_sessions::<UserProtocol, _>(sessions)?;
         db.write_once_map_err(
             |w_cxt| {
                 let mut course_table = CourseTable::write(w_cxt)?;

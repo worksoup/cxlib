@@ -2,7 +2,7 @@ use crate::error::ActivityError;
 use crate::{RawSign, Session, UnhandledGeoAddrWithRange};
 use cxlib_base_types::{Activity, CourseWithInfo, OtherActivity};
 use cxlib_error::AgentError;
-use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
+use cxlib_protocol::collect::TypesProtocolTrait;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -15,9 +15,9 @@ pub trait CourseWithInfoExt {
     ) -> Result<HashMap<String, UnhandledGeoAddrWithRange>, AgentError>
     where
         TypesProtocol: TypesProtocolTrait;
-    fn get_activities<TypesProtocol: TypesProtocolTrait, UserProtocol: UserProtocolTrait>(
+    fn get_activities<TypesProtocol: TypesProtocolTrait>(
         &self,
-        session: &Session<UserProtocol>,
+        session: &Session,
     ) -> Result<Vec<Activity>, ActivityError>;
 }
 
@@ -39,9 +39,9 @@ impl CourseWithInfoExt for CourseWithInfo {
         Ok(map)
     }
     /// 获取该课程的活动。
-    fn get_activities<TypesProtocol: TypesProtocolTrait, UserProtocol: UserProtocolTrait>(
+    fn get_activities<TypesProtocol: TypesProtocolTrait>(
         &self,
-        session: &Session<UserProtocol>,
+        session: &Session,
     ) -> Result<Vec<Activity>, ActivityError> {
         let r = TypesProtocol::active_list(session, (self.id(), self.class_id()))?;
         let class_ended = self.class_ended();

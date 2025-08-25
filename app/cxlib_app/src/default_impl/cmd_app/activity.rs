@@ -21,7 +21,7 @@ use cxlib_internal::{
     sign::{AsRaw, SignError, SignResult, SignTrait, SignnerTrait},
     types::{
         Activity, Course, CourseWithInfo, LocationPreprocessorTrait, RawSign, Session,
-        UntypedLoginSolver,
+        SessionUserInfo, UntypedLoginSolver,
         ext::{ActivityExt, RawSignExt},
     },
 };
@@ -108,8 +108,7 @@ pub struct SignParser {
     fresh: bool,
 }
 
-type CachedActivitiesResult<'s, UserProtocol> =
-    HashMap<String, (Activity, Vec<&'s Session<UserProtocol>>)>;
+type CachedActivitiesResult<'s> = HashMap<String, (Activity, Vec<&'s Session>)>;
 impl SignParser {
     pub fn notice_content(app_info: &AppInfo) -> String {
         let app = app_info.application();
@@ -229,15 +228,14 @@ impl<
         sign_name: String,
         typed_sign: &mut Sign<NetdiskProtocol>,
         (location_getter, preprocessor): (LocationGetter, &impl LocationPreprocessorTrait),
-        sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
+        sessions: impl IntoIterator<Item = &'s Session>,
         cli_args: &CliArgs,
-    ) -> Result<HashMap<&'s Session<UserProtocol>, SignResult>, Error>
+    ) -> Result<HashMap<&'s SessionUserInfo, SignResult>, Error>
     where
         CaptchaProtocol: CaptchaProtocolTrait,
         NetdiskProtocol: NetdiskProtocolTrait + 'static,
         SignProtocol: SignProtocolTrait + Send + 'static,
         TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait + Send + 'static,
         LocationGetter: LocationInfoGetterTrait,
         CaptchaSolver: CaptchaSolverTrait,
     {
@@ -249,7 +247,6 @@ impl<
             #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
             precisely,
         } = cli_args;
-        #[allow(clippy::mutable_key_type)]
         let mut sign_results = HashMap::new();
         match typed_sign {
             Sign::Photo(ps) => {
@@ -361,26 +358,24 @@ impl<
     pub fn match_signs<'s, LocationGetter>(
         raw_sign: RawSign,
         location_cxt: (LocationGetter, &impl LocationPreprocessorTrait),
-        sessions: impl IntoIterator<Item = &'s Session<UserProtocol>>,
+        sessions: impl IntoIterator<Item = &'s Session>,
         cli_args: &CliArgs,
     ) -> (
         RawSign,
-        Result<HashMap<&'s Session<UserProtocol>, SignResult>, Error>,
+        Result<HashMap<&'s SessionUserInfo, SignResult>, Error>,
     )
     where
         CaptchaProtocol: CaptchaProtocolTrait,
         NetdiskProtocol: NetdiskProtocolTrait + 'static,
         SignProtocol: SignProtocolTrait + Send + 'static,
         TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait + Send + 'static,
         LocationGetter: LocationInfoGetterTrait,
         CaptchaSolver: CaptchaSolverTrait,
     {
         let mut sessions = sessions.into_iter().peekable();
         let sign_name = raw_sign.name().clone();
         let mut typed_sign = if let Some(session) = sessions.peek() {
-            let typed_sign =
-                Sign::<NetdiskProtocol>::from_raw::<TypesProtocol, _>(raw_sign, session);
+            let typed_sign = Sign::<NetdiskProtocol>::from_raw::<TypesProtocol>(raw_sign, session);
             info!("成功判断签到[{sign_name}]的签到类型。");
             typed_sign
         } else {
@@ -458,7 +453,10 @@ impl<
             )
         {
             let mut courses = CourseTable::courses_to_course_sessions_map_with_current_sessions(
-                CoursesCmdApp::update_sessions_courses(&mut db_g, sessions.values())?,
+                CoursesCmdApp::<UserProtocol>::update_sessions_courses(
+                    &mut db_g,
+                    sessions.values(),
+                )?,
                 &sessions,
             )
             .collect::<HashMap<_, _>>();
@@ -544,12 +542,7 @@ impl<
         has_uid_arg: bool,
         location_cxt: (LocationGetter, &impl LocationPreprocessorTrait),
         cli_args: &CliArgs,
-        activities: impl IntoIterator<
-            Item = (
-                Activity,
-                impl IntoIterator<Item = &'s Session<UserProtocol>>,
-            ),
-        >,
+        activities: impl IntoIterator<Item = (Activity, impl IntoIterator<Item = &'s Session>)>,
     ) -> Result<(), Error>
     where
         CaptchaSolver: CaptchaSolverTrait,
@@ -557,7 +550,6 @@ impl<
         NetdiskProtocol: NetdiskProtocolTrait + 'static,
         SignProtocol: SignProtocolTrait + std::marker::Send + 'static,
         TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
         LocationGetter: LocationInfoGetterTrait + Copy,
     {
         let signs = activities.into_iter().filter_map(|(activity, sessions)| {
@@ -593,16 +585,20 @@ impl<
             match result {
                 Ok(sign_results) => {
                     info!("签到活动[{}]签到结果：", raw_sign.name());
-                    for (session, sign_result) in sign_results {
-                        match sign_result {
+                    for (user_info, result) in sign_results {
+                        match result {
                             SignResult::Success => {
-                                info!("\t用户[{}]签到成功！", session.name(),);
+                                info!("\t用户[{}]签到成功！", user_info.name(),);
                             }
-                            SignResult::PartialSuccess { msg } => {
-                                warn!("\t用户[{}]签到成功：[{:?}]。", session.name(), msg);
+                            SignResult::PartialSuccess { msg, .. } => {
+                                warn!("\t用户[{}]签到成功：[{:?}]。", user_info.name(), msg);
                             }
-                            SignResult::Failure { msg } => {
-                                warn!("\t用户[{}]签到失败！失败信息：[{:?}]", session.name(), msg);
+                            SignResult::Failure { msg, .. } => {
+                                warn!(
+                                    "\t用户[{}]签到失败！失败信息：[{:?}]",
+                                    user_info.name(),
+                                    msg
+                                );
                             }
                         }
                     }
@@ -646,13 +642,11 @@ impl<
         activities: impl IntoIterator<
             Item = (
                 Activity,
-                impl IntoIterator<Item = impl Borrow<Session<UserProtocol>> + 's>,
+                impl IntoIterator<Item = impl Borrow<Session> + 's>,
             ),
         >,
         display_course_info: bool,
-    ) where
-        UserProtocol: 's,
-    {
+    ) {
         if let Some(active_id) = active_id {
             warn!("将忽略活动 ID 参数（{active_id}）。")
         }
@@ -692,19 +686,12 @@ impl<
     /// 迭代器(包含活动列表和对应的用户会话)
     pub fn update_activity_table(
         w_cxt: &WriteTransaction,
-        courses: impl IntoIterator<
-            Item = (
-                CourseWithInfo,
-                impl IntoIterator<Item = Session<UserProtocol>>,
-            ),
-        >,
-    ) -> Result<impl Iterator<Item = (Vec<Activity>, Vec<Session<UserProtocol>>)>, StoreError>
+        courses: impl IntoIterator<Item = (CourseWithInfo, impl IntoIterator<Item = Session>)>,
+    ) -> Result<impl Iterator<Item = (Vec<Activity>, Vec<Session>)>, StoreError>
     where
-        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
         TypesProtocol: TypesProtocolTrait,
     {
-        let receiver =
-            Activity::get_from_courses::<TypesProtocol, UserProtocol>(courses.into_iter());
+        let receiver = Activity::get_from_courses::<TypesProtocol>(courses.into_iter());
         let r = receiver.into_iter().map(move |(activities, users)| {
             let users_str = users.iter().map(|s| s.uid().to_owned()).collect::<Vec<_>>();
             for activity in &activities {
@@ -732,11 +719,8 @@ impl<
     /// 缓存的活动信息映射表
     pub fn get_cached_activities<'a>(
         database_guard: &mut DatabaseGuard,
-        sessions: impl IntoIterator<Item = &'a Session<UserProtocol>>,
-    ) -> Result<CachedActivitiesResult<'a, UserProtocol>, Error>
-    where
-        UserProtocol: 'a,
-    {
+        sessions: impl IntoIterator<Item = &'a Session>,
+    ) -> Result<CachedActivitiesResult<'a>, Error> {
         let sessions = sessions
             .into_iter()
             .map(|s| (s.uid().to_owned(), s))
@@ -772,10 +756,9 @@ impl<
     #[inline]
     pub fn get_activities(
         w_cxt: &WriteTransaction,
-        courses: impl IntoIterator<Item = (CourseWithInfo, Vec<Session<UserProtocol>>)>,
-    ) -> Result<impl Iterator<Item = (Vec<Activity>, Vec<Session<UserProtocol>>)>, StoreError>
+        courses: impl IntoIterator<Item = (CourseWithInfo, Vec<Session>)>,
+    ) -> Result<impl Iterator<Item = (Vec<Activity>, Vec<Session>)>, StoreError>
     where
-        UserProtocol: UserProtocolTrait + std::marker::Send + 'static,
         TypesProtocol: TypesProtocolTrait,
     {
         Self::update_activity_table(w_cxt, courses)

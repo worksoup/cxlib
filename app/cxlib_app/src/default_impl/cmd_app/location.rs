@@ -476,7 +476,7 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
             // 获取所有用户。
             let sessions = AccountTable::get_all_sessions(database_guard, cxt).log_unwrap();
             // 获取用户所有的课程。
-            let courses = CourseWithInfo::get_from_sessions(sessions.values())
+            let courses = CourseWithInfo::get_from_sessions::<UserProtocol, _>(sessions.values())
                 .ok()
                 .unwrap();
             // 找到相应的课程。
@@ -535,11 +535,12 @@ impl<TypesProtocol, UserProtocol> LocationCmdApp<TypesProtocol, UserProtocol> {
                 .and_then(|course_without_info| {
                     // 获取所有用户。
                     let sessions = AccountTable::get_all_sessions(database_guard, cxt).log_unwrap();
-                    let courses = CourseWithInfo::get_from_sessions(sessions.values())
-                        .unwrap_or_default()
-                        .into_keys()
-                        .map(|c| (c.course().clone(), c))
-                        .collect::<HashMap<_, _>>();
+                    let courses =
+                        CourseWithInfo::get_from_sessions::<UserProtocol, _>(sessions.values())
+                            .unwrap_or_default()
+                            .into_keys()
+                            .map(|c| (c.course().clone(), c))
+                            .collect::<HashMap<_, _>>();
                     courses.get(&course_without_info).and_then(|course| {
                         sessions.values().next().map(|session| {
                             let mut contents = Vec::new();

@@ -36,7 +36,7 @@ impl GestureOrSigncodeSign {
     /// ```
     #[inline]
     pub fn check_signcode<SignProtocol, U>(
-        session: &Session<U>,
+        session: &Session,
         active_id: &str,
         signcode: &str,
     ) -> Result<Result<(), SignResult>, SignError>
@@ -49,6 +49,7 @@ impl GestureOrSigncodeSign {
         } else {
             Ok(Err(SignResult::Failure {
                 msg: "签到码或手势不正确".into(),
+                state_enum: None,
             }))
         }
     }
@@ -62,9 +63,9 @@ impl SignApi2507 for GestureOrSigncodeSign {
     type Data = str;
 
     #[inline]
-    fn sign_url<SignProtocol, U>(
+    fn sign_url<SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         _: &Self::PreSignData,
         data: &Self::Data,
     ) -> SignUrlHelper

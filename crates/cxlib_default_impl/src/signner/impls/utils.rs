@@ -36,17 +36,16 @@ impl<'a, SignProtocol> SignRetry<&'a Geoaddr, &'a <Self as SignTrait>::Data, Sig
 }
 /// 提供数据，不断进行签到，成功则返回。其通过失败时的 msg 判断是否需要重试，若无需重试，则签到失败。
 pub(crate) fn sign_single_retry<
-    CaptchaSolver: CaptchaSolverTrait,
+    CaptchaSolver,
     CaptchaProtocol,
     SignProtocol,
-    U,
     Sign,
     InputData,
     Data,
     InputDataIter,
 >(
     sign: &Sign,
-    session: &Session<U>,
+    session: &Session,
     (pre_sign_data, locations): (&<Sign as SignTrait>::AnalysisSignData, InputDataIter),
 ) -> Result<SignResult, SignError>
 where
@@ -55,13 +54,14 @@ where
     Data: Borrow<<Sign as SignTrait>::Data>,
     InputDataIter: IntoIterator<Item = InputData>,
     CaptchaProtocol: CaptchaProtocolTrait,
+    CaptchaSolver: CaptchaSolverTrait,
 {
     let state = SignProtocol::get_sign_state(session, sign.as_inner().active_id())?;
     let guess_result = SignResult::guess_by_state(state, session.name(), sign.as_inner().name());
     if let Some(guess_result) = guess_result {
         return Ok(guess_result);
     }
-    let r = sign.pre_sign::<CaptchaProtocol, SignProtocol, U>(session, pre_sign_data)?;
+    let r = sign.pre_sign::<CaptchaProtocol, SignProtocol>(session, pre_sign_data)?;
     match r {
         AnalysisResultResult::Susses => Ok(SignResult::Success),
         AnalysisResultResult::Data {
@@ -69,7 +69,7 @@ where
             data: ref pre_sign_result_data,
         } => {
             for location in locations {
-                match sign.sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
+                match sign.sign::<CaptchaSolver, CaptchaProtocol, SignProtocol>(
                     session,
                     url,
                     pre_sign_result_data,
@@ -77,11 +77,14 @@ where
                     Sign::data_helper(location).borrow(),
                 )? {
                     r @ (SignResult::Success | SignResult::PartialSuccess { .. }) => return Ok(r),
-                    SignResult::Failure { msg } => {
+                    SignResult::Failure { msg, .. } => {
                         if Sign::guess_if_retry(msg.as_str()) {
                             continue;
                         } else {
-                            return Ok(SignResult::Failure { msg });
+                            return Ok(SignResult::Failure {
+                                msg,
+                                state_enum: None,
+                            });
                         }
                     }
                 }
@@ -89,6 +92,7 @@ where
             warn!("BUG: 请保留现场联系开发者处理。");
             Ok(SignResult::Failure {
                 msg: "所有位置均不可用。".to_string(),
+                state_enum: None,
             })
         }
     }

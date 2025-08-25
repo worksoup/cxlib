@@ -3,7 +3,7 @@ use cx_interact::inquire_confirm;
 use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
-use cxlib_types::{Geoaddr, LocationPreprocessorTrait, Session};
+use cxlib_types::{Geoaddr, LocationPreprocessorTrait, Session, SessionUserInfo};
 use log::warn;
 use std::{
     collections::HashMap,
@@ -61,14 +61,13 @@ where
 {
     type ExtData<'e> = (&'e str, Option<Vec<Geoaddr>>);
 
-    fn sign<'a, U, Sessions>(
+    fn sign<'a, Sessions>(
         &mut self,
         sign: &QrCodeSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError>
+    ) -> Result<HashMap<&'a SessionUserInfo, SignResult>, SignError>
     where
-        U: Send + 'static,
-        Sessions: Iterator<Item = &'a Session<U>>,
+        Sessions: Iterator<Item = &'a Session>,
     {
         fn get_locations<T: LocationInfoGetterTrait, Preprocessor: LocationPreprocessorTrait>(
             self_: &DefaultQrCodeSignner<T, Preprocessor>,
@@ -92,11 +91,10 @@ where
         let enc = Self::enc_gen(sign, self.path, self.enc, self.precisely)?;
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         let enc = Self::enc_gen(self.path, self.enc)?;
-        #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         let locations = get_locations(self, sign).clone();
         if sign.is_refresh() {
-            let sessions = sessions.collect::<Vec<&'a Session<U>>>();
+            let sessions = sessions.collect::<Vec<&'a Session>>();
             let index_result_map = Arc::new(Mutex::new(HashMap::new()));
             let mut handles = Vec::new();
             for (sessions_index, session) in sessions.clone().into_iter().enumerate() {
@@ -112,7 +110,10 @@ where
                         CaptchaProtocol,
                         SignProtocol,
                     >>::sign_single(&sign, &session, (&enc, locations))
-                    .unwrap_or_else(|e| SignResult::Failure { msg: e.to_string() });
+                    .unwrap_or_else(|e| SignResult::Failure {
+                        msg: e.to_string(),
+                        state_enum: None,
+                    });
                     index_result_map.lock().unwrap().insert(sessions_index, a);
                 });
                 handles.push(h);
@@ -125,27 +126,27 @@ where
                 .into_inner()
                 .unwrap()
             {
-                map.insert(sessions[i], r);
+                map.insert(sessions[i].user_info(), r);
             }
         } else {
             for session in sessions {
-                let state =
+                let result =
                     <Self as SignnerTrait<
                         QrCodeSign,
                         CaptchaSolver,
                         CaptchaProtocol,
                         SignProtocol,
                     >>::sign_single(sign, session, (&enc, locations.clone()))?;
-                map.insert(session, state);
+                map.insert(session.user_info(), result);
             }
         }
         Ok(map)
     }
 
     #[inline]
-    fn sign_single<U>(
+    fn sign_single(
         sign: &QrCodeSign,
-        session: &Session<U>,
+        session: &Session,
         (enc, locations): (&str, Option<Vec<Geoaddr>>),
     ) -> Result<SignResult, SignError> {
         if let Some(locations) = locations {
@@ -157,10 +158,9 @@ where
                 _,
                 _,
                 _,
-                _,
             >(sign, session, (enc, locations))
         } else {
-            sign.check_state_and_do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, _>(
+            sign.check_state_and_do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol>(
                 session, enc, &None,
             )
         }

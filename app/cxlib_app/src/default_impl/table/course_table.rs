@@ -18,28 +18,27 @@ use std::{
 #[derive(Debug, Clone, Default, Copy)]
 pub struct CourseTable;
 type CourseStoreData = (CourseInfo, CourseData);
-type CourseStoreDataWithSessions<UserProtocol> =
-    (CourseInfo, CourseData, Vec<Session<UserProtocol>>);
+type CourseStoreDataWithSessions = (CourseInfo, CourseData, Vec<Session>);
 impl CourseTable {
     /// 从缓存中获取课程与会话。
     #[inline]
     pub fn get_courses_with_sessions<LoginSolver, UserProtocol>(
         r_cxt: &ReadTransaction,
-    ) -> Result<HashMap<Course, CourseStoreDataWithSessions<UserProtocol>>, StoreError>
+    ) -> Result<HashMap<Course, CourseStoreDataWithSessions>, StoreError>
     where
         UserProtocol: UserProtocolTrait + 'static,
     {
-        let sessions = AccountTable::load_all_sessions(r_cxt)?;
+        let sessions = AccountTable::<UserProtocol>::load_all_sessions(r_cxt)?;
         let course_table = Self::read(r_cxt)?;
         let r = Self::get_courses_with_current_sessions(&course_table, &sessions);
         drop(course_table);
         Ok(r?.collect())
     }
     #[inline]
-    pub fn courses_to_course_sessions_map_with_current_sessions<UserProtocol>(
+    pub fn courses_to_course_sessions_map_with_current_sessions(
         courses: impl IntoIterator<Item = (Course, CourseStoreData)>,
-        sessions: &HashMap<String, Session<UserProtocol>>,
-    ) -> impl Iterator<Item = (Course, CourseStoreDataWithSessions<UserProtocol>)> {
+        sessions: &HashMap<String, Session>,
+    ) -> impl Iterator<Item = (Course, CourseStoreDataWithSessions)> {
         courses.into_iter().map(move |(course, (info, data))| {
             let sessions = data
                 .users
@@ -54,16 +53,15 @@ impl CourseTable {
     #[inline]
     pub fn get_courses_with_current_sessions<
         's,
-        UserProtocol,
         T: ReadableTable<<Self as TableDefinitionTrait>::Key, <Self as TableDefinitionTrait>::Value>,
     >(
         table: &T,
-        sessions: &'s HashMap<String, Session<UserProtocol>>,
+        sessions: &'s HashMap<String, Session>,
     ) -> Result<
-        impl Iterator<Item = (Course, CourseStoreDataWithSessions<UserProtocol>)>
+        impl Iterator<Item = (Course, CourseStoreDataWithSessions)>
         // 个人理解：指定捕获列表，否则将捕获 table 的生命周期参数，导致该不透明类型依赖于该生命周期。
         // 但实际上并不依赖。
-        + use<'s, UserProtocol, T>,
+        + use<'s, T>,
         StoreError,
     > {
         Ok(Self::courses_to_course_sessions_map_with_current_sessions(

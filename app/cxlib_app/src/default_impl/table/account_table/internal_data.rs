@@ -12,7 +12,7 @@ use std::{borrow::Borrow, fmt::Display, io::Cursor};
 use try_from_with_context::TryFromWithContext;
 
 pub struct AccountDataInternal<UserProtocol> {
-    pub(in crate::default_impl::table::account_table) session: Session<UserProtocol>,
+    pub(in crate::default_impl::table::account_table) session: Session,
     pub(in crate::default_impl::table::account_table) enc_pwd: String,
     pub(in crate::default_impl::table::account_table) login_solver:
         UntypedLoginSolver<UserProtocol>,
@@ -43,7 +43,7 @@ where
             cookies_str,
         )?;
         Ok(Self {
-            session: session.into(),
+            session,
             enc_pwd: enc_pwd.to_owned(),
             login_solver,
         })

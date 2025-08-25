@@ -6,9 +6,9 @@ use crate::{SignError, SignTrait, analysis::Analysis};
 pub trait NeedPreSign: SignTrait {
     /// 预签到。
     #[inline]
-    fn pre_sign<CaptchaProtocol, SignProtocol, U>(
+    fn pre_sign<CaptchaProtocol, SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_data: &Self::AnalysisSignData,
     ) -> Result<AnalysisResultResult, SignError>
     where
@@ -16,7 +16,7 @@ pub trait NeedPreSign: SignTrait {
         SignProtocol: SignProtocolTrait,
     {
         let _ = pre_sign_data;
-        <RawSign as NeedPreSign>::pre_sign::<CaptchaProtocol, SignProtocol, _>(
+        <RawSign as NeedPreSign>::pre_sign::<CaptchaProtocol, SignProtocol>(
             self.as_inner(),
             session,
             &(),
@@ -25,9 +25,9 @@ pub trait NeedPreSign: SignTrait {
 }
 
 impl NeedPreSign for RawSign {
-    fn pre_sign<CaptchaProtocol, SignProtocol, U>(
+    fn pre_sign<CaptchaProtocol, SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         _: &(),
     ) -> Result<AnalysisResultResult, SignError>
     where
@@ -53,11 +53,11 @@ where
 {
     type AnalysisData = T::AnalysisSignData;
     #[inline]
-    fn analysis<CaptchaProtocol: CaptchaProtocolTrait, SignProtocol: SignProtocolTrait, U>(
+    fn analysis<CaptchaProtocol: CaptchaProtocolTrait, SignProtocol: SignProtocolTrait>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         pre_sign_data: &Self::AnalysisData,
     ) -> Result<AnalysisResultResult, crate::SignError> {
-        self.pre_sign::<CaptchaProtocol, SignProtocol, _>(session, pre_sign_data)
+        self.pre_sign::<CaptchaProtocol, SignProtocol>(session, pre_sign_data)
     }
 }

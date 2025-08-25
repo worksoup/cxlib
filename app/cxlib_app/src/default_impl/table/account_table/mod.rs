@@ -192,10 +192,7 @@ impl<P: 'static> LoopCollect for &P {
         Ok(s)
     }
 }
-impl<UserProtocol> AccountTable<UserProtocol>
-where
-    UserProtocol: 'static + UserProtocolTrait,
-{
+impl<U> AccountTable<U> {
     fn uid_to_account_data(w_cxt: &WriteTransaction, uid: &str) -> Result<AccountData, StoreError> {
         let table = Self::write(w_cxt).log_unwrap();
         if let Some(account) = Self::get_account(&table, uid) {
@@ -209,39 +206,12 @@ where
     pub fn load_sessions_by_uid_list_str(
         r_cxt: &ReadTransaction,
         uid_list_str: &str,
-    ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
+    ) -> Result<HashMap<String, Session>, StoreError> {
         let str_list = uid_list_str.split(',').map(|a| a.trim());
         let account_data = Self::get_accounts(&Self::read(r_cxt)?, str_list);
         LoopCollect::loop_collect(r_cxt, account_data, (), |r_cxt, uid, account_data, _| {
             Self::load_session_internal(r_cxt, uid, &account_data)
         })
-    }
-    pub fn get_sessions_by_uid_list_str<
-        'cxt,
-        Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>,
-    >(
-        db: &mut DatabaseGuard,
-        uid_list_str: &str,
-        cxt: Cxt,
-    ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
-        let str_list = uid_list_str.split(',').map(|a| a.trim());
-        let account_table = db
-            .read(AccountTable::<UserProtocol>::read)
-            .map(|account_table| account_table.unwrap_inner());
-        let account_table = match account_table {
-            Ok(account_table) => account_table,
-            Err(StoreError::TableError(TableError::TableDoesNotExist(e))) => {
-                warn!("数据表不存在：{e}。");
-                db.write_once(|w_cxt| {
-                    AccountTable::<UserProtocol>::write(w_cxt)?;
-                    Ok::<_, StoreError>(())
-                })?;
-                db.read(AccountTable::<UserProtocol>::read)?.unwrap_inner()
-            }
-            Err(e) => Err(e)?,
-        };
-        let accounts = Self::get_accounts(&account_table, str_list);
-        LoopCollect::loop_collect(db, accounts, cxt.borrow(), Self::get_session_internal)
     }
     #[inline]
     fn none2result(s: impl Display) -> impl FnOnce() -> StoreError {
@@ -269,7 +239,7 @@ where
         r_cxt: &ReadTransaction,
         uid: &str,
         account_data: &AccountData,
-    ) -> Result<Session<UserProtocol>, StoreError> {
+    ) -> Result<Session, StoreError> {
         let common_data_table = CommonDataTable::read(r_cxt)?;
         let cookies = common_data_table
             .get(&KeyType {
@@ -281,30 +251,87 @@ where
                 "没有该账号的 cookies 数据：`{uid}`。"
             )))?
             .value();
-        Ok(Session::<UserProtocol>::load_cookies(
+        Ok(Session::load_cookies(
             account_data.uname().to_owned(),
             account_data.stu_name().to_owned(),
             Cursor::new(cookies),
         )?)
     }
     #[inline]
-    pub fn load_session(
-        r_cxt: &ReadTransaction,
-        uid: &str,
-    ) -> Result<Session<UserProtocol>, StoreError> {
-        let table = AccountTable::<UserProtocol>::read(r_cxt)?;
+    pub fn load_session(r_cxt: &ReadTransaction, uid: &str) -> Result<Session, StoreError> {
+        let table = AccountTable::<U>::read(r_cxt)?;
         let account = Self::get_account_data(&table, uid)?;
         Self::load_session_internal(r_cxt, uid, &account)
     }
-    pub fn get_session_internal<
+    #[inline]
+    pub fn load_all_sessions(
+        r_cxt: &ReadTransaction,
+    ) -> Result<HashMap<String, Session>, StoreError> {
+        let account_table = AccountTable::<U>::read(r_cxt)?;
+        let accounts = Self::get_all_accounts(&account_table);
+        LoopCollect::loop_collect(r_cxt, accounts, (), |w_cxt, uid, account_data, _| {
+            Self::load_session_internal(w_cxt, uid, &account_data)
+        })
+    }
+    #[inline]
+    fn store_cookies(
+        w_cxt: &WriteTransaction,
+        cookies: String,
+        uid: &str,
+        login_type: &str,
+    ) -> Result<(), StoreError> {
+        let mut common_data_table = CommonDataTable::write(w_cxt)?;
+        common_data_table.insert(
+            KeyType {
+                block: "cookies".to_owned(),
+                key: uid.to_owned(),
+                identifier: login_type.to_owned(),
+            },
+            cookies,
+        )?;
+        Ok(())
+    }
+}
+impl<UserProtocol> AccountTable<UserProtocol> {
+    pub fn get_sessions_by_uid_list_str<
         'cxt,
         Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>,
     >(
         db: &mut DatabaseGuard,
+        uid_list_str: &str,
+        cxt: Cxt,
+    ) -> Result<HashMap<String, Session>, StoreError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
+        let str_list = uid_list_str.split(',').map(|a| a.trim());
+        let account_table = db
+            .read(AccountTable::<UserProtocol>::read)
+            .map(|account_table| account_table.unwrap_inner());
+        let account_table = match account_table {
+            Ok(account_table) => account_table,
+            Err(StoreError::TableError(TableError::TableDoesNotExist(e))) => {
+                warn!("数据表不存在：{e}。");
+                db.write_once(|w_cxt| {
+                    AccountTable::<UserProtocol>::write(w_cxt)?;
+                    Ok::<_, StoreError>(())
+                })?;
+                db.read(AccountTable::<UserProtocol>::read)?.unwrap_inner()
+            }
+            Err(e) => Err(e)?,
+        };
+        let accounts = Self::get_accounts(&account_table, str_list);
+        LoopCollect::loop_collect(db, accounts, cxt.borrow(), Self::get_session_internal)
+    }
+    pub fn get_session_internal<'cxt, Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>>(
+        db: &mut DatabaseGuard,
         uid: &str,
         account_data: AccountData,
         cxt: Cxt,
-    ) -> Result<Session<UserProtocol>, StoreError> {
+    ) -> Result<Session, StoreError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
         let session = db.read_once(|r_cxt| Self::load_session_internal(r_cxt, uid, &account_data));
 
         match session {
@@ -335,25 +362,21 @@ where
         db: &mut DatabaseGuard,
         uid: &str,
         cxt: Cxt,
-    ) -> Result<Session<UserProtocol>, StoreError> {
+    ) -> Result<Session, StoreError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
         let account = db.read_once(|r_cxt| Self::get_account_data(&Self::read(r_cxt)?, uid))?;
         Self::get_session_internal(db, uid, account, cxt)
-    }
-    #[inline]
-    pub fn load_all_sessions(
-        r_cxt: &ReadTransaction,
-    ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
-        let account_table = AccountTable::<UserProtocol>::read(r_cxt)?;
-        let accounts = Self::get_all_accounts(&account_table);
-        LoopCollect::loop_collect(r_cxt, accounts, (), |w_cxt, uid, account_data, _| {
-            Self::load_session_internal(w_cxt, uid, &account_data)
-        })
     }
     #[inline]
     pub fn get_all_sessions<'cxt, Cxt: Borrow<<Self as TableDefinitionTrait>::Context<'cxt>>>(
         db: &mut DatabaseGuard,
         cxt: Cxt,
-    ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
+    ) -> Result<HashMap<String, Session>, StoreError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
         let account_table = db
             .read(AccountTable::<UserProtocol>::read)
             .map(|account_table| account_table.unwrap_inner());
@@ -372,24 +395,6 @@ where
         let accounts = Self::get_all_accounts(&account_table);
         LoopCollect::loop_collect(db, accounts, cxt.borrow(), Self::get_session_internal)
     }
-    #[inline]
-    fn store_cookies(
-        w_cxt: &WriteTransaction,
-        cookies: String,
-        uid: &str,
-        login_type: &str,
-    ) -> Result<(), StoreError> {
-        let mut common_data_table = CommonDataTable::write(w_cxt)?;
-        common_data_table.insert(
-            KeyType {
-                block: "cookies".to_owned(),
-                key: uid.to_owned(),
-                identifier: login_type.to_owned(),
-            },
-            cookies,
-        )?;
-        Ok(())
-    }
     /// 用于第一次登录。
     pub fn login<'cxt, Cxt: AsRef<<Self as TableDefinitionTrait>::Context<'cxt>>>(
         w_cxt: &WriteTransaction,
@@ -397,7 +402,10 @@ where
         uname: String,
         pwd: Option<String>,
         login_type: String,
-    ) -> Result<Session<UserProtocol>, StoreError> {
+    ) -> Result<Session, StoreError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
         let cxt = cxt.as_ref();
         let pwd = pwd.ok_or(LoginError::BadPassword("没有密码。".to_owned()))?;
         let solver = LoginSolverGetter::new(cxt, &login_type)
@@ -424,7 +432,10 @@ where
         w_cxt: &WriteTransaction,
         cxt: Cxt,
         account_data: AccountData,
-    ) -> Result<Session<UserProtocol>, StoreError> {
+    ) -> Result<Session, StoreError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
         let cxt = cxt.as_ref();
         let solver = LoginSolverGetter::new(cxt, account_data.login_type())
             .ok_or_else(|| LoginError::UnsupportedProtocol)?;
@@ -442,14 +453,20 @@ where
         w_cxt: &WriteTransaction,
         cxt: Cxt,
         uid: String,
-    ) -> Result<Session<UserProtocol>, StoreError> {
+    ) -> Result<Session, StoreError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
         let account_data = Self::uid_to_account_data(w_cxt, &uid)?;
         Self::relogin_internal(w_cxt, cxt, account_data)
     }
     pub fn relogin_all<'cxt, Cxt: AsRef<<Self as TableDefinitionTrait>::Context<'cxt>>>(
         w_cxt: &WriteTransaction,
         cxt: Cxt,
-    ) -> Result<HashMap<String, Session<UserProtocol>>, StoreError> {
+    ) -> Result<HashMap<String, Session>, StoreError>
+    where
+        UserProtocol: UserProtocolTrait + 'static,
+    {
         let table = Self::write(w_cxt)?;
         let account_data = Self::get_all_accounts(&table);
         drop(table);

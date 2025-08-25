@@ -1,7 +1,7 @@
 use getset2::Getset2;
 use serde::Deserialize;
 use ureq::{Agent, Cookie};
-#[derive(Debug, Deserialize, Clone, Getset2)]
+#[derive(Debug, Deserialize, Clone, Getset2, PartialEq, Eq, Hash)]
 #[getset2(get_ref(pub))]
 pub struct UserCookies {
     // JSESSIONID: String,

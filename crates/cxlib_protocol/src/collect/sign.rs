@@ -40,7 +40,7 @@ mod types {
     /// 签到后状态。
     ///
     /// 可以为任意值（签到发出端可以通过网络请求手动设置为任意值）。
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     #[repr(i64)]
     pub enum ValidSignState {
         未签 = 0,

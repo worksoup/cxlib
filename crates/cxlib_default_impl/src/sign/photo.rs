@@ -34,9 +34,9 @@ impl<NetdiskProtocol> SignApi2507 for PhotoSign<NetdiskProtocol> {
     type PreSignData = ();
     type Data = Photo<NetdiskProtocol>;
     #[inline]
-    fn sign_url<SignProtocol, U>(
+    fn sign_url<SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         _: &(),
         runtime_data: &Photo<NetdiskProtocol>,
     ) -> SignUrlHelper

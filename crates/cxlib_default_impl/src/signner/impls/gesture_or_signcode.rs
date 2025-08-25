@@ -2,7 +2,7 @@ use crate::sign::GestureOrSigncodeSign;
 use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, SignProtocolTrait};
 use cxlib_sign::{SignError, SignResult, SignTrait, SignnerTrait};
-use cxlib_types::Session;
+use cxlib_types::{Session, SessionUserInfo};
 use std::collections::HashMap;
 
 pub struct DefaultGestureOrSigncodeSignner(String);
@@ -23,12 +23,11 @@ where
     type ExtData<'e> = &'e str;
 
     #[inline]
-    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
+    fn sign<'a, Sessions: Iterator<Item = &'a Session>>(
         &mut self,
         sign: &GestureOrSigncodeSign,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
-        #[allow(clippy::mutable_key_type)]
+    ) -> Result<HashMap<&'a SessionUserInfo, SignResult>, SignError> {
         let mut map = HashMap::new();
         for session in sessions {
             let a = <Self as SignnerTrait<
@@ -37,18 +36,18 @@ where
                 CaptchaProtocol,
                 SignProtocol,
             >>::sign_single(sign, session, &self.0)?;
-            map.insert(session, a);
+            map.insert(session.user_info(), a);
         }
         Ok(map)
     }
 
     #[inline]
-    fn sign_single<U>(
+    fn sign_single(
         sign: &GestureOrSigncodeSign,
-        session: &Session<U>,
+        session: &Session,
         signcode: &str,
     ) -> Result<SignResult, SignError> {
-        sign.check_state_and_do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
+        sign.check_state_and_do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol>(
             session,
             &(),
             signcode,

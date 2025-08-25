@@ -20,9 +20,9 @@ impl SignApi2507 for NormalSign {
     type Data = ();
 
     #[inline]
-    fn sign_url<SignProtocol, U>(
+    fn sign_url<SignProtocol>(
         &self,
-        session: &Session<U>,
+        session: &Session,
         _: &(),
         runtime_data: &Self::Data,
     ) -> SignUrlHelper
@@ -30,7 +30,7 @@ impl SignApi2507 for NormalSign {
         SignProtocol: SignProtocolTrait,
     {
         self.raw_sign
-            .sign_url::<SignProtocol, _>(session, &(), runtime_data)
+            .sign_url::<SignProtocol>(session, &(), runtime_data)
     }
 }
 impl AsRaw for NormalSign {

@@ -12,11 +12,11 @@ pub trait CourseExt {
     fn get_from_sessions<
         'a,
         UserProtocol: UserProtocolTrait + Send + 'static,
-        Sessions: Iterator<Item = &'a Session<UserProtocol>>,
+        Sessions: Iterator<Item = &'a Session>,
     >(
         sessions: Sessions,
-    ) -> Result<HashMap<CourseWithInfo, Vec<Session<UserProtocol>>>, CourseError> {
-        let classes = Class::get_from_sessions(sessions)?;
+    ) -> Result<HashMap<CourseWithInfo, Vec<Session>>, CourseError> {
+        let classes = Class::get_from_sessions::<UserProtocol, _>(sessions)?;
         Ok(classes
             .into_iter()
             .flat_map(|(k, v)| {

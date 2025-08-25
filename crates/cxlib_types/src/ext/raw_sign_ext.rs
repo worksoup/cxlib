@@ -1,7 +1,7 @@
 use crate::{Session, SignDetail};
 use cxlib_base_types::RawSign;
 use cxlib_error::AgentError;
-use cxlib_protocol::collect::{TypesProtocolTrait, UserProtocolTrait};
+use cxlib_protocol::collect::TypesProtocolTrait;
 use std::{
     fmt::{Display, Formatter},
     time::{Duration, SystemTime},
@@ -88,13 +88,9 @@ impl Display for RawSignDisplayWithoutCourse<'_> {
 pub trait RawSignExt {
     fn display<'a>(&'a self) -> RawSignDisplay<'a>;
     fn display_without_course<'a>(&'a self) -> RawSignDisplayWithoutCourse<'a>;
-    fn get_sign_detail<TypesProtocol, UserProtocol>(
-        &self,
-        session: &Session<UserProtocol>,
-    ) -> Result<SignDetail, AgentError>
+    fn get_sign_detail<TypesProtocol>(&self, session: &Session) -> Result<SignDetail, AgentError>
     where
-        TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait;
+        TypesProtocol: TypesProtocolTrait;
 }
 impl RawSignExt for RawSign {
     #[inline]
@@ -106,13 +102,9 @@ impl RawSignExt for RawSign {
         RawSignDisplayWithoutCourse(self)
     }
     #[inline]
-    fn get_sign_detail<TypesProtocol, UserProtocol>(
-        &self,
-        session: &Session<UserProtocol>,
-    ) -> Result<SignDetail, AgentError>
+    fn get_sign_detail<TypesProtocol>(&self, session: &Session) -> Result<SignDetail, AgentError>
     where
         TypesProtocol: TypesProtocolTrait,
-        UserProtocol: UserProtocolTrait,
     {
         Ok(TypesProtocol::sign_detail(session, self.active_id())?.into())
     }

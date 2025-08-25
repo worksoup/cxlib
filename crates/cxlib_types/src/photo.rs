@@ -28,8 +28,8 @@ impl<P> From<CloudItem> for Photo<P> {
 impl<NetdiskProtocol: NetdiskProtocolTrait> Photo<NetdiskProtocol> {
     #[cfg(feature = "upload-file")]
     #[inline]
-    pub fn new<U, R: std::io::Read>(
-        session: &Session<U>,
+    pub fn new<R: std::io::Read>(
+        session: &Session,
         file: R,
         file_name: impl AsRef<std::path::Path>,
     ) -> Result<Self, AgentError> {
@@ -42,14 +42,14 @@ impl<NetdiskProtocol: NetdiskProtocolTrait> Photo<NetdiskProtocol> {
         Ok(item.into())
     }
     #[inline]
-    pub fn default<U>(session: &Session<U>) -> Option<Self> {
+    pub fn default(session: &Session) -> Option<Self> {
         Self::find_in_cxpan(session, |a| a == "1.png" || a == "1.jpg")
             .log_ok()
             .flatten()
     }
     #[inline]
-    pub fn find_in_cxpan<U>(
-        session: &Session<U>,
+    pub fn find_in_cxpan(
+        session: &Session,
         p: impl Fn(&str) -> bool,
     ) -> Result<Option<Self>, AgentError> {
         let r = NetdiskProtocol::chaoxing_netdisk_root(session)?;
@@ -58,8 +58,8 @@ impl<NetdiskProtocol: NetdiskProtocolTrait> Photo<NetdiskProtocol> {
     }
     #[cfg(feature = "upload-file")]
     #[inline]
-    pub fn get_from_file<U>(
-        session: &Session<U>,
+    pub fn get_from_file(
+        session: &Session,
         file_path: impl AsRef<std::path::Path>,
     ) -> Result<Self, AgentError> {
         let f = std::fs::File::open(&file_path).log_unwrap();

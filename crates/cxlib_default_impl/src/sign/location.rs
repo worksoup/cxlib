@@ -38,12 +38,7 @@ impl SignTrait for LocationSign {
     type Data = Geoaddr;
 
     #[inline]
-    fn sign_url<SignProtocol, U>(
-        &self,
-        session: &Session<U>,
-        _: &(),
-        data: &Geoaddr,
-    ) -> SignUrlHelper
+    fn sign_url<SignProtocol>(&self, session: &Session, _: &(), data: &Geoaddr) -> SignUrlHelper
     where
         SignProtocol: SignProtocolTrait,
     {

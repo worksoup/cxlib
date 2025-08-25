@@ -112,7 +112,7 @@ impl<LoginTypeEnum, UserProtocol> AccountCmdApp<LoginTypeEnum, UserProtocol> {
         match session {
             Ok(session) => {
                 info!("添加账号[{uname}]（用户名：{}）成功！", session.name());
-                if let Ok(courses) = session.get_courses() {
+                if let Ok(courses) = session.get_courses::<UserProtocol>() {
                     db.write_once(|w_cxt| {
                         let users = vec![session.uid().to_owned()];
                         for course in courses {

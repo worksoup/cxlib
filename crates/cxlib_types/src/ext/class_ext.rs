@@ -13,16 +13,16 @@ pub trait ClassExt {
     fn get_from_sessions<
         'a,
         UserProtocol: UserProtocolTrait + Send + 'static,
-        Sessions: Iterator<Item = &'a Session<UserProtocol>>,
+        Sessions: Iterator<Item = &'a Session>,
     >(
         sessions: Sessions,
-    ) -> Result<HashMap<Class, Vec<Session<UserProtocol>>>, CourseError> {
+    ) -> Result<HashMap<Class, Vec<Session>>, CourseError> {
         // 由于多个线程几乎同时启动，故不需要 fatal_error_occurred 变量判断是否出现致命错误而直接返回。
         let mut handles = Vec::new();
         for session in sessions {
             let session_ = session.clone();
             let handle = std::thread::spawn(move || -> Result<Vec<Class>, CourseError> {
-                session_.get_classes()
+                session_.get_classes::<UserProtocol>()
             });
             handles.push((handle, session));
         }

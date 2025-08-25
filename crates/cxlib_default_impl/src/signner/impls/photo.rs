@@ -2,7 +2,7 @@ use crate::sign::PhotoSign;
 use cxlib_captcha::CaptchaSolverTrait;
 use cxlib_protocol::collect::{CaptchaProtocolTrait, NetdiskProtocolTrait, SignProtocolTrait};
 use cxlib_sign::{AsRaw, SignError, SignResult, SignTrait, SignnerTrait};
-use cxlib_types::{Photo, Session};
+use cxlib_types::{Photo, Session, SessionUserInfo};
 use log::warn;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -36,11 +36,11 @@ where
 {
     type ExtData<'e> = &'e Photo<NetdiskProtocol>;
 
-    fn sign<'a, U, Sessions: Iterator<Item = &'a Session<U>>>(
+    fn sign<'a, Sessions: Iterator<Item = &'a Session>>(
         &mut self,
         sign: &PhotoSign<NetdiskProtocol>,
         sessions: Sessions,
-    ) -> Result<HashMap<&'a Session<U>, SignResult>, SignError> {
+    ) -> Result<HashMap<&'a SessionUserInfo, SignResult>, SignError> {
         let mut pic_map = Vec::new();
         let mut session_to_index = HashMap::new();
         let sessions = sessions.collect::<Vec<_>>();
@@ -85,7 +85,6 @@ where
                 }
             }
         }
-        #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for session in sessions {
             let index = session_to_index[session.uid()];
@@ -96,12 +95,13 @@ where
                     CaptchaProtocol,
                     SignProtocol,
                 >>::sign_single(sign, session, &photo)?;
-                map.insert(session, a);
+                map.insert(session.user_info(), a);
             } else {
                 map.insert(
-                    session,
+                    session.user_info(),
                     SignResult::Failure {
                         msg: format!("拍照签到[{}]没有获取到有效的照片！", sign.as_inner().name()),
+                        state_enum: None,
                     },
                 );
             }
@@ -110,12 +110,12 @@ where
     }
 
     #[inline]
-    fn sign_single<U>(
+    fn sign_single(
         sign: &PhotoSign<NetdiskProtocol>,
-        session: &Session<U>,
+        session: &Session,
         photo: &Photo<NetdiskProtocol>,
     ) -> Result<SignResult, SignError> {
-        sign.check_state_and_do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol, U>(
+        sign.check_state_and_do_sign::<CaptchaSolver, CaptchaProtocol, SignProtocol>(
             session,
             &(),
             photo,
