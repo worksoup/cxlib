@@ -240,6 +240,7 @@ impl<U> AccountTable<U> {
         uid: &str,
         account_data: &AccountData,
     ) -> Result<Session, StoreError> {
+        // TODO: 可能出现表 `CommonDataTable` 不存在的错误。
         let common_data_table = CommonDataTable::read(r_cxt)?;
         let cookies = common_data_table
             .get(&KeyType {
