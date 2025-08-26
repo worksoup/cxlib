@@ -34,27 +34,11 @@ pub enum ConfigParser {
 }
 impl ConfigParser {
     pub fn parse_key(key: String) -> ConfigKey {
-        const fn is_valid(s: &str) -> bool {
-            let bytes = s.as_bytes();
-            let first = if !bytes.is_empty() {
-                bytes[0]
-            } else {
-                return false;
-            };
-            if !(first.is_ascii_lowercase() || first.is_ascii_uppercase() || first == b'_') {
-                return false;
-            }
-            let mut index = 1;
-            while index < bytes.len() {
-                let c = bytes[index];
-                if !(c.is_ascii_lowercase()
-                    || c.is_ascii_uppercase()
-                    || c.is_ascii_digit()
-                    || c == b'_')
-                {
+        fn is_valid(s: &str) -> bool {
+            for c in s.chars() {
+                if c == '.' {
                     return false;
                 }
-                index += 1;
             }
             true
         }
